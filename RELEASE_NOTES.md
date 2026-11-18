@@ -1,5 +1,15 @@
 Build It for Android 8.0 and newer.
 
+New in 0.16.0: Kotlin projects now build on your phone. The first Kotlin build downloads the
+Kotlin compiler (about 60 MB) and prepares it once; Kotlin and Java files in one project can call
+each other. New projects can start from six small apps, in Java or Kotlin: Counter, Calculator,
+To-do list, Notes, Stopwatch and Dice, made of normal layouts and blocks you can change. Release
+APKs: create a signing key or import a .p12 keystore, build a release APK signed with it, and
+export the keystore as a backup. Project settings have a permissions manager. Fixed: saving
+project settings removed the project's libraries and the AppCompat switch; Kotlin code for
+setting the text of a text field did not compile. Library downloads retry when Maven Central is
+busy. Faster first launches (baseline profile). Not yet: App Bundles (AAB).
+
 New in 0.14.0: tap a property card under the selected view to edit it in a popup (sizes,
 colours from a palette, choices, numbers with presets), with Basic, Recent and All tabs. A
 collection shared by all your projects: save views, blocks, images and sounds once and reuse them.
