@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -51,6 +52,15 @@ class AppFlowTest {
         compose.onNodeWithContentDescription("Save").performClick()
         compose.waitUntil(10_000) { layout.readText().contains("<Button") }
         assertTrue(layout.readText(), layout.readText().contains("android:id=\"@+id/button"))
+
+        // Blocks tab: add a block from the palette and save; the block file is written.
+        compose.onNodeWithText("Blocks").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("App").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("App").performScrollTo().performClick()
+        compose.onNodeWithText("close this screen").performScrollTo().performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Save").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Save").performClick()
+        compose.waitUntil(10_000) { File(workspace, ".buildit/blocks/MainActivity.json").let { it.isFile && it.readText().contains("app_finish") } }
 
         compose.onNodeWithText("Project").performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Application ID").fetchSemanticsNodes().isNotEmpty() }

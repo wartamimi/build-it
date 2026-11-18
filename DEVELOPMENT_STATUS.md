@@ -4,10 +4,10 @@ Last updated: 2026-11-18
 
 ## Summary
 
-Phases 0–3 are implemented. The app shell, design system, project management, the project
-workspace (settings + file explorer) and the visual layout designer work end to end and are
-covered by tests. The block editor, code editor, build engine and AI assistant are **not
-implemented yet** and do not appear in the app. Per the owner's instruction, no APK is built or published until the final
+Phases 0–4 are implemented. The app shell, design system, project management, the project
+workspace (settings + file explorer), the visual layout designer and the block editor (with Java
+and Kotlin code generation) work end to end and are covered by tests. The code editor, build
+engine and AI assistant are **not implemented yet** and do not appear in the app. Per the owner's instruction, no APK is built or published until the final
 phase; CI compiles the app and runs the tests.
 
 ## Phase 1 — Foundation: complete
@@ -92,10 +92,49 @@ Known gaps (planned)
   dependency manager comes with the build engine in Phase 6).
 - Reordering in the tree uses move up/down buttons; dragging inside the tree is not supported.
 
+## Phase 4 — Block engine and editor: complete, with known gaps
+
+Completed features
+- `engine:blocks` (pure JVM): block document per activity (`.buildit/blocks/<Activity>.json`,
+  versioned), 46 block types in 10 categories (Events, Control, Logic, Math, Text, Variables,
+  Lists of text, Components, App, Custom code), typed values (true/false, number, text, list of
+  text) with implicit to-text conversion, editing operations (detach/insert/delete/duplicate,
+  fields, variables with rename-everywhere) and whole-document undo/redo.
+- Validation anchored to block ids: missing inputs, type mismatches, unknown/incompatible views,
+  unknown variables/procedures/screens, duplicate events, loose blocks, invalid numbers/colors.
+- Typed IR, then Java and Kotlin backends producing deterministic, readable activity classes
+  (fields for views and variables, listener methods, lifecycle overrides, procedures, small
+  helpers only when used). **Generated Java is compiled against the real `android.jar` in the
+  tests.**
+- Safe source sync: the untouched template activity is replaced on first generation; any hand
+  edit afterwards is detected and the user chooses "Replace" or "Keep my code". Blocks with
+  errors never overwrite the source.
+- Block editor (Blocks tab): Canvas renderer with its own layout, culling of off-screen stacks,
+  pan, pinch and button zoom, drag to move/connect with snapping (statements, C-mouths, value
+  inputs with type checking), drop on the trash to delete, tap fields to edit (text, number,
+  dropdowns, views of the layout filtered by widget family, variables, procedures, screens, code),
+  selection actions (duplicate, enable/disable, delete), palette by category, variables panel,
+  problems list (tap to jump), read-only generated-code preview, autosave/save with the same rules
+  as the designer.
+- Block labels and every editor string in English and Indonesian.
+
+Known gaps (planned)
+- Not yet available as blocks: Intent extras, Network, JSON, Database, Firebase, Files, Media.
+  These need runtime libraries and dependency handling that arrive with the build engine (Phase 6)
+  and are deliberately not shown until they generate working code.
+- Procedures take no parameters and return no value; lists hold text only.
+- No minimap, multi-select, block search or copy/paste between screens yet; blocks are added from
+  the palette by tapping (not dragging).
+- Kotlin output is verified by tests on the generated text; it is compiled for real once the build
+  engine's Kotlin path exists (Phase 6).
+- Turning hand-edited source back into blocks is not supported (by design, see
+  TECHNICAL_DECISIONS A4); the user keeps their code or replaces it.
+- Large-workspace performance has culling but has not been benchmarked with 2,000+ blocks yet.
+
 ## Build status
 
-- `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test` — passing locally (60
-  tests) and on CI (GitHub Actions, JDK 21).
+- `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test` —
+  passing locally (82 tests) and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
 - APK: intentionally not built yet (owner's instruction: only after the final phase).
 
@@ -111,9 +150,14 @@ Known gaps (planned)
 | engine:layout LayoutEditorTest | 10 | pass |
 | engine:layout DropAndValuesTest | 6 | pass |
 | feature:designer PreviewRendererTest (Robolectric, real views) | 2 | pass |
+| engine:blocks BlockOpsTest | 7 | pass |
+| engine:blocks ValidatorTest | 3 | pass |
+| engine:blocks CodegenTest (incl. javac against android.jar) | 6 | pass |
+| feature:blocks BlockLayoutTest | 3 | pass |
+| feature:blocks BlocksViewModelTest (save → generated Java on disk, hand-edit protection) | 3 | pass |
 | core:database ProjectDaoTest | 3 | pass |
 | core:data ProjectRepositoryTest | 4 | pass |
-| app AppFlowTest (Robolectric, end-to-end create → designer → add component → saved XML → settings → files) | 1 | pass |
+| app AppFlowTest (Robolectric, end-to-end create → designer → saved XML → blocks → saved block file → settings → files) | 1 | pass |
 
 ## Known issues
 
@@ -123,5 +167,5 @@ Known gaps (planned)
 
 ## Next
 
-Phase 4: `engine:blocks` (block model, definitions, validation, IR, Java/Kotlin code generation,
-undo/redo) and `feature:blocks` (Canvas renderer, palette, event handlers bound to designer views).
+Phase 5: code editor (editor abstraction, Java/Kotlin/XML/JSON/Gradle highlighting, find/replace,
+tabs, diagnostics), editing project files in place with the same conflict rules.

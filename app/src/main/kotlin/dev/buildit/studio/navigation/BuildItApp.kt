@@ -39,6 +39,9 @@ import dev.buildit.feature.projects.ProjectsStartAction
 import dev.buildit.feature.projects.ProjectsViewModel
 import dev.buildit.feature.settings.SettingsScreen
 import dev.buildit.feature.settings.SettingsViewModel
+import dev.buildit.feature.blocks.BlocksScreen
+import dev.buildit.feature.blocks.BlocksViewModel
+import dev.buildit.feature.blocks.R as BlocksR
 import dev.buildit.feature.designer.DesignerScreen
 import dev.buildit.feature.designer.DesignerViewModel
 import dev.buildit.feature.designer.R as DesignerR
@@ -140,8 +143,14 @@ fun BuildItApp(container: AppContainer) {
                     val designer: DesignerViewModel = viewModel(key = "ds-$id", factory = viewModelFactory {
                         initializer { DesignerViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers) }
                     })
-                    val tabs = remember(designer) {
-                        listOf(WorkspaceExtraTab(title = { stringResource(DesignerR.string.ds_tab) }, content = { leave -> DesignerScreen(designer, onExit = leave) }))
+                    val blocks: BlocksViewModel = viewModel(key = "bk-$id", factory = viewModelFactory {
+                        initializer { BlocksViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers) }
+                    })
+                    val tabs = remember(designer, blocks) {
+                        listOf(
+                            WorkspaceExtraTab(title = { stringResource(DesignerR.string.ds_tab) }, content = { leave -> DesignerScreen(designer, onExit = leave) }),
+                            WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_tab) }, content = { leave -> BlocksScreen(blocks, onExit = leave) }),
+                        )
                     }
                     WorkspaceScreen(vm, onBack = { nav.popBackStack() }, extraTabs = tabs)
                 }

@@ -43,19 +43,35 @@ data class BlockDef(
     fun fieldDef(name: String) = fields.firstOrNull { it.name == name }
     fun inputDef(name: String) = inputs.firstOrNull { it.name == name }
 
-    /** Splits [message] into literal text and `{placeholder}` parts. */
-    val parts: List<MessagePart> by lazy {
+    /** [message] split into literal text and `{placeholder}` parts. */
+    val parts: List<MessagePart> by lazy { parse(message) }
+
+    /**
+     * Splits a message template (this block's own, or a translation of it) into parts. Unknown
+     * placeholders are kept as labels so a bad translation can't hide inputs silently.
+     */
+    fun parse(template: String): List<MessagePart> {
         val out = mutableListOf<MessagePart>()
         val re = Regex("\\{(\\w+)}")
         var last = 0
-        re.findAll(message).forEach { m ->
-            if (m.range.first > last) out += MessagePart.Label(message.substring(last, m.range.first).trim())
+        re.findAll(template).forEach { m ->
+            if (m.range.first > last) out += MessagePart.Label(template.substring(last, m.range.first).trim())
             val n = m.groupValues[1]
-            out += if (inputDef(n) != null) MessagePart.Input(n) else MessagePart.Field(n)
+            out += when {
+                inputDef(n) != null -> MessagePart.Input(n)
+                fieldDef(n) != null -> MessagePart.Field(n)
+                else -> MessagePart.Label(m.value)
+            }
             last = m.range.last + 1
         }
-        if (last < message.length) out += MessagePart.Label(message.substring(last).trim())
-        out.filterNot { it is MessagePart.Label && it.text.isEmpty() }
+        if (last < template.length) out += MessagePart.Label(template.substring(last).trim())
+        return out.filterNot { it is MessagePart.Label && it.text.isEmpty() }
+    }
+
+    /** True when [template] uses exactly this block's placeholders (for validating translations). */
+    fun matches(template: String): Boolean {
+        val names = Regex("\\{(\\w+)}").findAll(template).map { it.groupValues[1] }.toList()
+        return names.sorted() == (fields.map { it.name } + inputs.map { it.name }).sorted()
     }
 }
 

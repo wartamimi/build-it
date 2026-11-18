@@ -45,14 +45,15 @@ Flow throughout; blocking I/O runs on the injected `io` dispatcher.
 | `engine:project` | JVM | Project format v1, validation, store (create/load/save/rename/duplicate/delete), migrations, ZIP import/export, backups/restore, templates, generated-file tracking, safe project file operations. |
 | `engine:layout` | JVM | Layout XML model (lossless parser/writer), component catalog, edit commands with undo/redo, validation, drop resolution, resource values. |
 | `feature:designer` | Android + Compose | Visual designer: real-View preview renderer, canvas host, component library, tree, properties inspector, problems; contributed to the workspace as the Design tab. |
+| `engine:blocks` | JVM | Block document model + JSON store, block definitions, editing ops with undo/redo, validation, IR, Java/Kotlin backends, safe source sync. |
+| `feature:blocks` | Android + Compose | Block editor: Canvas renderer and layout, gestures/snapping, palette, variables, problems, code preview; contributed as the Blocks tab. |
 | `feature:home` | Android + Compose | Dashboard: quick actions, recent projects, storage. |
 | `feature:projects` | Android + Compose | Project list, search/sort, create sheet, rename/duplicate/delete, ZIP import/export (SAF), backups. |
 | `feature:workspace` | Android + Compose | Open project: project settings (app ID, versions, SDK levels) and file explorer. Editor tabs are added per phase. |
 | `feature:settings` | Android + Compose | Theme, dynamic color, language, editor font size, auto-save, rescan workspace, about. |
 | `build-logic` | Gradle | Convention plugins shared by all modules. |
 
-Planned modules: `engine:blocks`, `feature:blocks`
-(Phase 4); `feature:code` + editor abstraction (Phase 5); `engine:build`, `toolchain:*`,
+Planned modules: `feature:code` + editor abstraction (Phase 5); `engine:build`, `toolchain:*`,
 `feature:build` (Phase 6); `engine:ai`, `feature:ai`, `feature:console` (Phase 7);
 `feature:resources` (with Phase 3/5).
 
@@ -132,8 +133,9 @@ IR (language-neutral, explicit types, structured control flow, resolved imports/
    └── Kotlin backend ──► deterministic source
 ```
 
-- **Model.** `Block(id, type, fields, inputs: Map<name, Connection>, next, parent, position,
-  comment, collapsed, disabled)`. Connections are typed: `Statement`, `Value(type)`.
+- **Model.** Nested tree: `Block(id, type, fields, inputs: Map<name, Block>, statements:
+  Map<name, List<Block>>, disabled)`; top-level `BlockStack(x, y, blocks)`. Statement order is the
+  list order, so there are no next/parent pointers to keep consistent.
 - **Definitions.** A `BlockDefinition` registry declares each type's category, fields (with
   validators), inputs (accepted types), output type, scope rules, required imports/permissions
   and its lowering to AST. Categories: Events, Logic, Variables, Math, Text, Loops, Lists,

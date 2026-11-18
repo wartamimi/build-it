@@ -1,0 +1,128 @@
+package dev.buildit.feature.blocks
+
+import dev.buildit.core.common.DispatcherProvider
+import dev.buildit.core.data.OpenProject
+import dev.buildit.core.data.ProjectRepository
+import dev.buildit.core.data.SettingsRepository
+import dev.buildit.core.model.ProjectSummary
+import dev.buildit.core.model.UserSettings
+import dev.buildit.engine.blocks.BlockOps
+import dev.buildit.engine.blocks.Slot
+import dev.buildit.engine.blocks.ValueType
+import dev.buildit.engine.project.LoadResult
+import dev.buildit.engine.project.ProjectStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.File
+import java.lang.reflect.Proxy
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class BlocksViewModelTest {
+    @get:Rule val tmp = TemporaryFolder()
+    private val dispatcher = StandardTestDispatcher()
+    private lateinit var project: LoadResult.Loaded
+
+    @Before fun setUp() {
+        Dispatchers.setMain(dispatcher)
+        project = ProjectStore(tmp.root).create("Demo", "com.example.demo")
+    }
+
+    @After fun tearDown() = Dispatchers.resetMain()
+
+    private val unimplemented = Proxy.newProxyInstance(javaClass.classLoader, arrayOf(ProjectRepository::class.java)) { _, m, _ -> error("not used: ${m.name}") } as ProjectRepository
+
+    private inner class Repo : ProjectRepository by unimplemented {
+        override suspend fun open(id: String) = OpenProject(
+            ProjectSummary(project.manifest.id, "Demo", "com.example.demo", project.directory.path, 0, 0, null), project.manifest, project.directory,
+        )
+    }
+
+    private class Settings(autoSave: Boolean) : SettingsRepository {
+        override val settings: Flow<UserSettings> = MutableStateFlow(UserSettings(autoSave = autoSave))
+        override suspend fun setThemeMode(mode: dev.buildit.core.model.ThemeMode) = Unit
+        override suspend fun setDynamicColor(enabled: Boolean) = Unit
+        override suspend fun setLanguage(language: dev.buildit.core.model.AppLanguage) = Unit
+        override suspend fun setEditorFontSize(sp: Int) = Unit
+        override suspend fun setAutoSave(enabled: Boolean) = Unit
+    }
+
+    private fun vm(autoSave: Boolean = true): BlocksViewModel {
+        var n = 0
+        return BlocksViewModel("p", Repo(), Settings(autoSave), object : DispatcherProvider {
+            override val io = dispatcher
+            override val default = dispatcher
+            override val main = dispatcher
+        }, ids = { "id${++n}" })
+    }
+
+    @Test fun addingBlocksAutosavesAndGeneratesJava() = runTest(dispatcher) {
+        val vm = vm()
+        advanceUntilIdle()
+        val s = vm.state.value
+        assertEquals("MainActivity", s.activity)
+        assertEquals(listOf("greeting"), s.views.map { it.id })
+        val event = s.document!!.stacks.single().blocks.single()
+
+        vm.select(event.id)
+        vm.add("view_set_text", 0f, 0f) // goes into the selected event
+        advanceUntilIdle()
+        val doc = vm.state.value.document!!
+        assertEquals("view_set_text", doc.find(event.id)!!.statements["do"]!!.single().type)
+
+        val source = File(project.directory, "app/src/main/java/com/example/demo/MainActivity.java")
+        val text = source.readText()
+        assertTrue(text, text.contains("greeting.setText(\"\");"))
+        assertTrue(File(project.directory, ".buildit/blocks/MainActivity.json").isFile)
+        assertEquals(CodeStatus.UpToDate, vm.state.value.codeStatus)
+        assertTrue(!vm.state.value.dirty)
+    }
+
+    @Test fun handEditedSourceIsNotOverwritten() = runTest(dispatcher) {
+        val vm = vm()
+        advanceUntilIdle()
+        vm.add("app_finish", 0f, 0f)
+        advanceUntilIdle()
+        val source = File(project.directory, "app/src/main/java/com/example/demo/MainActivity.java")
+        source.appendText("// mine\n")
+        vm.addVariable("score", ValueType.Number)
+        advanceUntilIdle()
+        assertTrue(vm.state.value.codeStatus is CodeStatus.HandEdited)
+        assertTrue(source.readText().endsWith("// mine\n"))
+        vm.save(force = true)
+        advanceUntilIdle()
+        assertTrue(!source.readText().contains("// mine"))
+    }
+
+    @Test fun errorsBlockGenerationAndDragCommitsAsOneUndoStep() = runTest(dispatcher) {
+        val vm = vm()
+        advanceUntilIdle()
+        val before = File(project.directory, "app/src/main/java/com/example/demo/MainActivity.java").readText()
+        vm.add("var_change", 10f, 10f) // no Number variable exists: invalid
+        advanceUntilIdle()
+        assertTrue(vm.state.value.codeStatus is CodeStatus.HasErrors)
+        assertEquals(before, File(project.directory, "app/src/main/java/com/example/demo/MainActivity.java").readText())
+
+        val original = vm.state.value.document!!
+        val loose = original.stacks.last().blocks.single()
+        val (base, chain) = BlockOps.detach(original, loose.id)
+        val event = original.stacks.first().blocks.single()
+        vm.commitDrag(original, BlockOps.insert(base, chain, Slot.Statement(event.id, "do", 0)))
+        assertEquals(1, vm.state.value.document!!.stacks.size)
+        vm.undo()
+        assertEquals(2, vm.state.value.document!!.stacks.size)
+    }
+}
