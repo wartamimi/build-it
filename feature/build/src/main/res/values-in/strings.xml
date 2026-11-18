@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bd_tab">Build</string>
+    <string name="bd_build_debug">Build APK debug</string>
+    <string name="bd_cancel">Batal</string>
+    <string name="bd_retry">Coba lagi</string>
+    <string name="bd_saved_files_hint">Build memakai file yang tersimpan di perangkat ini. Error dibuka di editor kode.</string>
+    <string name="bd_problems">Masalah (%1$d)</string>
+    <string name="bd_platform_title">Platform Android</string>
+    <string name="bd_platform_ready">Android API %1$d sudah terpasang.</string>
+    <string name="bd_platform_missing">Proyek ini dikompilasi dengan Android API %1$d, yang belum terpasang. Platform diunduh sekali dari repositori SDK resmi Google.</string>
+    <string name="bd_platform_download">Unduh platform</string>
+    <string name="bd_platform_checking">Memeriksa repositori SDK Google…</string>
+    <string name="bd_platform_license_needed">Baca lisensi Android SDK untuk melanjutkan.</string>
+    <string name="bd_platform_downloading">Mengunduh API %1$d: %2$s dari %3$s MB</string>
+    <string name="bd_platform_failed">Gagal memasang platform: %1$s</string>
+    <string name="bd_license_title">%1$s</string>
+    <string name="bd_license_body">Mengunduh platform (%1$s MB) memerlukan persetujuan Perjanjian Lisensi Android SDK.</string>
+    <string name="bd_license_accept">Setuju dan unduh</string>
+    <string name="bd_license_decline">Tolak</string>
+    <string name="bd_step_check">Periksa proyek</string>
+    <string name="bd_step_resources">Kompilasi resource dan manifest</string>
+    <string name="bd_step_compile">Kompilasi Java</string>
+    <string name="bd_step_dex">Ubah ke DEX</string>
+    <string name="bd_step_package">Kemas APK</string>
+    <string name="bd_step_sign">Tanda tangani</string>
+    <string name="bd_step_verify">Verifikasi tanda tangan</string>
+    <string name="bd_ms">%1$d md</string>
+    <string name="bd_success">Build berhasil</string>
+    <string name="bd_failed">Build gagal</string>
+    <string name="bd_failed_at">Build gagal: %1$s</string>
+    <string name="bd_cancelled">Build dibatalkan</string>
+    <string name="bd_install">Pasang</string>
+    <string name="bd_share">Bagikan</string>
+    <string name="bd_install_failed">Tidak dapat membuka penginstal: %1$s</string>
+</resources>

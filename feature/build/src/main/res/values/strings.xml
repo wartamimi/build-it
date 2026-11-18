@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bd_tab">Build</string>
+    <string name="bd_build_debug">Build debug APK</string>
+    <string name="bd_cancel">Cancel</string>
+    <string name="bd_retry">Try again</string>
+    <string name="bd_saved_files_hint">Builds use the files saved on this device. Errors open in the code editor.</string>
+    <string name="bd_problems">Problems (%1$d)</string>
+    <string name="bd_platform_title">Android platform</string>
+    <string name="bd_platform_ready">Android API %1$d is installed.</string>
+    <string name="bd_platform_missing">This project compiles against Android API %1$d, which is not installed yet. It is downloaded once from Google\'s official SDK repository.</string>
+    <string name="bd_platform_download">Download platform</string>
+    <string name="bd_platform_checking">Checking Google\'s SDK repository…</string>
+    <string name="bd_platform_license_needed">Review the Android SDK license to continue.</string>
+    <string name="bd_platform_downloading">Downloading API %1$d: %2$s of %3$s MB</string>
+    <string name="bd_platform_failed">Could not install the platform: %1$s</string>
+    <string name="bd_license_title">%1$s</string>
+    <string name="bd_license_body">Downloading the platform (%1$s MB) requires accepting the Android SDK License Agreement.</string>
+    <string name="bd_license_accept">Accept and download</string>
+    <string name="bd_license_decline">Decline</string>
+    <string name="bd_step_check">Check project</string>
+    <string name="bd_step_resources">Compile resources and manifest</string>
+    <string name="bd_step_compile">Compile Java</string>
+    <string name="bd_step_dex">Convert to DEX</string>
+    <string name="bd_step_package">Package APK</string>
+    <string name="bd_step_sign">Sign</string>
+    <string name="bd_step_verify">Verify signature</string>
+    <string name="bd_ms">%1$d ms</string>
+    <string name="bd_success">Build succeeded</string>
+    <string name="bd_failed">Build failed</string>
+    <string name="bd_failed_at">Build failed: %1$s</string>
+    <string name="bd_cancelled">Build cancelled</string>
+    <string name="bd_install">Install</string>
+    <string name="bd_share">Share</string>
+    <string name="bd_install_failed">Could not open the installer: %1$s</string>
+</resources>
