@@ -63,7 +63,7 @@ private fun usesClass(p: Program, predicate: (Stmt) -> Boolean): Boolean {
         }
     }
     return any(p.onCreate) || p.lifecycle.values.any(::any) || p.clicks.any { any(it.body) } ||
-        p.checkedChanges.any { any(it.body) } || p.procedures.any { any(it.body) } || p.componentEvents.values.any(::any)
+        p.checkedChanges.any { any(it.body) } || p.procedures.any { any(it.body) } || p.componentEvents.values.any(::any) || p.viewEvents.any { any(it.body) }
 }
 
 private fun Program.has(t: ComponentType) = components.any { it.type == t }
@@ -138,6 +138,7 @@ object JavaBackend : Backend {
                 p.specCode(false).forEach { (c, _, code) -> code.init?.let { raw(p.fillFor(c, it)) } }
                 p.clicks.forEach { line("${it.view}.setOnClickListener(v -> ${handlerName("on", it.view, "Click")}());") }
                 p.checkedChanges.forEach { line("${it.view}.setOnCheckedChangeListener((button, isChecked) -> ${handlerName("on", it.view, "CheckedChange")}());") }
+                p.viewEvents.forEach { raw(ViewEvents.fill(it.spec.java, it.view, handlerName("on", it.view, it.spec.suffix))) }
                 stmts(p.onCreate)
             }
             val cleanup = p.cleanup(kotlin = false)
@@ -153,6 +154,11 @@ object JavaBackend : Backend {
             }
             p.clicks.forEach { h -> line(); block("private void ${handlerName("on", h.view, "Click")}() {") { stmts(h.body) } }
             p.checkedChanges.forEach { h -> line(); block("private void ${handlerName("on", h.view, "CheckedChange")}() {") { stmts(h.body) } }
+            p.viewEvents.forEach { h ->
+                line()
+                val params = h.spec.params.joinToString(", ") { "final ${type(it.type)} ${it.name}" }
+                block("private void ${handlerName("on", h.view, h.spec.suffix)}($params) {") { stmts(h.body) }
+            }
             p.procedures.forEach { pr ->
                 line()
                 block("private void ${procName(pr.name)}(${pr.params.joinToString(", ") { "${if (it.type.isCollection) "" else "final "}${type(it.type)} ${it.name}" }}) {") { stmts(pr.body) }
@@ -374,6 +380,7 @@ object KotlinBackend : Backend {
                 p.specCode(true).forEach { (c, _, code) -> code.init?.let { raw(p.fillFor(c, it)) } }
                 p.clicks.forEach { line("${it.view}.setOnClickListener { ${handlerName("on", it.view, "Click")}() }") }
                 p.checkedChanges.forEach { line("${it.view}.setOnCheckedChangeListener { _, _ -> ${handlerName("on", it.view, "CheckedChange")}() }") }
+                p.viewEvents.forEach { raw(ViewEvents.fill(it.spec.kotlin, it.view, handlerName("on", it.view, it.spec.suffix))) }
                 stmts(p.onCreate)
             }
             val cleanup = p.cleanup(kotlin = true)
@@ -388,6 +395,11 @@ object KotlinBackend : Backend {
             }
             p.clicks.forEach { h -> line(); block("private fun ${handlerName("on", h.view, "Click")}() {") { stmts(h.body) } }
             p.checkedChanges.forEach { h -> line(); block("private fun ${handlerName("on", h.view, "CheckedChange")}() {") { stmts(h.body) } }
+            p.viewEvents.forEach { h ->
+                line()
+                val params = h.spec.params.joinToString(", ") { "${it.name}: ${type(it.type)}" }
+                block("private fun ${handlerName("on", h.view, h.spec.suffix)}($params) {") { stmts(h.body) }
+            }
             p.procedures.forEach { pr ->
                 line()
                 block("private fun ${procName(pr.name)}(${pr.params.joinToString(", ") { "${it.name}: ${type(it.type)}" }}) {") { stmts(pr.body) }

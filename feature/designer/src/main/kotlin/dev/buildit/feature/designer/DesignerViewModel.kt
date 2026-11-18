@@ -15,8 +15,11 @@ import dev.buildit.engine.layout.XmlElement
 import dev.buildit.engine.layout.XmlParseException
 import dev.buildit.engine.layout.XmlParser
 import dev.buildit.engine.project.Activities
+import dev.buildit.engine.project.ActivityConfig
 import dev.buildit.engine.project.AtomicFiles
 import dev.buildit.engine.project.GeneratedFiles
+import dev.buildit.engine.project.ModuleType
+import dev.buildit.engine.project.ProjectManifest
 import dev.buildit.engine.project.ProjectValidationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -50,6 +53,8 @@ data class DesignerUiState(
     val resDir: File? = null,
     /** Bumps on every document change so the preview re-renders. */
     val revision: Int = 0,
+    /** The screen (activity) that shows the current layout, if any. */
+    val screen: ActivityConfig? = null,
 )
 
 sealed interface DesignerMessage {
@@ -57,6 +62,9 @@ sealed interface DesignerMessage {
     data class Failed(val detail: String) : DesignerMessage
     data object Saved : DesignerMessage
     data class ActivityAdded(val name: String) : DesignerMessage
+    data object ScreenOptionsSaved : DesignerMessage
+    /** The options were saved, but AndroidManifest.xml was edited by hand and was not regenerated. */
+    data object ManifestNotWritten : DesignerMessage
 }
 
 class DesignerViewModel(
@@ -71,6 +79,7 @@ class DesignerViewModel(
     val messages = _messages.receiveAsFlow()
 
     private var projectDir: File? = null
+    private var manifest: ProjectManifest? = null
     private var editor: LayoutEditor? = null
     private var loadedHash: String? = null
     private var autoSaveJob: Job? = null
@@ -80,6 +89,7 @@ class DesignerViewModel(
             try {
                 val p = repository.open(projectId)
                 projectDir = p.directory
+                manifest = p.manifest
                 val layouts = withContext(dispatchers.io) { Activities.layouts(p.directory) }
                 val first = p.manifest.modules.firstOrNull()?.activities?.firstOrNull { it.launcher }?.layout?.takeIf { it in layouts }
                     ?: layouts.firstOrNull()
@@ -108,14 +118,14 @@ class DesignerViewModel(
                 editor = LayoutEditor(root)
                 _state.update {
                     it.copy(
-                        loading = false, current = name, root = root, selectedUid = null, parseError = null,
+                        loading = false, current = name, screen = screenFor(name), root = root, selectedUid = null, parseError = null,
                         diagnostics = LayoutEditor.validate(root), canUndo = false, canRedo = false, dirty = false,
                         externalChange = false, values = values, revision = it.revision + 1,
                     )
                 }
             } catch (e: XmlParseException) {
                 editor = null
-                _state.update { it.copy(loading = false, current = name, root = null, parseError = e.message, values = values) }
+                _state.update { it.copy(loading = false, current = name, screen = screenFor(name), root = null, parseError = e.message, values = values) }
             }
         }
     }
@@ -262,10 +272,30 @@ class DesignerViewModel(
         }
     }
 
+    private fun screenFor(layout: String) = manifest?.modules?.firstOrNull { it.type == ModuleType.Application }?.activities?.firstOrNull { it.layout == layout }
+
+    /** Saves orientation, keyboard and window options of the current screen and regenerates the manifest. */
+    fun setScreenOptions(updated: ActivityConfig) {
+        val m = manifest ?: return
+        viewModelScope.launch {
+            try {
+                val modules = m.modules.map { mod ->
+                    if (mod.type == ModuleType.Application) mod.copy(activities = mod.activities.map { if (it.name == updated.name) updated else it }) else mod
+                }
+                val r = repository.saveSettings(projectId, m.copy(modules = modules))
+                manifest = r.manifest
+                _state.update { it.copy(screen = it.current?.let(::screenFor)) }
+                _messages.send(if (r.conflicts.isEmpty()) DesignerMessage.ScreenOptionsSaved else DesignerMessage.ManifestNotWritten)
+            } catch (e: Exception) {
+                _messages.send(DesignerMessage.Failed(e.message ?: e.javaClass.simpleName))
+            }
+        }
+    }
+
     fun addActivity(name: String, layout: String) {
         viewModelScope.launch {
             try {
-                repository.addActivity(projectId, name, layout, LayoutEditor.newLayout("LinearLayout"))
+                manifest = repository.addActivity(projectId, name, layout, LayoutEditor.newLayout("LinearLayout")).manifest
                 refreshLayouts()
                 open(layout)
                 _messages.send(DesignerMessage.ActivityAdded(name))

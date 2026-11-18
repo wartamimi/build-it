@@ -82,7 +82,37 @@ data class ActivityConfig(
     val name: String,
     val layout: String,
     val launcher: Boolean = false,
+    val orientation: ScreenOrientation = ScreenOrientation.Unspecified,
+    val keyboard: KeyboardMode = KeyboardMode.Default,
+    val window: WindowStyle = WindowStyle.Default,
 )
+
+/** android:screenOrientation of a screen ([manifestValue] null: attribute left out). */
+@Serializable
+enum class ScreenOrientation(val manifestValue: String?) {
+    @SerialName("unspecified") Unspecified(null),
+    @SerialName("portrait") Portrait("portrait"),
+    @SerialName("landscape") Landscape("landscape"),
+    @SerialName("sensor") Sensor("fullSensor"),
+}
+
+/** android:windowSoftInputMode of a screen. */
+@Serializable
+enum class KeyboardMode(val manifestValue: String?) {
+    @SerialName("default") Default(null),
+    @SerialName("resize") Resize("adjustResize"),
+    @SerialName("pan") Pan("adjustPan"),
+    @SerialName("hidden") HiddenOnStart("stateHidden"),
+    @SerialName("visible") VisibleOnStart("stateVisible|adjustResize"),
+}
+
+/** Window of a screen: the app theme with its action bar, without it, or fullscreen. */
+@Serializable
+enum class WindowStyle(val theme: String?) {
+    @SerialName("default") Default(null),
+    @SerialName("no_action_bar") NoActionBar("@android:style/Theme.Material.Light.NoActionBar"),
+    @SerialName("fullscreen") Fullscreen("@android:style/Theme.Material.Light.NoActionBar.Fullscreen"),
+}
 
 object ProjectFormat {
     const val CURRENT_VERSION = 1

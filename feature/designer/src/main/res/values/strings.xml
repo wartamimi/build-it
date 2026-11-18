@@ -100,4 +100,23 @@
     <string name="ds_all_properties">All properties</string>
     <string name="ds_width">Width</string>
     <string name="ds_height">Height</string>
+    <string name="ds_screen_options">Screen options · %1$s</string>
+    <string name="ds_orientation">Orientation</string>
+    <string name="ds_orientation_any">Follow the device</string>
+    <string name="ds_orientation_portrait">Portrait</string>
+    <string name="ds_orientation_landscape">Landscape</string>
+    <string name="ds_orientation_sensor">Rotate with sensor</string>
+    <string name="ds_keyboard">Keyboard</string>
+    <string name="ds_keyboard_default">Default</string>
+    <string name="ds_keyboard_resize">Resize the screen</string>
+    <string name="ds_keyboard_pan">Pan the screen</string>
+    <string name="ds_keyboard_hidden">Hidden when the screen opens</string>
+    <string name="ds_keyboard_visible">Shown when the screen opens</string>
+    <string name="ds_window">Window</string>
+    <string name="ds_window_default">App theme with title bar</string>
+    <string name="ds_window_no_action_bar">No title bar</string>
+    <string name="ds_window_fullscreen">Fullscreen</string>
+    <string name="ds_screen_options_note">Saved in buildit.json and written to AndroidManifest.xml.</string>
+    <string name="ds_screen_options_saved">Screen options saved</string>
+    <string name="ds_manifest_not_written">Options saved, but AndroidManifest.xml was edited by hand and was not changed</string>
 </resources>

@@ -1,6 +1,12 @@
 Build It for Android 8.0 and newer.
 
-New in 0.12.0: 12 new components with their blocks and events: Intent, Vibrator, Calendar,
+New in 0.13.0: more widgets, closer to Sketchware: Spinner, SeekBar, RatingBar, ListView,
+GridView, VideoView, CalendarView, ToggleButton, RadioGroup, AutoComplete and Space. Their events
+(item selected or clicked, moved, rating changed, text changed, long click, video finished, date
+picked) and blocks (list items, selection, rating, video playback, calendar date). Each screen
+has options for orientation, keyboard and fullscreen (layout menu → Screen options).
+
+In 0.12.0: 12 new components with their blocks and events: Intent, Vibrator, Calendar,
 Animator, Sensor, Text to speech, Speech to text, File picker, Request network, Notification,
 Date picker and Time picker. Components add the Android permissions they need to the app's
 manifest when you save.

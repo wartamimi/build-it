@@ -60,6 +60,20 @@ class ProjectFilesTest {
         assertEquals(GeneratedFiles.WriteResult.Unchanged, g.write("app/build.gradle.kts", "new content"))
     }
 
+    @Test fun screenOptionsGoIntoTheManifest() {
+        val p = project()
+        val app = p.manifest.modules[0]
+        val main = app.activities[0].copy(orientation = ScreenOrientation.Portrait, keyboard = KeyboardMode.Resize, window = WindowStyle.Fullscreen)
+        val second = ActivityConfig("Second", "activity_second", window = WindowStyle.NoActionBar)
+        val xml = AndroidSources.manifest(p.manifest.copy(modules = listOf(app.copy(activities = listOf(main, second)))))
+        assertTrue(xml, xml.contains("android:screenOrientation=\"portrait\""))
+        assertTrue(xml, xml.contains("android:windowSoftInputMode=\"adjustResize\""))
+        assertTrue(xml, xml.contains("android:theme=\"@android:style/Theme.Material.Light.NoActionBar.Fullscreen\""))
+        assertTrue(xml, xml.contains("<activity android:name=\".Second\" android:theme=\"@android:style/Theme.Material.Light.NoActionBar\" android:exported=\"false\" />"))
+        // Defaults add nothing
+        assertFalse(AndroidSources.manifest(p.manifest).contains("screenOrientation"))
+    }
+
     @Test fun manifestSyncUpdatesVersionAndReportsConflicts() {
         val p = project()
         val updated = p.manifest.copy(app = p.manifest.app.copy(versionCode = 5, versionName = "1.5", packageName = "com.example.renamed"))

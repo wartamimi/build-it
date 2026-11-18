@@ -59,4 +59,29 @@ class PreviewRendererTest {
         assertTrue(result.issues.any { it.uid == unknown && it.code == "not_previewable" })
         assertTrue(result.views.containsKey(unknown))
     }
+
+    @Test fun phase13WidgetsRenderWithTheirAttributes() {
+        val (root, result) = render(
+            """
+            <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+                <SeekBar android:layout_width="match_parent" android:layout_height="wrap_content" android:max="50" android:progress="20"/>
+                <RatingBar android:layout_width="wrap_content" android:layout_height="wrap_content" android:numStars="4" android:rating="2.5"/>
+                <ToggleButton android:layout_width="wrap_content" android:layout_height="wrap_content" android:textOn="ON" android:textOff="OFF"/>
+                <Spinner android:layout_width="match_parent" android:layout_height="wrap_content"/>
+                <ListView android:layout_width="match_parent" android:layout_height="100dp"/>
+                <CalendarView android:layout_width="match_parent" android:layout_height="wrap_content"/>
+            </LinearLayout>
+            """.trimIndent(),
+        )
+        val seek = result.views[root.elements[0].uid] as android.widget.SeekBar
+        assertEquals(50, seek.max)
+        assertEquals(20, seek.progress)
+        val rating = result.views[root.elements[1].uid] as android.widget.RatingBar
+        assertEquals(4, rating.numStars)
+        assertEquals(2.5f, rating.rating, 0.15f)
+        assertEquals("ON", (result.views[root.elements[2].uid] as android.widget.ToggleButton).textOn.toString())
+        assertEquals(6, root.elements.count { result.views.containsKey(it.uid) })
+        assertTrue(result.issues.toString(), result.issues.none { it.code == "not_previewable" })
+    }
 }

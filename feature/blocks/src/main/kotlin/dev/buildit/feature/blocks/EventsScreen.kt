@@ -68,6 +68,7 @@ import dev.buildit.engine.blocks.ComponentType
 import dev.buildit.engine.blocks.Components
 import dev.buildit.engine.blocks.MessagePart
 import dev.buildit.engine.blocks.Names
+import dev.buildit.engine.blocks.ViewEvents
 import dev.buildit.engine.blocks.ViewFamilies
 import dev.buildit.engine.blocks.ViewKind
 import kotlinx.coroutines.launch
@@ -75,7 +76,7 @@ import kotlinx.coroutines.launch
 /** Groups of events, shown as a rail beside the event list. */
 internal enum class EventSection(val label: Int, val types: List<String>) {
     Screen(R.string.bk_section_screen, listOf("event_create", "event_resume", "event_pause", "event_destroy")),
-    Views(R.string.bk_section_views, listOf("event_click", "event_checked")),
+    Views(R.string.bk_section_views, listOf("event_click", "event_checked") + ViewEvents.specs.map { it.hat }),
     Components(R.string.bk_section_components, dev.buildit.engine.blocks.Components.specs.flatMap { s -> s.events.map { it.hat } }),
     More(R.string.bk_section_more, listOf("proc_define")),
     Loose(R.string.bk_section_loose, emptyList()),
@@ -212,7 +213,8 @@ private fun AddEventDialog(
         EventSection.Screen -> section.types.map { it to emptyMap() }
         EventSection.Views -> state.views.flatMap { v ->
             listOf("event_click" to mapOf("view" to v.id)) +
-                if (ViewFamilies.matches(ViewKind.Compound, v.tag)) listOf("event_checked" to mapOf("view" to v.id)) else emptyList()
+                (if (ViewFamilies.matches(ViewKind.Compound, v.tag)) listOf("event_checked" to mapOf("view" to v.id)) else emptyList()) +
+                ViewEvents.specs.filter { ViewFamilies.matches(it.kind, v.tag) }.map { it.hat to mapOf("view" to v.id) }
         }
         EventSection.Components -> doc.components.flatMap { c ->
             val spec = Components.spec(c.type)

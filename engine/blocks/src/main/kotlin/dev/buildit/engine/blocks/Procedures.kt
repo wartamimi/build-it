@@ -49,6 +49,7 @@ object Procedures {
     fun enclosingParams(doc: BlockDocument, blockId: String): List<ProcParam>? {
         val head = doc.stacks.firstOrNull { s -> s.blocks.any { b -> b.walk().any { it.id == blockId } } }?.blocks?.firstOrNull() ?: return null
         if (head.type == "proc_define") return parse(head.field("params")).orEmpty()
+        ViewEvents.spec(head.type)?.let { return it.params.takeIf { p -> p.isNotEmpty() } }
         return Components.event(head.type)?.second?.params?.takeIf { it.isNotEmpty() }
     }
 

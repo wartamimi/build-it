@@ -381,10 +381,40 @@ Not done / limits
 - The first notification on Android 13+ only asks for the permission; it is not shown until the
   next call.
 
+## Phase 13 — Sketchware parity: widgets and screen options (owner request)
+
+Done
+- New widgets in the designer palette and preview: ToggleButton, RadioGroup, Space, Spinner,
+  AutoCompleteTextView, SeekBar, RatingBar, ListView, GridView, VideoView and CalendarView
+  (ListView, GridView and VideoView show a placeholder in the preview; the other widgets are the
+  real Android views with max, progress, numStars, rating, textOn/textOff and
+  completionThreshold applied).
+- 9 new view events, each with Java and Kotlin listener code (ViewEvents): long click, text
+  changed (text), item selected in a Spinner (position, item), item clicked and long clicked in a
+  ListView/GridView (position, item), SeekBar moved (progress, from user), rating changed (rating),
+  video finished, date picked in a CalendarView (year, month, day). The Events tab offers only the
+  events that fit each view. Positions are counted from 1, like list blocks.
+- 17 new widget blocks: set and refresh the items of a Spinner/ListView/GridView/AutoComplete
+  from a text list, selected position and item, select a position, maximum, rating, video
+  (URI, play, pause, seek, is playing, playback controls), CalendarView date, and an error message
+  on a text field.
+- Per-screen options in the designer (layout menu → Screen options): orientation (follow device,
+  portrait, landscape, sensor), keyboard (resize, pan, hidden or shown at start) and window
+  (title bar, no title bar, fullscreen). Saved in buildit.json and written to AndroidManifest.xml;
+  a hand-edited manifest is left alone and the user is told.
+- CatalogTest compiles every new block and event as Java and Kotlin against android.jar.
+
+Not done / limits
+- Custom list item layouts (Sketchware's "custom view" for ListView/RecyclerView) are not built:
+  items use android.R.layout.simple_list_item_1. RecyclerView, drawer and floating action button
+  screen options are not built either.
+- The window options use the framework Material themes; with an AppCompat theme (Phase 14) they
+  will need AppCompat equivalents.
+
 ## Build status
 
 - `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:deps:test :engine:ai:test` —
-  passing locally (130 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
+  passing locally (152 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
 - APK: CI publishes a signed GitHub release for each push to main. Emulator job: on-device build, install and console pass.
 
@@ -393,13 +423,13 @@ Not done / limits
 | Suite | Tests | Result |
 |---|---|---|
 | engine:project ProjectStoreTest | 17 | pass |
-| engine:project ProjectFilesTest | 5 | pass |
+| engine:project ProjectFilesTest (incl. screen options in the manifest) | 6 | pass |
 | engine:project ProjectValidationTest | 5 | pass |
 | engine:project ActivitiesTest | 2 | pass |
 | engine:layout XmlTest | 5 | pass |
 | engine:layout LayoutEditorTest | 10 | pass |
 | engine:layout DropAndValuesTest | 6 | pass |
-| feature:designer PreviewRendererTest (Robolectric, real views) | 2 | pass |
+| feature:designer PreviewRendererTest (Robolectric, real views, Phase 13 widgets) | 3 | pass |
 | engine:blocks BlockOpsTest | 7 | pass |
 | engine:blocks ValidatorTest | 3 | pass |
 | engine:blocks CodegenTest (incl. javac against android.jar) | 6 | pass |

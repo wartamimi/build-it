@@ -67,9 +67,15 @@ object AndroidSources {
         appendLine("""        android:label="@string/app_name"""")
         appendLine("""        android:theme="@style/AppTheme">""")
         m.modules.first { it.type == ModuleType.Application }.activities.forEach { a ->
+            val options = listOfNotNull(
+                a.orientation.manifestValue?.let { "android:screenOrientation=\"$it\"" },
+                a.keyboard.manifestValue?.let { "android:windowSoftInputMode=\"$it\"" },
+                a.window.theme?.let { "android:theme=\"$it\"" },
+            )
             if (a.launcher) {
                 appendLine("""        <activity""")
                 appendLine("""            android:name=".${a.name}"""")
+                options.forEach { appendLine("            $it") }
                 appendLine("""            android:exported="true">""")
                 appendLine("""            <intent-filter>""")
                 appendLine("""                <action android:name="android.intent.action.MAIN" />""")
@@ -77,7 +83,7 @@ object AndroidSources {
                 appendLine("""            </intent-filter>""")
                 appendLine("""        </activity>""")
             } else {
-                appendLine("""        <activity android:name=".${a.name}" android:exported="false" />""")
+                appendLine("""        <activity android:name=".${a.name}"${options.joinToString("") { " $it" }} android:exported="false" />""")
             }
         }
         appendLine("""    </application>""")

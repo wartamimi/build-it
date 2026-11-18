@@ -7,7 +7,7 @@ enum class BlockCategory { Events, Control, Logic, Math, Text, Variables, Lists,
 enum class BlockShape { Hat, Statement, Value }
 
 /** Which views a view field may reference, by widget family. */
-enum class ViewKind { Any, Text, Compound, Image, Progress }
+enum class ViewKind { Any, Text, Compound, Image, Progress, Edit, Adapter, Spinner, ItemList, SeekBar, Rating, Video, CalendarView }
 
 sealed interface FieldKind {
     data class Text(val default: String = "") : FieldKind
@@ -284,7 +284,17 @@ object ViewFamilies {
     )
 
     private val image = setOf("ImageView", "ImageButton", "androidx.appcompat.widget.AppCompatImageView", "com.google.android.material.imageview.ShapeableImageView")
-    private val progress = setOf("ProgressBar", "SeekBar", "androidx.appcompat.widget.AppCompatSeekBar")
+    private val progress = setOf("ProgressBar", "SeekBar", "RatingBar", "androidx.appcompat.widget.AppCompatSeekBar", "androidx.appcompat.widget.AppCompatRatingBar")
+    private val edit = setOf(
+        "EditText", "AutoCompleteTextView", "MultiAutoCompleteTextView",
+        "com.google.android.material.textfield.TextInputEditText", "androidx.appcompat.widget.AppCompatEditText",
+        "androidx.appcompat.widget.AppCompatAutoCompleteTextView",
+    )
+    private val spinner = setOf("Spinner", "androidx.appcompat.widget.AppCompatSpinner")
+    private val itemList = setOf("ListView", "GridView")
+    private val adapter = spinner + itemList + setOf("AutoCompleteTextView", "MultiAutoCompleteTextView", "androidx.appcompat.widget.AppCompatAutoCompleteTextView")
+    private val seekBar = setOf("SeekBar", "androidx.appcompat.widget.AppCompatSeekBar")
+    private val rating = setOf("RatingBar", "androidx.appcompat.widget.AppCompatRatingBar")
 
     fun matches(kind: ViewKind, tag: String): Boolean = when (kind) {
         ViewKind.Any -> true
@@ -292,6 +302,14 @@ object ViewFamilies {
         ViewKind.Compound -> tag in compound
         ViewKind.Image -> tag in image
         ViewKind.Progress -> tag in progress
+        ViewKind.Edit -> tag in edit
+        ViewKind.Adapter -> tag in adapter
+        ViewKind.Spinner -> tag in spinner
+        ViewKind.ItemList -> tag in itemList
+        ViewKind.SeekBar -> tag in seekBar
+        ViewKind.Rating -> tag in rating
+        ViewKind.Video -> tag == "VideoView"
+        ViewKind.CalendarView -> tag == "CalendarView"
     }
 
     /** Fully qualified class for a layout tag (framework short names live in android.widget/android.view/android.webkit). */

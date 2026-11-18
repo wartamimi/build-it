@@ -123,6 +123,20 @@ class PreviewRenderer(
             "RadioButton" -> RadioButton(c)
             "Switch" -> android.widget.Switch(c)
             "ProgressBar" -> ProgressBar(c)
+            "ToggleButton" -> android.widget.ToggleButton(c)
+            "RadioGroup" -> android.widget.RadioGroup(c)
+            "Space" -> android.widget.Space(c)
+            "Spinner" -> android.widget.Spinner(c).apply {
+                // Items are set by blocks at runtime; show one sample row so the size is visible.
+                adapter = android.widget.ArrayAdapter(c, android.R.layout.simple_spinner_dropdown_item, listOf("Spinner"))
+            }
+            "AutoCompleteTextView" -> android.widget.AutoCompleteTextView(c)
+            "SeekBar" -> android.widget.SeekBar(c)
+            "RatingBar" -> android.widget.RatingBar(c)
+            "ListView" -> placeholder(e, "ListView").also { issue(e, "runtime_content", "ListView") }
+            "GridView" -> placeholder(e, "GridView").also { issue(e, "runtime_content", "GridView") }
+            "VideoView" -> placeholder(e, "VideoView").also { issue(e, "runtime_content", "VideoView") }
+            "CalendarView" -> android.widget.CalendarView(c)
             "View" -> View(c)
             "WebView" -> placeholder(e, "WebView").also { issue(e, "runtime_content", "WebView") }
             "androidx.constraintlayout.widget.ConstraintLayout" -> ConstraintLayout(c)
@@ -182,6 +196,24 @@ class PreviewRenderer(
             attr("android:inputType")?.let { v.inputType = inputType(it) }
         }
         if (v is CompoundButton) attr("android:checked")?.let { v.isChecked = it == "true" }
+        if (v is android.widget.ToggleButton) {
+            attr("android:textOn")?.let { v.textOn = text(it) }
+            attr("android:textOff")?.let { v.textOff = text(it) }
+            v.isChecked = v.isChecked // refresh the shown text
+        }
+        if (v is ProgressBar) {
+            attr("android:max")?.toIntOrNull()?.let { v.max = it }
+            attr("android:progress")?.toIntOrNull()?.let { v.progress = it }
+            attr("android:indeterminate")?.let { v.isIndeterminate = it == "true" }
+        }
+        if (v is android.widget.RatingBar) {
+            attr("android:numStars")?.toIntOrNull()?.let { v.numStars = it }
+            attr("android:stepSize")?.toFloatOrNull()?.let { v.stepSize = it }
+            attr("android:rating")?.toFloatOrNull()?.let { v.rating = it }
+            attr("android:isIndicator")?.let { v.setIsIndicator(it == "true") }
+        }
+        if (v is android.widget.Spinner) attr("android:spinnerMode") // fixed when the view is created; shown as a dropdown
+        if (v is android.widget.AutoCompleteTextView) attr("android:completionThreshold")?.toIntOrNull()?.let { v.threshold = it }
         if (v is ImageView) {
             attr("android:src")?.let { drawable(it, e) }?.let { v.setImageDrawable(it) }
             attr("android:scaleType")?.let { st ->

@@ -179,6 +179,32 @@ internal fun blockMessageRes(type: String): Int? = when (type) {
     "app_share" -> R.string.blk_app_share
     "app_now" -> R.string.blk_app_now
     "app_format_time" -> R.string.blk_app_format_time
+    "event_long_click" -> R.string.blk_event_long_click
+    "event_text_changed" -> R.string.blk_event_text_changed
+    "event_item_selected" -> R.string.blk_event_item_selected
+    "event_item_clicked" -> R.string.blk_event_item_clicked
+    "event_item_long_clicked" -> R.string.blk_event_item_long_clicked
+    "event_seekbar_changed" -> R.string.blk_event_seekbar_changed
+    "event_rating_changed" -> R.string.blk_event_rating_changed
+    "event_video_done" -> R.string.blk_event_video_done
+    "event_date_changed" -> R.string.blk_event_date_changed
+    "view_set_items" -> R.string.blk_view_set_items
+    "view_refresh_items" -> R.string.blk_view_refresh_items
+    "view_selected_position" -> R.string.blk_view_selected_position
+    "view_selected_item" -> R.string.blk_view_selected_item
+    "view_select_position" -> R.string.blk_view_select_position
+    "view_set_max" -> R.string.blk_view_set_max
+    "view_set_rating" -> R.string.blk_view_set_rating
+    "view_get_rating" -> R.string.blk_view_get_rating
+    "video_set_uri" -> R.string.blk_video_set_uri
+    "video_start" -> R.string.blk_video_start
+    "video_pause" -> R.string.blk_video_pause
+    "video_seek" -> R.string.blk_video_seek
+    "video_is_playing" -> R.string.blk_video_is_playing
+    "video_controls" -> R.string.blk_video_controls
+    "calendar_set_date" -> R.string.blk_calendar_set_date
+    "calendar_get_date" -> R.string.blk_calendar_get_date
+    "view_set_error" -> R.string.blk_view_set_error
     else -> null
 }
 

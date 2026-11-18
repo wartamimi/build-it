@@ -1,6 +1,9 @@
 package dev.buildit.feature.designer
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -13,15 +16,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -29,6 +38,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +54,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -57,16 +68,14 @@ import dev.buildit.core.designsystem.component.BiIconButton
 import dev.buildit.core.designsystem.component.BiLoadingState
 import dev.buildit.core.designsystem.component.BiTextField
 import dev.buildit.core.designsystem.icon.BiIcons
+import dev.buildit.core.designsystem.theme.CodeTypography
 import dev.buildit.core.designsystem.theme.Spacing
 import dev.buildit.engine.layout.DropResolver
 import dev.buildit.engine.layout.LayoutCommand
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.foundation.layout.Arrangement
-import dev.buildit.core.designsystem.theme.CodeTypography
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
+import dev.buildit.engine.project.ActivityConfig
+import dev.buildit.engine.project.KeyboardMode
+import dev.buildit.engine.project.ScreenOrientation
+import dev.buildit.engine.project.WindowStyle
 
 private enum class Panel(val label: Int) { Library(R.string.ds_panel_library), Tree(R.string.ds_panel_tree), Properties(R.string.ds_panel_properties), Problems(R.string.ds_panel_problems) }
 
@@ -88,6 +97,7 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
     var confirmLeave by remember { mutableStateOf(false) }
     var newLayout by remember { mutableStateOf(false) }
     var newActivity by remember { mutableStateOf(false) }
+    var screenOptions by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf<Panel?>(null) }
 
     val messages = rememberMessages()
@@ -130,7 +140,7 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
 
     Box(Modifier.fillMaxSize().onGloballyPositioned { rootOffset = it.positionInWindow() }) {
         Column(Modifier.fillMaxSize()) {
-            Toolbar(state, viewModel, onNewLayout = { newLayout = true }, onNewActivity = { newActivity = true })
+            Toolbar(state, viewModel, onNewLayout = { newLayout = true }, onNewActivity = { newActivity = true }, onScreenOptions = { screenOptions = true })
             HorizontalDivider()
             when {
                 state.loading && state.root == null -> BiLoadingState()
@@ -230,6 +240,8 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
     }
     if (newLayout) NewLayoutDialog(onDismiss = { newLayout = false }, onCreate = { n, r -> newLayout = false; viewModel.createLayout(n, r) })
     if (newActivity) NewActivityDialog(onDismiss = { newActivity = false }, onCreate = { a, l -> newActivity = false; viewModel.addActivity(a, l) })
+    val screen = state.screen
+    if (screenOptions && screen != null) ScreenOptionsDialog(screen, onDismiss = { screenOptions = false }, onSave = { screenOptions = false; viewModel.setScreenOptions(it) })
 }
 
 /** Bottom bar of the phone layout: what is selected and quick actions for it. */
@@ -277,7 +289,7 @@ private fun SizeChip(label: String, value: String?, onSet: (String) -> Unit) {
 }
 
 @Composable
-private fun Toolbar(state: DesignerUiState, vm: DesignerViewModel, onNewLayout: () -> Unit, onNewActivity: () -> Unit) {
+private fun Toolbar(state: DesignerUiState, vm: DesignerViewModel, onNewLayout: () -> Unit, onNewActivity: () -> Unit, onScreenOptions: () -> Unit) {
     // Save status and the save action stay pinned; the rest scrolls on narrow screens.
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
     Row(
@@ -292,6 +304,14 @@ private fun Toolbar(state: DesignerUiState, vm: DesignerViewModel, onNewLayout: 
                 HorizontalDivider()
                 DropdownMenuItem(text = { Text(stringResource(R.string.ds_new_layout)) }, leadingIcon = { Icon(BiIcons.Add, null) }, onClick = { layoutMenu = false; onNewLayout() })
                 DropdownMenuItem(text = { Text(stringResource(R.string.ds_new_activity)) }, leadingIcon = { Icon(BiIcons.Add, null) }, onClick = { layoutMenu = false; onNewActivity() })
+                state.screen?.let { s ->
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.ds_screen_options, s.name)) },
+                        leadingIcon = { Icon(BiIcons.Tune, null) },
+                        onClick = { layoutMenu = false; onScreenOptions() },
+                    )
+                }
             }
         }
         BiIconButton(BiIcons.Undo, stringResource(R.string.ds_undo), vm::undo, enabled = state.canUndo)
@@ -373,6 +393,58 @@ private fun NewActivityDialog(onDismiss: () -> Unit, onCreate: (String, String) 
     )
 }
 
+/** Orientation, keyboard and window options of one screen, written to AndroidManifest.xml. */
+@Composable
+private fun ScreenOptionsDialog(screen: ActivityConfig, onDismiss: () -> Unit, onSave: (ActivityConfig) -> Unit) {
+    var edited by remember(screen) { mutableStateOf(screen) }
+    @Composable
+    fun <T> Choices(@StringRes title: Int, options: List<Pair<T, Int>>, selected: T, onSelect: (T) -> Unit) {
+        Text(stringResource(title), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.md, bottom = Spacing.xs))
+        options.forEach { (value, label) ->
+            Row(
+                Modifier.fillMaxWidth().selectable(selected = value == selected, role = Role.RadioButton, onClick = { onSelect(value) }).padding(vertical = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = value == selected, onClick = null)
+                Text(stringResource(label), modifier = Modifier.padding(start = Spacing.sm))
+            }
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.ds_screen_options, screen.name)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Choices(
+                    R.string.ds_orientation,
+                    listOf(
+                        ScreenOrientation.Unspecified to R.string.ds_orientation_any, ScreenOrientation.Portrait to R.string.ds_orientation_portrait,
+                        ScreenOrientation.Landscape to R.string.ds_orientation_landscape, ScreenOrientation.Sensor to R.string.ds_orientation_sensor,
+                    ),
+                    edited.orientation,
+                ) { edited = edited.copy(orientation = it) }
+                Choices(
+                    R.string.ds_keyboard,
+                    listOf(
+                        KeyboardMode.Default to R.string.ds_keyboard_default, KeyboardMode.Resize to R.string.ds_keyboard_resize,
+                        KeyboardMode.Pan to R.string.ds_keyboard_pan, KeyboardMode.HiddenOnStart to R.string.ds_keyboard_hidden,
+                        KeyboardMode.VisibleOnStart to R.string.ds_keyboard_visible,
+                    ),
+                    edited.keyboard,
+                ) { edited = edited.copy(keyboard = it) }
+                Choices(
+                    R.string.ds_window,
+                    listOf(WindowStyle.Default to R.string.ds_window_default, WindowStyle.NoActionBar to R.string.ds_window_no_action_bar, WindowStyle.Fullscreen to R.string.ds_window_fullscreen),
+                    edited.window,
+                ) { edited = edited.copy(window = it) }
+                Text(stringResource(R.string.ds_screen_options_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.md))
+            }
+        },
+        confirmButton = { TextButton(enabled = edited != screen, onClick = { onSave(edited) }) { Text(stringResource(R.string.ds_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ds_cancel)) } },
+    )
+}
+
 /** `SettingsActivity` → `activity_settings`, following the platform naming convention. */
 internal fun suggestLayoutName(activity: String): String {
     val base = activity.removeSuffix("Activity").ifEmpty { activity }
@@ -385,6 +457,8 @@ private fun rememberMessages(): (DesignerMessage) -> String {
     val saved = stringResource(R.string.ds_saved)
     val failed = stringResource(R.string.ds_failed)
     val added = stringResource(R.string.ds_activity_added)
+    val optionsSaved = stringResource(R.string.ds_screen_options_saved)
+    val manifestNotWritten = stringResource(R.string.ds_manifest_not_written)
     val generic = stringResource(R.string.ds_rejected_generic)
     val byCode = mapOf(
         "invalid_resource" to stringResource(R.string.ds_rejected_invalid_resource),
@@ -405,6 +479,8 @@ private fun rememberMessages(): (DesignerMessage) -> String {
             DesignerMessage.Saved -> saved
             is DesignerMessage.Failed -> failed.format(m.detail)
             is DesignerMessage.ActivityAdded -> added.format(m.name)
+            DesignerMessage.ScreenOptionsSaved -> optionsSaved
+            DesignerMessage.ManifestNotWritten -> manifestNotWritten
             is DesignerMessage.EditRejected -> byCode[m.code] ?: generic.format(m.code)
         }
     }

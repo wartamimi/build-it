@@ -101,11 +101,15 @@ data class Program(
     val components: List<Component> = emptyList(),
     /** Bodies of component event hats, by "hat type|component name". */
     val componentEvents: Map<String, List<Stmt>> = emptyMap(),
+    /** Handlers of the view events in [ViewEvents]. */
+    val viewEvents: List<ViewEventHandler> = emptyList(),
     /** Classes needed by template blocks. */
     val imports: Set<String> = emptySet(),
     /** Helper methods needed by template blocks, by name. */
     val templateHelpers: List<TemplateHelper> = emptyList(),
 )
+
+data class ViewEventHandler(val spec: ViewEventSpec, val view: String, val body: List<Stmt>)
 
 data class ActivityTarget(val packageName: String, val className: String, val layout: String)
 
@@ -138,6 +142,9 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
         val checks = hats.filter { it.type == "event_checked" }.map { Handler(view(it.field("view")), body(it)) }.sortedBy { it.view }
         val procs = hats.filter { it.type == "proc_define" }.map { Procedure(it.field("name"), body(it), Procedures.parse(it.field("params")).orEmpty()) }.sortedBy { it.name }
         val componentEvents = hats.mapNotNull { h -> Components.event(h.type)?.let { (spec, _) -> "${h.type}|${h.field(spec.field)}" to body(h) } }.toMap()
+        val viewEvents = hats.mapNotNull { h -> ViewEvents.spec(h.type)?.let { ViewEventHandler(it, view(h.field("view")), body(h)) } }
+            .sortedWith(compareBy({ it.view }, { it.spec.suffix }))
+        viewEvents.forEach { imports += it.spec.imports }
         val tags = ctx.views.associate { it.id to it.tag }
         return Program(
             packageName = target.packageName,
@@ -153,6 +160,7 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
             helpers = helpers,
             components = doc.components,
             componentEvents = componentEvents,
+            viewEvents = viewEvents,
             imports = imports,
             templateHelpers = templateHelpers.values.toList(),
         )

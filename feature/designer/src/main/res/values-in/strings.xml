@@ -100,4 +100,23 @@
     <string name="ds_all_properties">Semua properti</string>
     <string name="ds_width">Lebar</string>
     <string name="ds_height">Tinggi</string>
+    <string name="ds_screen_options">Opsi layar · %1$s</string>
+    <string name="ds_orientation">Orientasi</string>
+    <string name="ds_orientation_any">Ikuti perangkat</string>
+    <string name="ds_orientation_portrait">Potret</string>
+    <string name="ds_orientation_landscape">Lanskap</string>
+    <string name="ds_orientation_sensor">Putar mengikuti sensor</string>
+    <string name="ds_keyboard">Keyboard</string>
+    <string name="ds_keyboard_default">Bawaan</string>
+    <string name="ds_keyboard_resize">Ubah ukuran layar</string>
+    <string name="ds_keyboard_pan">Geser layar</string>
+    <string name="ds_keyboard_hidden">Tersembunyi saat layar dibuka</string>
+    <string name="ds_keyboard_visible">Tampil saat layar dibuka</string>
+    <string name="ds_window">Jendela</string>
+    <string name="ds_window_default">Tema aplikasi dengan bilah judul</string>
+    <string name="ds_window_no_action_bar">Tanpa bilah judul</string>
+    <string name="ds_window_fullscreen">Layar penuh</string>
+    <string name="ds_screen_options_note">Disimpan di buildit.json dan ditulis ke AndroidManifest.xml.</string>
+    <string name="ds_screen_options_saved">Opsi layar disimpan</string>
+    <string name="ds_manifest_not_written">Opsi disimpan, tetapi AndroidManifest.xml sudah diedit manual sehingga tidak diubah</string>
 </resources>

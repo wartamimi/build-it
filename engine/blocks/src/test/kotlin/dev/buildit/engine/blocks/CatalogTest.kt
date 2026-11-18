@@ -24,6 +24,8 @@ class CatalogTest {
 
     private val catalogViews = listOf(
         ViewInfo("label", "TextView"), ViewInfo("agree", "CheckBox"), ViewInfo("photo", "ImageView"), ViewInfo("level", "SeekBar"),
+        ViewInfo("query", "EditText"), ViewInfo("choice", "Spinner"), ViewInfo("rows", "ListView"), ViewInfo("stars", "RatingBar"),
+        ViewInfo("clip", "VideoView"), ViewInfo("cal", "CalendarView"),
     )
     private val catalogCtx = BlockContext(catalogViews, activities = listOf("MainActivity", "SettingsActivity"), sounds = listOf("ding"), images = listOf("logo"))
 
@@ -62,8 +64,8 @@ class CatalogTest {
                         statements = mapOf("do" to listOf(param("n"), param("t"), param("flag"), param("words"))),
                     )
                 } else if (def.type != "event_create") {
-                    // Component events: read every value the event provides
-                    val params = Components.event(def.type)?.second?.params.orEmpty()
+                    // Component and view events: read every value the event provides
+                    val params = Components.event(def.type)?.second?.params ?: ViewEvents.spec(def.type)?.params.orEmpty()
                     val reads = params.map { p -> create("app_log").copy(inputs = mapOf("text" to create("proc_param").copy(fields = mapOf("param" to p.name)))) }
                     hats += create(def.type).let { h -> if (reads.isEmpty()) h else h.copy(statements = mapOf("do" to reads)) }
                 }
@@ -160,7 +162,7 @@ class CatalogTest {
                 public static final class layout { public static final int activity_main = 1; }
                 public static final class raw { public static final int ding = 2; }
                 public static final class drawable { public static final int logo = 3; }
-                public static final class id { public static final int label = 4, agree = 5, photo = 6, level = 7; }
+                public static final class id { public static final int label = 4, agree = 5, photo = 6, level = 7, query = 8, choice = 9, rows = 10, stars = 11, clip = 12, cal = 13; }
             }
             """.trimIndent(),
         )
@@ -184,7 +186,7 @@ class CatalogTest {
                 object layout { const val activity_main = 1 }
                 object raw { const val ding = 2 }
                 object drawable { const val logo = 3 }
-                object id { const val label = 4; const val agree = 5; const val photo = 6; const val level = 7 }
+                object id { const val label = 4; const val agree = 5; const val photo = 6; const val level = 7; const val query = 8; const val choice = 9; const val rows = 10; const val stars = 11; const val clip = 12; const val cal = 13 }
             }
             """.trimIndent(),
         )

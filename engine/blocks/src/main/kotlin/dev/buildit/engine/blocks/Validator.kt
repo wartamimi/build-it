@@ -60,6 +60,7 @@ object BlockValidator {
                 val key = when (first.type) {
                     "event_click", "event_checked" -> first.type + ":" + first.field("view")
                     "proc_define" -> "proc:" + first.field("name")
+                    in ViewEvents.specs.map { it.hat } -> first.type + ":" + first.field("view")
                     else -> Components.event(first.type)?.let { (spec, _) -> first.type + ":" + first.field(spec.field) } ?: first.type
                 }
                 if (!first.disabled && eventKeys.put(key, first.id) != null) {

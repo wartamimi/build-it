@@ -245,7 +245,7 @@ internal object Catalog {
         hat("event_time_picked", "when a time is picked in {timePicker}", ComponentType.TimePicker),
     )
 
-    val blocks: List<BlockDef> = componentBlocks + listOf(
+    val blocks: List<BlockDef> = componentBlocks + ViewEvents.blocks + listOf(
         // Control
         BlockDef("ctrl_foreach", Control, BlockShape.Statement, "for each {var} in {list}",
             fields = listOf(FieldDef("var", FieldKind.VariableRef(ValueType.Text)), list(ValueType.TextList)), statements = listOf(StatementDef("do", "do"))),
@@ -370,6 +370,40 @@ internal object Catalog {
             fields = listOf(view()), imports = listOf("android.view.View")),
         stmt("view_focus", Components, "focus {view} and show keyboard", "showKeyboard({view});", "showKeyboard({view})", fields = listOf(view()), helper = showKeyboard),
         stmt("view_hide_keyboard", Components, "hide the keyboard", "hideKeyboard();", "hideKeyboard()", helper = hideKeyboard),
+
+        // Widgets (Phase 13)
+        stmt("view_set_items", Components, "set items of {view} to {list}",
+            "{view}.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, {list}));",
+            "{view}.setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, {list}))",
+            fields = listOf(view(ViewKind.Adapter), list(ValueType.TextList)), imports = listOf("android.widget.ArrayAdapter")),
+        stmt("view_refresh_items", Components, "refresh items of {view}",
+            "if ({view}.getAdapter() instanceof BaseAdapter) ((BaseAdapter) {view}.getAdapter()).notifyDataSetChanged();",
+            "({view}.adapter as? BaseAdapter)?.notifyDataSetChanged()",
+            fields = listOf(view(ViewKind.Adapter)), imports = listOf("android.widget.BaseAdapter")),
+        value("view_selected_position", Components, "selected position of {view}", ValueType.Number,
+            "((double) ({view}.getSelectedItemPosition() + 1))", "({view}.selectedItemPosition + 1).toDouble()", fields = listOf(view(ViewKind.Spinner))),
+        value("view_selected_item", Components, "selected item of {view}", ValueType.Text,
+            "({view}.getSelectedItem() == null ? \"\" : String.valueOf({view}.getSelectedItem()))", "{view}.selectedItem?.toString() ?: \"\"", fields = listOf(view(ViewKind.Spinner))),
+        stmt("view_select_position", Components, "select item # {position} of {view}",
+            "{view}.setSelection((int) {position} - 1);", "{view}.setSelection({position}.toInt() - 1)", inputs = listOf(n("position")), fields = listOf(view(ViewKind.Spinner))),
+        stmt("view_set_max", Components, "set maximum of {view} to {value}", "{view}.setMax((int) {value});", "{view}.max = {value}.toInt()",
+            inputs = listOf(n("value")), fields = listOf(view(ViewKind.Progress))),
+        stmt("view_set_rating", Components, "set rating of {view} to {value}", "{view}.setRating((float) {value});", "{view}.rating = {value}.toFloat()",
+            inputs = listOf(n("value")), fields = listOf(view(ViewKind.Rating))),
+        value("view_get_rating", Components, "rating of {view}", ValueType.Number, "((double) {view}.getRating())", "{view}.rating.toDouble()", fields = listOf(view(ViewKind.Rating))),
+        stmt("video_set_uri", Components, "set video of {view} to {uri}", "{view}.setVideoURI(Uri.parse({uri}));", "{view}.setVideoURI(Uri.parse({uri}))",
+            inputs = listOf(t("uri")), fields = listOf(view(ViewKind.Video)), imports = listOf("android.net.Uri")),
+        stmt("video_start", Components, "play {view}", "{view}.start();", "{view}.start()", fields = listOf(view(ViewKind.Video))),
+        stmt("video_pause", Components, "pause {view}", "{view}.pause();", "{view}.pause()", fields = listOf(view(ViewKind.Video))),
+        stmt("video_seek", Components, "move {view} to {ms} ms", "{view}.seekTo((int) {ms});", "{view}.seekTo({ms}.toInt())", inputs = listOf(n("ms")), fields = listOf(view(ViewKind.Video))),
+        value("video_is_playing", Components, "{view} is playing", ValueType.Boolean, "{view}.isPlaying()", "{view}.isPlaying", fields = listOf(view(ViewKind.Video))),
+        stmt("video_controls", Components, "show playback controls on {view}", "{view}.setMediaController(new MediaController(this));",
+            "{view}.setMediaController(MediaController(this))", fields = listOf(view(ViewKind.Video)), imports = listOf("android.widget.MediaController")),
+        stmt("calendar_set_date", Components, "set date of {view} to {ms} ms", "{view}.setDate((long) {ms});", "{view}.date = {ms}.toLong()",
+            inputs = listOf(n("ms")), fields = listOf(view(ViewKind.CalendarView))),
+        value("calendar_get_date", Components, "date of {view} in ms", ValueType.Number, "((double) {view}.getDate())", "{view}.date.toDouble()", fields = listOf(view(ViewKind.CalendarView))),
+        stmt("view_set_error", Components, "show error {text} on {view}", "{view}.setError(TextUtils.isEmpty({text}) ? null : {text});",
+            "{view}.error = ({text}).ifEmpty { null }", inputs = listOf(t("text")), fields = listOf(view(ViewKind.Edit)), imports = listOf("android.text.TextUtils")),
 
         // App
         stmt("app_toast_long", App, "show long message {text}", "Toast.makeText(this, {text}, Toast.LENGTH_LONG).show();", "Toast.makeText(this, {text}, Toast.LENGTH_LONG).show()",
