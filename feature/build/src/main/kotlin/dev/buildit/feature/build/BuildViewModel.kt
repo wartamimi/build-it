@@ -13,6 +13,11 @@ import dev.buildit.engine.build.BuildStep
 import dev.buildit.engine.build.BuildType
 import dev.buildit.engine.build.DebugBridge
 import dev.buildit.engine.build.Keys
+import dev.buildit.engine.build.NewKey
+import dev.buildit.engine.build.ReleaseKeyException
+import dev.buildit.engine.build.ReleaseKeyInfo
+import dev.buildit.engine.build.ReleaseKeyring
+import dev.buildit.engine.build.SigningKey
 import dev.buildit.engine.build.PlatformPackage
 import dev.buildit.engine.build.Toolchain
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,7 +56,21 @@ data class BuildUiState(
     val apk: ApkInfo? = null,
     val failedStep: BuildStep? = null,
     val cancelled: Boolean = false,
+    /** Release signing keys on this device, and the one this project signs release builds with. */
+    val releaseKeys: List<ReleaseKeyInfo> = emptyList(),
+    val releaseKey: String? = null,
+    val keyMessage: KeyMessage? = null,
+    /** Key work (creating takes a moment) in progress. */
+    val keyBusy: Boolean = false,
 )
+
+sealed interface KeyMessage {
+    data class Created(val name: String) : KeyMessage
+    data class Imported(val name: String) : KeyMessage
+    data class Exported(val name: String) : KeyMessage
+    data class Deleted(val name: String) : KeyMessage
+    data class Failed(val reason: ReleaseKeyException.Reason?, val detail: String) : KeyMessage
+}
 
 /**
  * Drives the on-device build for one project: makes sure the project's Android platform is
@@ -71,12 +90,68 @@ class BuildViewModel(
     private val maven: dev.buildit.engine.deps.MavenCache? = null,
     /** Kotlin compiler host; projects with Kotlin sources need it. */
     private val kotlin: dev.buildit.engine.build.KotlinCompilerHost? = null,
+    /** Release keys; without it only debug builds are offered. */
+    private val keyring: ReleaseKeyring? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(BuildUiState())
     val state: StateFlow<BuildUiState> = _state.asStateFlow()
     private val cancel = AtomicBoolean(false)
 
-    init { refreshPlatform() }
+    init { refreshPlatform(); loadKeys() }
+
+    val releaseAvailable: Boolean get() = keyring != null
+
+    private fun loadKeys() {
+        val ring = keyring ?: return
+        viewModelScope.launch {
+            val (keys, chosen) = withContext(dispatchers.io) { ring.list() to ring.assigned(projectId) }
+            _state.update { it.copy(releaseKeys = keys, releaseKey = chosen ?: keys.singleOrNull()?.id) }
+        }
+    }
+
+    fun selectKey(id: String) {
+        val ring = keyring ?: return
+        _state.update { it.copy(releaseKey = id) }
+        viewModelScope.launch { withContext(dispatchers.io) { ring.assign(projectId, id) } }
+    }
+
+    private fun keyWork(work: (ReleaseKeyring) -> Pair<ReleaseKeyInfo?, KeyMessage>) {
+        val ring = keyring ?: return
+        _state.update { it.copy(keyBusy = true, keyMessage = null) }
+        viewModelScope.launch {
+            val (info, message) = try {
+                withContext(dispatchers.io) {
+                    work(ring).also { (i, _) -> i?.let { ring.assign(projectId, it.id) } }
+                }
+            } catch (e: ReleaseKeyException) {
+                null to KeyMessage.Failed(e.reason, e.message.orEmpty())
+            } catch (e: Exception) {
+                null to KeyMessage.Failed(null, e.message ?: e.javaClass.simpleName)
+            }
+            val keys = withContext(dispatchers.io) { ring.list() }
+            _state.update { s -> s.copy(keyBusy = false, keyMessage = message, releaseKeys = keys, releaseKey = info?.id ?: s.releaseKey?.takeIf { id -> keys.any { it.id == id } }) }
+        }
+    }
+
+    fun createKey(k: NewKey) = keyWork { ring -> ring.create(k).let { it to KeyMessage.Created(it.name) } }
+
+    fun importKey(bytes: ByteArray, name: String, storePassword: CharArray, alias: String?, keyPassword: CharArray?) =
+        keyWork { ring -> ring.import(bytes, name, storePassword, alias, keyPassword).let { it to KeyMessage.Imported(it.name) } }
+
+    fun deleteKey(id: String) = keyWork { ring ->
+        val name = ring.list().firstOrNull { it.id == id }?.name.orEmpty()
+        ring.delete(id)
+        null to KeyMessage.Deleted(name)
+    }
+
+    /** Copies the keystore file to [write] (a document the user chose) for a backup. */
+    fun exportKey(id: String, write: (ByteArray) -> Unit) = keyWork { ring ->
+        val info = ring.list().first { it.id == id }
+        write(ring.keystore(id).readBytes())
+        null to KeyMessage.Exported(info.name)
+    }
+
+    fun dismissKeyMessage() = _state.update { it.copy(keyMessage = null) }
 
     /** Re-reads the project's compileSdk (it may have changed in Project settings) unless busy. */
     fun refreshPlatform() {
@@ -165,7 +240,7 @@ class BuildViewModel(
                     _state.update { it.copy(running = false, steps = emptyList(), api = app.compileSdk, platform = PlatformState.Missing(app.compileSdk)) }
                     return@launch
                 }
-                val request = BuildRequest(project.directory, app, jar, type, key = { Keys.debugKey(debugKeystore) }, toolCache = toolchain.cacheDir, console = console, maven = maven, kotlin = kotlin)
+                val request = BuildRequest(project.directory, app, jar, type, key = signingKey(type), toolCache = toolchain.cacheDir, console = console, maven = maven, kotlin = kotlin)
                 val result = withContext(dispatchers.default) { pipeline.run(request, ::onEvent, cancel::get) }
                 _state.update { s ->
                     s.copy(
@@ -181,6 +256,15 @@ class BuildViewModel(
             } catch (e: Exception) {
                 _state.update { it.copy(running = false, diagnostics = listOf(BuildDiagnostic(BuildDiagnostic.Severity.Error, e.message ?: e.javaClass.simpleName))) }
             }
+        }
+    }
+
+    private fun signingKey(type: BuildType): () -> SigningKey = when (type) {
+        BuildType.Debug -> { { Keys.debugKey(debugKeystore) } }
+        BuildType.Release -> {
+            val ring = keyring ?: error("Release signing is not available")
+            val id = _state.value.releaseKey ?: error("Choose a release key first")
+            ({ ring.key(id) })
         }
     }
 
