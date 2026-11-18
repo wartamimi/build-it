@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cd_tab">Kode</string>
+    <string name="cd_empty_title">Belum ada file terbuka</string>
+    <string name="cd_empty_body">Buka file sumber, layout, atau Gradle dari tab File untuk mengeditnya di sini.</string>
+    <string name="cd_failed">Gagal menyimpan: %1$s</string>
+    <string name="cd_cannot_open">Tidak dapat membuka %1$s: %2$s</string>
+    <string name="cd_conflict">File ini berubah di disk setelah Anda membukanya.</string>
+    <string name="cd_overwrite">Timpa</string>
+    <string name="cd_reload">Muat ulang</string>
+    <string name="cd_generated">Build It membuat file ini dari desainer dan blok. Editan Anda disimpan; pembuatan ulang akan bertanya sebelum menggantinya.</string>
+    <string name="cd_close_tab">Tutup %1$s</string>
+    <string name="cd_close_title">Simpan perubahan pada %1$s?</string>
+    <string name="cd_close_body">File ini memiliki perubahan yang belum disimpan.</string>
+    <string name="cd_leave_title">Simpan perubahan?</string>
+    <string name="cd_leave_body">Beberapa file terbuka memiliki perubahan yang belum disimpan.</string>
+    <string name="cd_save">Simpan</string>
+    <string name="cd_discard">Buang</string>
+    <string name="cd_undo">Urungkan</string>
+    <string name="cd_redo">Ulangi</string>
+    <string name="cd_find">Cari</string>
+    <string name="cd_go_to_line">Ke baris</string>
+    <string name="cd_line_number">Nomor baris</string>
+    <string name="cd_go">Buka</string>
+    <string name="cd_cancel">Batal</string>
+    <string name="cd_saving">Menyimpan…</string>
+    <string name="cd_unsaved">Belum disimpan</string>
+    <string name="cd_saved">Tersimpan</string>
+    <string name="cd_previous">Hasil sebelumnya</string>
+    <string name="cd_next">Hasil berikutnya</string>
+    <string name="cd_close">Tutup</string>
+    <string name="cd_replace_with">Ganti dengan</string>
+    <string name="cd_replace">Ganti</string>
+    <string name="cd_replace_all">Ganti semua</string>
+    <string name="cd_match_case">Huruf besar/kecil</string>
+    <string name="cd_whole_word">Kata utuh</string>
+    <string name="cd_regex">Regex</string>
+    <string name="cd_no_problems">Tidak ada masalah sintaks.</string>
+    <string name="cd_diag_unterminated_string">String tidak ditutup</string>
+    <string name="cd_diag_unterminated_comment">Komentar tidak ditutup</string>
+    <string name="cd_diag_unmatched_close">%1$s tanpa pasangan</string>
+    <string name="cd_diag_mismatched">Kurung tidak cocok %1$s</string>
+    <string name="cd_diag_unclosed">%1$s tidak pernah ditutup</string>
+    <string name="cd_diag_xml">XML: %1$s</string>
+    <string name="cd_diag_json">JSON: %1$s</string>
+</resources>

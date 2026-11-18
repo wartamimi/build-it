@@ -42,6 +42,9 @@ import dev.buildit.feature.settings.SettingsViewModel
 import dev.buildit.feature.blocks.BlocksScreen
 import dev.buildit.feature.blocks.BlocksViewModel
 import dev.buildit.feature.blocks.R as BlocksR
+import dev.buildit.feature.code.CodeScreen
+import dev.buildit.feature.code.CodeViewModel
+import dev.buildit.feature.code.R as CodeR
 import dev.buildit.feature.designer.DesignerScreen
 import dev.buildit.feature.designer.DesignerViewModel
 import dev.buildit.feature.designer.R as DesignerR
@@ -146,10 +149,18 @@ fun BuildItApp(container: AppContainer) {
                     val blocks: BlocksViewModel = viewModel(key = "bk-$id", factory = viewModelFactory {
                         initializer { BlocksViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers) }
                     })
-                    val tabs = remember(designer, blocks) {
+                    val code: CodeViewModel = viewModel(key = "cd-$id", factory = viewModelFactory {
+                        initializer { CodeViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers) }
+                    })
+                    val tabs = remember(designer, blocks, code) {
                         listOf(
                             WorkspaceExtraTab(title = { stringResource(DesignerR.string.ds_tab) }, content = { leave -> DesignerScreen(designer, onExit = leave) }),
                             WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_tab) }, content = { leave -> BlocksScreen(blocks, onExit = leave) }),
+                            WorkspaceExtraTab(
+                                title = { stringResource(CodeR.string.cd_tab) },
+                                content = { leave -> CodeScreen(code, onExit = leave) },
+                                opens = { path -> CodeViewModel.canOpen(path).also { if (it) code.open(path) } },
+                            ),
                         )
                     }
                     WorkspaceScreen(vm, onBack = { nav.popBackStack() }, extraTabs = tabs)

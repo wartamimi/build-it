@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cd_tab">Code</string>
+    <string name="cd_empty_title">No files open</string>
+    <string name="cd_empty_body">Open a source, layout or Gradle file from the Files tab to edit it here.</string>
+    <string name="cd_failed">Could not save: %1$s</string>
+    <string name="cd_cannot_open">Cannot open %1$s: %2$s</string>
+    <string name="cd_conflict">This file changed on disk after you opened it.</string>
+    <string name="cd_overwrite">Overwrite</string>
+    <string name="cd_reload">Reload</string>
+    <string name="cd_generated">Build It generates this file from the designer and blocks. Your edits are kept; regenerating will ask before replacing them.</string>
+    <string name="cd_close_tab">Close %1$s</string>
+    <string name="cd_close_title">Save changes to %1$s?</string>
+    <string name="cd_close_body">This file has unsaved changes.</string>
+    <string name="cd_leave_title">Save changes?</string>
+    <string name="cd_leave_body">Some open files have unsaved changes.</string>
+    <string name="cd_save">Save</string>
+    <string name="cd_discard">Discard</string>
+    <string name="cd_undo">Undo</string>
+    <string name="cd_redo">Redo</string>
+    <string name="cd_find">Find</string>
+    <string name="cd_go_to_line">Go to line</string>
+    <string name="cd_line_number">Line number</string>
+    <string name="cd_go">Go</string>
+    <string name="cd_cancel">Cancel</string>
+    <string name="cd_saving">Saving…</string>
+    <string name="cd_unsaved">Unsaved</string>
+    <string name="cd_saved">Saved</string>
+    <string name="cd_previous">Previous match</string>
+    <string name="cd_next">Next match</string>
+    <string name="cd_close">Close</string>
+    <string name="cd_replace_with">Replace with</string>
+    <string name="cd_replace">Replace</string>
+    <string name="cd_replace_all">Replace all</string>
+    <string name="cd_match_case">Match case</string>
+    <string name="cd_whole_word">Whole word</string>
+    <string name="cd_regex">Regex</string>
+    <string name="cd_no_problems">No syntax problems found.</string>
+    <string name="cd_diag_unterminated_string">Unterminated string</string>
+    <string name="cd_diag_unterminated_comment">Unterminated comment</string>
+    <string name="cd_diag_unmatched_close">Unmatched %1$s</string>
+    <string name="cd_diag_mismatched">Mismatched brackets %1$s</string>
+    <string name="cd_diag_unclosed">%1$s is never closed</string>
+    <string name="cd_diag_xml">XML: %1$s</string>
+    <string name="cd_diag_json">JSON: %1$s</string>
+</resources>

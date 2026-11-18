@@ -9,8 +9,8 @@ android {
 
     defaultConfig {
         applicationId = "dev.buildit.studio"
-        versionCode = 1
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
     }
 
     androidResources {
@@ -38,6 +38,7 @@ dependencies {
     implementation(project(":feature:workspace"))
     implementation(project(":feature:designer"))
     implementation(project(":feature:blocks"))
+    implementation(project(":feature:code"))
     implementation(project(":feature:settings"))
 
     implementation(libs.androidx.core.ktx)

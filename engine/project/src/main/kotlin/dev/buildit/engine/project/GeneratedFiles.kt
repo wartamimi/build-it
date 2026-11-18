@@ -58,6 +58,9 @@ class GeneratedFiles(private val projectDir: File) {
         return WriteResult.Written
     }
 
+    /** True when Build It generates [path] (e.g. from blocks or project settings). */
+    fun isTracked(path: String): Boolean = registry().containsKey(path)
+
     /** Stops tracking [path], e.g. when the user takes ownership of a generated file. */
     fun release(path: String) {
         val reg = registry()

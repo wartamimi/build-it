@@ -66,5 +66,11 @@ class AppFlowTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Application ID").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Files").performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("buildit.json").fetchSemanticsNodes().isNotEmpty() }
+
+        // A text file opens in the Code tab with its own editor tab.
+        compose.onNodeWithText("settings.gradle.kts").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Close settings.gradle.kts").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Kotlin").assertExists()
+        compose.onNodeWithText("Go to line").assertExists()
     }
 }

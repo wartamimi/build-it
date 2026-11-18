@@ -109,7 +109,11 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit, extraTabs
                     when (val extra = current) {
                         in extraTabs.indices -> extraTabs[extra].content(leave)
                         extraTabs.size -> ProjectSettingsTab(state, viewModel)
-                        else -> FilesTab(state.files, viewModel)
+                        else -> FilesTab(state.files, viewModel, openInTab = { path ->
+                            val i = extraTabs.indexOfFirst { it.opens?.invoke(path) == true }
+                            if (i >= 0) selected = i
+                            i >= 0
+                        })
                     }
                 }
             }
@@ -147,6 +151,8 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit, extraTabs
 class WorkspaceExtraTab(
     val title: @Composable () -> String,
     val content: @Composable (leave: () -> Unit) -> Unit,
+    /** Opens a project file in this tab; returns false if the tab can't handle it. */
+    val opens: ((path: String) -> Boolean)? = null,
 )
 
 @Composable
@@ -209,7 +215,7 @@ private fun ValidationIssue.text(): String = when (field to code) {
 }
 
 @Composable
-private fun FilesTab(files: FilesState, vm: WorkspaceViewModel) {
+private fun FilesTab(files: FilesState, vm: WorkspaceViewModel, openInTab: (String) -> Boolean) {
     var newItem by remember { mutableStateOf<Boolean?>(null) } // true = folder, false = file
     var fabMenu by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<ProjectEntry?>(null) }
@@ -232,7 +238,14 @@ private fun FilesTab(files: FilesState, vm: WorkspaceViewModel) {
                 LazyColumn(Modifier.fillMaxSize()) {
                     items(files.entries, key = { it.path }) { e ->
                         FileRow(e, protected = vm.isProtected(e),
-                            onClick = { if (e.isDirectory) vm.browse(e.path) else vm.openFile(e) },
+                            onClick = {
+                                when {
+                                    e.isDirectory -> vm.browse(e.path)
+                                    // Editable files open in the code editor; Build It's own metadata stays read-only here.
+                                    !vm.isProtected(e) && openInTab(e.path) -> Unit
+                                    else -> vm.openFile(e)
+                                }
+                            },
                             onRename = { renameTarget = e }, onDelete = { deleteTarget = e })
                     }
                 }

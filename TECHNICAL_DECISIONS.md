@@ -159,6 +159,25 @@ system per-app language settings on Android 13+.
 CI (GitHub Actions) runs unit tests and compiles every module. Per the owner's instruction the
 APK is **not** built or published until the final phase.
 
+### D12. Code editor on the platform text stack, not a third-party editor
+*Context:* the code editor needs highlighting, line numbers, undo/redo, find/replace and good IME
+behaviour (Indonesian and other keyboards, autocorrect off, hardware keyboards). Embedding a
+third-party editor component (e.g. Sora Editor, LGPL) adds licence obligations for a closed APK
+distribution and a large surface we cannot fix ourselves.
+*Decision:* `feature:code` uses a subclass of the platform `EditText` (`CodeEditText`), so the
+platform owns IME, selection handles, accessibility and copy/paste. Everything else lives in the
+pure-JVM `engine:editor` module and is unit tested: lexers (Java, Kotlin, Groovy Gradle, XML,
+JSON), search (case/whole word/regex) and replacement, syntax checks (brackets, unterminated
+strings/comments, XML well-formedness, JSON validity), and the edit history (coalesced typing,
+auto-indent recorded as part of the newline). Highlighting is applied only to the visible lines
+plus a margin, debounced, so typing in long files stays responsive.
+*Consequences:* files larger than 2 MB are not opened (the read-only viewer is used); there is no
+code completion yet. The editor sits behind its own module, so it can be replaced by a custom
+text view (piece table, incremental layout) later without touching the view model or the engine.
+*Safety:* saving compares the file on disk with the text that was loaded; if it changed (for
+example, the designer or blocks regenerated it), the editor reports a conflict and lets the user
+overwrite or reload instead of silently overwriting either side.
+
 ---
 
 ## Part C — Risks and mitigations (§20 item 11)
