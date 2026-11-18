@@ -66,16 +66,14 @@ jobs:
           script: ./gradlew :app:connectedDebugAndroidTest
       - name: Print device test failures
         if: always()
+        shell: python3 {0}
         run: |
-          for f in $(find app/build/outputs/androidTest-results -name '*.xml' 2>/dev/null); do
-            python3 - "$f" <<'PY'
-          import sys, xml.etree.ElementTree as ET
-          for case in ET.parse(sys.argv[1]).getroot().iter('testcase'):
-              for bad in list(case.findall('failure')) + list(case.findall('error')):
-                  print('FAILED', case.get('classname'), case.get('name'))
-                  print((bad.text or '')[:4000])
-          PY
-          done
+          import glob, xml.etree.ElementTree as ET
+          for f in glob.glob('app/build/outputs/androidTest-results/**/*.xml', recursive=True):
+              for case in ET.parse(f).getroot().iter('testcase'):
+                  for bad in case.findall('failure') + case.findall('error'):
+                      print('FAILED', case.get('classname'), case.get('name'))
+                      print((bad.text or '')[:4000])
       - name: Upload device test reports
         if: always()
         uses: actions/upload-artifact@v4
