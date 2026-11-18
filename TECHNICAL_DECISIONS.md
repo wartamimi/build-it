@@ -210,6 +210,40 @@ its SHA-1 matches. The debug key is a per-device PKCS#12 keystore created on fir
 *Consequences:* the app's APK grows noticeably (the R8 jar alone is 21 MB before dexing; to be measured when the APK is first built in Phase 8). Builds run in the app process for now
 (`largeHeap`); a separate build process is planned with Phase 8 performance work.
 
+### D15. AI assistant: user's own provider, whole-file proposals, applied only on confirmation
+*Decision:* The user brings their own provider. Claude is called through Anthropic's official Java
+SDK (`com.anthropic:anthropic-java`, streamed; default model `claude-opus-5-5`). Any other
+provider is reached through the OpenAI chat-completions protocol at a URL the user enters (for
+example a local model); plain `http://` is only accepted for localhost and private networks. The
+API key is encrypted with an AES-GCM key held in the Android Keystore; only ciphertext is stored,
+in app-private preferences excluded from backup. It is never logged, never in project files and
+never part of the settings JSON. The model sees only the files the user attaches (plus, if ticked,
+the last build's problems). File changes come back as complete files between `<<<FILE path="…">>>`
+and `<<<END>>>` markers; they are parsed, diffed locally (Myers line diff) against the file on
+disk, and shown per file with Apply and Discard. Apply writes only if the file still has exactly
+the content the diff was made against; otherwise it reports "changed since" and writes nothing.
+Paths outside the project, Build It metadata, build output and replies cut off mid-file are
+refused. An open editor tab reloads an applied file, or shows a conflict if it has unsaved edits.
+*Why whole files instead of patches:* models produce complete files more reliably than exact
+patches, and the local diff makes the review identical either way.
+*Consequences:* long files cost more output tokens; the SDK adds Jackson and OkHttp to the APK
+(size measured in Phase 8). Nothing runs without a key, and no request is made in tests: the
+clients are tested against a local HTTP server that speaks the providers' streaming formats.
+
+### D16. Debug console through a bridge injected into debug builds
+*Decision:* Debug builds made on the device get one generated ContentProvider class
+(`dev.buildit.debugbridge.BuildItDebugBridge`) and the manifest entries it needs (`<provider>`,
+`<queries>` for Build It). It starts with the app's process and forwards the app's own logcat
+lines (`logcat --pid`, which apps may read without permissions), activity lifecycle events and
+uncaught exceptions with stack traces, in batches, to Build It's exported insert-only console
+provider. Build It identifies the caller by its UID through the system and accepts entries only
+from apps signed with this device's Build It debug key. The user's sources are never changed,
+release builds never contain the bridge, and if Build It is not installed the bridge does nothing.
+*Consequences:* entries are kept in memory (newest 5,000 per app), not on disk. Logs from before
+the first bridge start (e.g. a crash in `Application` static init) may be missed. Behaviour on ART
+is verified with the emulator job in Phase 8; the JVM tests check the compiled APK with aapt2 and
+dexdump and the provider with Robolectric.
+
 ---
 
 ## Part C — Risks and mitigations (§20 item 11)
@@ -224,4 +258,7 @@ its SHA-1 matches. The debug key is a per-device PKCS#12 keystore created on fir
 | Dependency resolution edge cases | High | Medium | Start with Maven POM semantics; report unsupported metadata clearly; offline cache; tests against real AndroidX POMs. |
 | Block editor performance with large workspaces | Medium | Medium | Canvas renderer with viewport culling, cached block geometry, incremental layout; benchmark with 2,000+ blocks. |
 | Code editor performance on large files | Medium | Medium | Editor abstraction; piece-table text model; incremental highlighting. |
+| AI change overwrites newer user edits | Medium | High | Changes apply only on tap and only if the file is byte-for-byte what the diff was made against; files changed after sending are flagged; editors with unsaved edits show a conflict (D15). |
+| API key leakage | Low | High | Keystore-encrypted, excluded from backup, never logged or written into projects; sent only to the endpoint the user configured; http only for local networks (D15). |
+| Console provider abused by other apps | Low | Low | Insert-only, caller identified by UID and accepted only when signed with this device's debug key (D16). |
 | Data loss from bugs in file operations | Low | Very high | Atomic writes, staging dirs, refusal to touch paths outside the workspace, backups before migrations and restores, tests for each. |

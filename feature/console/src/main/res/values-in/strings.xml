@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cn_tab">Konsol</string>
+    <string name="cn_search">Cari log</string>
+    <string name="cn_follow">Ikuti</string>
+    <string name="cn_clear">Bersihkan</string>
+    <string name="cn_empty">Pasang dan buka build debug proyek ini (%1$s) di perangkat ini. Log, event activity, dan crash-nya muncul di sini selama berjalan.</string>
+    <string name="cn_no_match">Tidak ada entri yang cocok dengan filter.</string>
+    <string name="cn_level_verbose">Verbose</string>
+    <string name="cn_level_debug">Debug</string>
+    <string name="cn_level_info">Info</string>
+    <string name="cn_level_warn">Peringatan</string>
+    <string name="cn_level_error">Error</string>
+    <string name="cn_crash">Crash di thread %1$s pada %2$s</string>
+    <string name="cn_ask_ai">Tanya AI tentang crash ini</string>
+</resources>

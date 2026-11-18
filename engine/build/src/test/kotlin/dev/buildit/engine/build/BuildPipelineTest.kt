@@ -87,6 +87,33 @@ class BuildPipelineTest {
         assertTrue(certs1.contains("CN=Build It Debug"))
     }
 
+    @Test fun debugBuildsCarryTheConsoleBridgeAndReleaseBuildsDoNot() {
+        val (dir, app) = javaProject()
+        val host = DebugBridge.Host("dev.buildit.studio", "dev.buildit.studio.console")
+        val sdk = TestSdk.root
+        val buildTools = File(sdk, "build-tools").listFiles().orEmpty().sortedDescending().firstOrNull()
+        TestSdk.require(buildTools != null, "build-tools")
+
+        val debug = BuildPipeline().run(request(dir, app).copy(console = host))
+        assertTrue(debug.diagnostics.joinToString("\n"), debug.success)
+        val manifest = TestSdk.run(File(buildTools, "aapt2").path, "dump", "xmltree", "--file", "AndroidManifest.xml", debug.apk!!.path)
+        assertTrue(manifest, manifest.contains("E: queries"))
+        assertTrue(manifest, manifest.contains("\"dev.buildit.studio\""))
+        assertTrue(manifest, manifest.contains("\"dev.buildit.studio.console\""))
+        assertTrue(manifest, manifest.contains("\"${DebugBridge.CLASS}\""))
+        assertTrue(manifest, manifest.contains("\"com.example.hello.buildit-debug-bridge\""))
+        val dex = TestSdk.run(File(buildTools, "dexdump").path, debug.apk!!.path)
+        assertTrue(dex.contains("Ldev/buildit/debugbridge/BuildItDebugBridge;"))
+        // The project's own sources are untouched.
+        assertFalse(File(dir, "app/src/main/java/dev").exists())
+
+        val keystore = File(tmp.root, "release.p12").also { Keys.debugKey(it) }
+        val release = BuildPipeline().run(request(dir, app, BuildType.Release).copy(console = host, key = { Keys.debugKey(keystore) }))
+        assertTrue(release.diagnostics.joinToString("\n"), release.success)
+        assertFalse(TestSdk.run(File(buildTools, "dexdump").path, release.apk!!.path).contains("debugbridge"))
+        assertFalse(TestSdk.run(File(buildTools, "aapt2").path, "dump", "xmltree", "--file", "AndroidManifest.xml", release.apk!!.path).contains("queries"))
+    }
+
     @Test fun javaErrorsPointToTheSourceLine() {
         val (dir, app) = javaProject()
         val src = File(dir, "app/src/main/java/com/example/hello/MainActivity.java")

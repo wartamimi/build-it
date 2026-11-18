@@ -196,6 +196,15 @@ class CodeViewModel(
         }
     }
 
+    /**
+     * [path] was written outside the editor (for example an applied AI change). An open tab without
+     * unsaved edits reloads it; one with unsaved edits is marked as a conflict instead of being lost.
+     */
+    fun externalChange(path: String) {
+        val f = _state.value.files.firstOrNull { it.path == path } ?: return
+        if (f.dirty) updateFile(path) { it.copy(conflict = true) } else reload(path)
+    }
+
     /** Discards edits in [path] and loads it from disk. */
     fun reload(path: String) {
         viewModelScope.launch {

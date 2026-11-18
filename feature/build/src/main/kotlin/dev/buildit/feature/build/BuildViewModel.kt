@@ -11,6 +11,7 @@ import dev.buildit.engine.build.BuildPipeline
 import dev.buildit.engine.build.BuildRequest
 import dev.buildit.engine.build.BuildStep
 import dev.buildit.engine.build.BuildType
+import dev.buildit.engine.build.DebugBridge
 import dev.buildit.engine.build.Keys
 import dev.buildit.engine.build.PlatformPackage
 import dev.buildit.engine.build.Toolchain
@@ -64,6 +65,8 @@ class BuildViewModel(
     private val debugKeystore: File,
     private val dispatchers: DispatcherProvider,
     private val pipeline: BuildPipeline = BuildPipeline(),
+    /** Debug builds connect to this console (null leaves the console bridge out). */
+    private val console: DebugBridge.Host? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(BuildUiState())
     val state: StateFlow<BuildUiState> = _state.asStateFlow()
@@ -157,7 +160,7 @@ class BuildViewModel(
                     _state.update { it.copy(running = false, steps = emptyList(), api = app.compileSdk, platform = PlatformState.Missing(app.compileSdk)) }
                     return@launch
                 }
-                val request = BuildRequest(project.directory, app, jar, type, key = { Keys.debugKey(debugKeystore) }, toolCache = toolchain.cacheDir)
+                val request = BuildRequest(project.directory, app, jar, type, key = { Keys.debugKey(debugKeystore) }, toolCache = toolchain.cacheDir, console = console)
                 val result = withContext(dispatchers.default) { pipeline.run(request, ::onEvent, cancel::get) }
                 _state.update { s ->
                     s.copy(

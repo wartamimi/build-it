@@ -111,8 +111,12 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit, extraTabs
                         if (i >= 0) selected = i
                         i >= 0
                     }
+                    val showTab = { key: String ->
+                        val i = extraTabs.indexOfFirst { it.key == key }
+                        if (i >= 0) selected = i
+                    }
                     when (val extra = current) {
-                        in extraTabs.indices -> extraTabs[extra].content(WorkspaceTabScope(leave, openInTab))
+                        in extraTabs.indices -> extraTabs[extra].content(WorkspaceTabScope(leave, openInTab, showTab))
                         extraTabs.size -> ProjectSettingsTab(state, viewModel)
                         else -> FilesTab(state.files, viewModel, openInTab = openInTab)
                     }
@@ -147,9 +151,9 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit, extraTabs
 
 /**
  * What a contributed tab can ask of the workspace: [leave] it (after finishing its own work), or
- * [openFile] in whichever tab opens that file (returns false if none can).
+ * [openFile] in whichever tab opens that file (returns false if none can), or [showTab] by its key.
  */
-class WorkspaceTabScope(val leave: () -> Unit, val openFile: (path: String) -> Boolean)
+class WorkspaceTabScope(val leave: () -> Unit, val openFile: (path: String) -> Boolean, val showTab: (key: String) -> Unit = {})
 
 /** A tab contributed by another feature (e.g. the designer). Extra tabs come first. */
 class WorkspaceExtraTab(
@@ -157,6 +161,8 @@ class WorkspaceExtraTab(
     val content: @Composable (WorkspaceTabScope) -> Unit,
     /** Opens a project file in this tab; returns false if the tab can't handle it. */
     val opens: ((path: String) -> Boolean)? = null,
+    /** Lets other tabs switch to this one with [WorkspaceTabScope.showTab]. */
+    val key: String? = null,
 )
 
 @Composable

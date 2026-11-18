@@ -13,6 +13,8 @@ import dev.buildit.core.data.WorkspaceInfo
 import dev.buildit.core.database.BuildItDatabase
 import dev.buildit.engine.project.ProjectStore
 import dev.buildit.engine.build.Toolchain
+import dev.buildit.engine.build.DebugBridge
+import dev.buildit.engine.ai.AiSettingsStore
 import java.io.File
 
 private val Context.settingsStore by preferencesDataStore(name = "settings")
@@ -29,6 +31,12 @@ class AppContainer(context: Context) {
     val toolchainDir: File = File(appContext.filesDir, "toolchain")
     val toolchain: Toolchain by lazy { Toolchain(toolchainDir) }
     val debugKeystore: File get() = File(toolchainDir, "keys/debug.p12")
+
+    /** AI provider settings; the API key itself is kept encrypted by the Android Keystore. */
+    val aiSettings: AiSettingsStore by lazy { AiSettingsStore(File(appContext.filesDir, "ai/config.json"), KeystoreSecretStore(appContext)) }
+
+    /** Debug builds send their logs here (see the console provider in feature:console). */
+    val consoleHost = DebugBridge.Host(appContext.packageName, appContext.packageName + ".console")
 
     private val database: BuildItDatabase by lazy { BuildItDatabase.create(appContext) }
     private val projectStore: ProjectStore by lazy { ProjectStore(workspaceDir) }

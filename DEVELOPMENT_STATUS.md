@@ -4,12 +4,13 @@ Last updated: 2026-11-18
 
 ## Summary
 
-Phases 0–5 are implemented and Phase 6 is partly done. The app shell, design system, project
-management, the project workspace (settings + file explorer), the visual layout designer, the
-block editor (with Java and Kotlin code generation), the code editor and the on-device build of
-**Java** projects into signed, verified debug APKs work end to end and are covered by tests. Not
-yet: library dependencies, Kotlin compilation, AAB and release signing UI in the build engine,
-and the AI assistant (Phase 7). Per the owner's instruction, no APK is built or published until the final
+Phases 0–5 and 7 are implemented and Phase 6 is partly done. The app shell, design system,
+project management, the project workspace (settings + file explorer), the visual layout designer,
+the block editor (with Java and Kotlin code generation), the code editor, the on-device build of
+**Java** projects into signed, verified debug APKs, the AI assistant with reviewed changes and the
+debug console work end to end and are covered by tests. Not yet: library dependencies, Kotlin
+compilation, AAB and release signing UI in the build engine, and any run on a real device or
+emulator (Phase 8). Per the owner's instruction, no APK is built or published until the final
 phase; CI compiles the app and runs the tests.
 
 ## Phase 1 — Foundation: complete
@@ -204,10 +205,46 @@ Known gaps (planned)
   process and foreground service come with Phase 8.
 - Native libraries (`jniLibs`) are not packaged.
 
+## Phase 7 — AI assistant and debug console: complete, with known gaps
+
+Completed features
+- AI tab with provider setup: Claude (Anthropic) through the official Java SDK, default model
+  `claude-opus-5-5`, or any OpenAI-compatible endpoint (e.g. a local model). Model, endpoint and
+  maximum reply length are editable; the API key is encrypted with the Android Keystore and kept
+  out of project files and settings (TECHNICAL_DECISIONS D15).
+- Chat that streams the reply as it arrives, with Stop. The user attaches project files (picker of
+  the project's text files) and can include the last build's problems; the model sees nothing else.
+- Every file the model wants to write is shown as a diff (added/removed lines with line numbers)
+  with Apply, Discard and "Apply all". Applying writes only if the file is unchanged since the diff
+  was made; files edited after they were sent, generated files, new files, and refused paths
+  (outside the project, Build It metadata, build output, replies cut off mid-file) are labelled.
+  Open Code tabs reload applied files, or show a conflict when they have unsaved edits.
+- Errors are explained (invalid key, rate limit, overloaded, model not found, network, refusal,
+  reply cut off by the length limit).
+- Debug builds include a console bridge (D16): logs (`logcat --pid` of the app), activity
+  lifecycle events and crashes with stack traces reach the Console tab. Release builds do not
+  include it, and the project's files are not changed.
+- Console tab: minimum level filter, search, follow, clear; crash cards whose stack frames open
+  the source line in the Code tab when the class is in the project; "Ask AI about this crash"
+  fills the AI composer with the stack trace and attaches the crashing file.
+- The console provider is exported but insert-only and accepts entries only from apps signed with
+  this device's Build It debug key (checked by UID through the package manager).
+
+Known gaps
+- **Nothing in this phase has run on a device yet** (no emulator here). The bridge APK is checked
+  with aapt2 and dexdump, the provider with Robolectric, and the AI clients against a local server
+  that replays each provider's streaming format; no request to a real provider is made in tests.
+- The Keystore secret store is not unit-tested (Robolectric has no AndroidKeyStore); it is covered
+  by the Phase 8 emulator job.
+- Chat history is kept per open project in memory only; it is not saved across app restarts.
+- The assistant cannot delete or rename files; it proposes full file contents only.
+- Console entries live in memory (newest 5,000); logs from before the bridge starts (very early
+  process start) can be missed.
+
 ## Build status
 
-- `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test` —
-  passing locally (110 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
+- `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:ai:test` —
+  passing locally (130 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
 - APK: intentionally not built yet (owner's instruction: only after the final phase).
 
@@ -233,12 +270,19 @@ Known gaps (planned)
 | feature:code CodeEditTextTest (Robolectric, real view: auto-indent, undo/redo) | 2 | pass |
 | engine:build FrameworkResourcesTest (ids/enums/flags vs android.jar's R classes) | 1 | pass |
 | engine:build ResourceCompilerTest (checked with the SDK's aapt2; values, qualifiers, errors with lines) | 3 | pass |
-| engine:build BuildPipelineTest (signed APK accepted by aapt2, dexdump, apksigner; Java errors; unsupported inputs; cancel) | 4 | pass |
+| engine:build BuildPipelineTest (signed APK accepted by aapt2, dexdump, apksigner; console bridge only in debug builds; Java errors; unsupported inputs; cancel) | 5 | pass |
 | engine:build ToolchainTest (official index format, SHA-1 check, cancel) | 3 | pass |
 | feature:build BuildViewModelTest (license before download, real build, failed step) | 3 | pass |
+| engine:ai AnthropicAiClientTest (official SDK against a local server: streaming, request body, auth error, cancel) | 3 | pass |
+| engine:ai OpenAiCompatibleClientTest (streaming, usage, no-key requests, provider errors) | 2 | pass |
+| engine:ai ProposalTest (parser, cut-off files, randomized diff round-trip, hunks) | 4 | pass |
+| engine:ai ChangeSetTest (path escapes refused, apply only if unchanged, changed-since-sent) | 3 | pass |
+| engine:ai AiSettingsStoreTest (key never in the config file, setup checks) | 2 | pass |
+| feature:ai AiViewModelTest (attached files sent, nothing written until Apply, refused paths, setup gate, errors) | 2 | pass |
+| feature:console ConsoleTest (Robolectric provider: unverified callers rejected, logcat parsing; stack-frame links; filters, capacity) | 3 | pass |
 | core:database ProjectDaoTest | 3 | pass |
 | core:data ProjectRepositoryTest | 4 | pass |
-| app AppFlowTest (Robolectric, end-to-end create → designer → saved XML → blocks → saved block file → settings → files → code tab → build tab) | 1 | pass |
+| app AppFlowTest (Robolectric, end-to-end create → designer → saved XML → blocks → saved block file → settings → files → code tab → build tab → console tab → AI setup) | 1 | pass |
 
 ## Known issues
 
@@ -248,6 +292,7 @@ Known gaps (planned)
 
 ## Next
 
-Phase 7: AI assistant (providers, reviewed proposals that never overwrite code silently) and the
-debug console. The remaining Phase 6 items (dependencies, Kotlin, AAB, release signing UI) are
-tracked above; on-device verification of the build engine runs in Phase 8.
+Phase 8: integration and an emulator CI job that runs the on-device build, the console bridge and
+the Keystore store on ART (including the Kotlin-on-ART spike), performance and memory work, a
+security review, then building and publishing the APK. The remaining Phase 6 items
+(dependencies, Kotlin, AAB, release signing UI) are tracked above.

@@ -47,8 +47,15 @@ import dev.buildit.feature.code.CodeScreen
 import dev.buildit.feature.code.CodeViewModel
 import dev.buildit.feature.code.R as CodeR
 import dev.buildit.feature.build.BuildScreen
+import dev.buildit.feature.ai.AiScreen
+import dev.buildit.feature.ai.AiViewModel
+import dev.buildit.feature.console.ConsoleLog
+import dev.buildit.feature.console.ConsoleScreen
+import dev.buildit.feature.console.ConsoleViewModel
 import dev.buildit.feature.build.BuildViewModel
 import dev.buildit.feature.build.R as BuildR
+import dev.buildit.feature.ai.R as AiR
+import dev.buildit.feature.console.R as ConsoleR
 import dev.buildit.studio.ApkActions
 import dev.buildit.feature.designer.DesignerScreen
 import dev.buildit.feature.designer.DesignerViewModel
@@ -59,6 +66,8 @@ import dev.buildit.feature.workspace.WorkspaceViewModel
 import dev.buildit.studio.AppContainer
 import dev.buildit.studio.R
 import kotlin.reflect.KClass
+
+private const val AI_TAB = "ai"
 
 private enum class TopLevel(val route: Any, val routeClass: KClass<*>, val label: Int, val icon: ImageVector) {
     Home(HomeRoute, HomeRoute::class, R.string.nav_home, BiIcons.Home),
@@ -158,10 +167,22 @@ fun BuildItApp(container: AppContainer) {
                         initializer { CodeViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers) }
                     })
                     val build: BuildViewModel = viewModel(key = "bd-$id", factory = viewModelFactory {
-                        initializer { BuildViewModel(id, container.projectRepository, container.toolchain, container.debugKeystore, container.dispatchers) }
+                        initializer { BuildViewModel(id, container.projectRepository, container.toolchain, container.debugKeystore, container.dispatchers, console = container.consoleHost) }
+                    })
+                    val console: ConsoleViewModel = viewModel(key = "cn-$id", factory = viewModelFactory {
+                        initializer { ConsoleViewModel(id, container.projectRepository, ConsoleLog.shared, container.dispatchers) }
+                    })
+                    val ai: AiViewModel = viewModel(key = "ai-$id", factory = viewModelFactory {
+                        initializer {
+                            AiViewModel(
+                                id, container.projectRepository, container.aiSettings, container.dispatchers,
+                                buildProblems = { build.state.value.diagnostics.map { it.toString() } },
+                                onFilesWritten = { paths -> paths.forEach(code::externalChange) },
+                            )
+                        }
                     })
                     val context = LocalContext.current
-                    val tabs = remember(designer, blocks, code, build) {
+                    val tabs = remember(designer, blocks, code, build, console, ai) {
                         listOf(
                             WorkspaceExtraTab(title = { stringResource(DesignerR.string.ds_tab) }, content = { scope -> DesignerScreen(designer, onExit = scope.leave) }),
                             WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_tab) }, content = { scope -> BlocksScreen(blocks, onExit = scope.leave) }),
@@ -181,6 +202,18 @@ fun BuildItApp(container: AppContainer) {
                                     )
                                 },
                             ),
+                            WorkspaceExtraTab(
+                                title = { stringResource(ConsoleR.string.cn_tab) },
+                                content = { scope ->
+                                    val askTemplate = stringResource(AiR.string.ai_ask_crash)
+                                    ConsoleScreen(
+                                        console,
+                                        onOpenSource = { path, line -> if (CodeViewModel.canOpen(path)) { code.reveal(path, line); scope.openFile(path) } },
+                                        onAskAi = { text, path -> ai.prefill(askTemplate.format(text), listOfNotNull(path)); scope.showTab(AI_TAB) },
+                                    )
+                                },
+                            ),
+                            WorkspaceExtraTab(title = { stringResource(AiR.string.ai_tab) }, content = { AiScreen(ai) }, key = AI_TAB),
                         )
                     }
                     WorkspaceScreen(vm, onBack = { nav.popBackStack() }, extraTabs = tabs)

@@ -14,7 +14,7 @@ are updated (§19). Status details are in [DEVELOPMENT_STATUS.md](DEVELOPMENT_ST
 | 5 | Code editor: editor abstraction, Java/Kotlin/XML/JSON/Gradle highlighting, find/replace, tabs, diagnostics | Done (see known gaps) |
 | 6 | Local build engine: Toolchain Manager, Kotlin-on-ART spike, dependency resolver, AAPT2/ECJ/D8/R8, APK/AAB, signing, verification | Partly done: Java projects build to signed, verified APKs on the device; see known gaps (dependencies, Kotlin, AAB) |
 | 6b | Gradle compatibility mode (experimental, non-Play builds) | Not started |
-| 7 | AI providers and assistant (reviewed proposals), debug console, runtime log bridge | Not started |
+| 7 | AI providers and assistant (reviewed proposals), debug console, runtime log bridge | Done: Claude (official SDK) and OpenAI-compatible providers, reviewed per-file diffs, console bridge in debug builds; not yet run on a device (Phase 8) |
 | 8 | Integration, performance and memory work, compatibility testing, security review, release (APK built and published here) | Not started |
 
 ## Phase 1 implementation plan (as executed)

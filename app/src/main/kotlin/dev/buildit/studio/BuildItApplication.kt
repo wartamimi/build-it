@@ -2,6 +2,7 @@ package dev.buildit.studio
 
 import android.app.Application
 import android.util.Log
+import dev.buildit.feature.console.ConsoleLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -16,6 +17,7 @@ class BuildItApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        ConsoleLog.verifier = DebugBuildVerifier(this, container.debugKeystore)
         // Recovery after unexpected termination: drop half-finished operations and make the
         // project index match what is actually on disk.
         appScope.launch(container.dispatchers.io) {

@@ -19,6 +19,8 @@ data class ManifestOptions(
     val minSdk: Int,
     val targetSdk: Int,
     val debuggable: Boolean,
+    /** Adds the console bridge provider and the package query it needs (debug builds only). */
+    val debugBridge: dev.buildit.engine.build.DebugBridge.Host? = null,
 )
 
 class CompiledResources(
@@ -407,6 +409,23 @@ class ResourceCompiler(
             .withAttribute("package", o.applicationId)
             .withAttribute(a("versionCode"), o.versionCode.toString())
             .withAttribute(a("versionName"), o.versionName)
+        o.debugBridge?.let { host ->
+            val app = root.elements.firstOrNull { it.name == "application" }
+            if (app == null) diagnostics.warning("No <application> element: the debug console is not connected", relative(file))
+            else {
+                val provider = XmlElement(-2, "provider", linkedMapOf(
+                    a("name") to dev.buildit.engine.build.DebugBridge.CLASS,
+                    a("authorities") to dev.buildit.engine.build.DebugBridge.ownAuthority(o.applicationId),
+                    a("exported") to "false",
+                    a("initOrder") to "1000",
+                ))
+                val queries = XmlElement(-3, "queries", children = listOf(
+                    XmlElement(-4, "package", linkedMapOf(a("name") to host.packageName)),
+                    XmlElement(-5, "provider", linkedMapOf(a("authorities") to host.authority)),
+                ))
+                root = root.copy(children = listOf(queries) + root.children.map { c -> if (c === app) app.copy(children = app.children + provider) else c })
+            }
+        }
         if (root.elements.none { it.name == "uses-sdk" }) {
             val usesSdk = XmlElement(-1, "uses-sdk", linkedMapOf(a("minSdkVersion") to o.minSdk.toString(), a("targetSdkVersion") to o.targetSdk.toString()))
             root = root.copy(children = listOf(usesSdk) + root.children)

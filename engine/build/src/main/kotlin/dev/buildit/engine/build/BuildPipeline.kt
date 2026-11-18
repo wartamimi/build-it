@@ -21,6 +21,8 @@ data class BuildRequest(
     val module: String = "app",
     /** Where prepared tool files (compiler stubs) are cached; defaults to the project's build dir. */
     val toolCache: File? = null,
+    /** Debug builds connect to this console host (see [DebugBridge]); null leaves the bridge out. */
+    val console: DebugBridge.Host? = null,
 )
 
 sealed interface BuildEvent {
@@ -87,7 +89,8 @@ class BuildPipeline(private val frameworkCache: (File) -> FrameworkResources = :
             onEvent(BuildEvent.Log("${sources.size} Java file(s)"))
 
             // 2. Resources and manifest.
-            val options = ManifestOptions(app.packageName, app.effectiveNamespace, app.versionCode, app.versionName, app.minSdk, app.targetSdk, request.type == BuildType.Debug)
+            val options = ManifestOptions(app.packageName, app.effectiveNamespace, app.versionCode, app.versionName, app.minSdk, app.targetSdk, request.type == BuildType.Debug,
+                debugBridge = request.console.takeIf { request.type == BuildType.Debug })
             val resources = step(BuildStep.Resources) {
                 val fw = frameworkCache(request.androidJar)
                 ResourceCompiler(fw, d, ::rel).compile(File(main, "res"), File(main, "AndroidManifest.xml"), options)
@@ -101,9 +104,15 @@ class BuildPipeline(private val frameworkCache: (File) -> FrameworkResources = :
                 val pkgDir = File(gen, app.effectiveNamespace.replace('.', '/')).apply { mkdirs() }
                 File(pkgDir, "R.java").writeText(resources.rJava)
                 File(pkgDir, "BuildConfig.java").writeText(buildConfig(app, request.type))
+                val extra = mutableListOf(File(pkgDir, "R.java"), File(pkgDir, "BuildConfig.java"))
+                if (options.debugBridge != null) {
+                    val bridge = File(gen, DebugBridge.CLASS.replace('.', '/') + ".java").apply { parentFile.mkdirs() }
+                    bridge.writeText(DebugBridge.source(options.debugBridge))
+                    extra += bridge
+                }
                 classes.deleteRecursively()
                 val stubs = LambdaStubs.classes(request.androidJar, request.toolCache ?: File(project, "build/buildit/tools"))
-                JavaCompiler.compile(sources + listOf(File(pkgDir, "R.java"), File(pkgDir, "BuildConfig.java")), request.androidJar, classes, d, ::rel, stubs)
+                JavaCompiler.compile(sources + extra, request.androidJar, classes, d, ::rel, stubs)
             }.let { ok -> if (!ok || d.hasErrors) return fail() }
 
             // 4. Dex.

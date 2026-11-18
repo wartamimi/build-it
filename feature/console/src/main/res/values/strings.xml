@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cn_tab">Console</string>
+    <string name="cn_search">Search logs</string>
+    <string name="cn_follow">Follow</string>
+    <string name="cn_clear">Clear</string>
+    <string name="cn_empty">Install and open a debug build of this project (%1$s) on this device. Its logs, activity events and crashes appear here while it runs.</string>
+    <string name="cn_no_match">No entries match the filter.</string>
+    <string name="cn_level_verbose">Verbose</string>
+    <string name="cn_level_debug">Debug</string>
+    <string name="cn_level_info">Info</string>
+    <string name="cn_level_warn">Warning</string>
+    <string name="cn_level_error">Error</string>
+    <string name="cn_crash">Crash on thread %1$s at %2$s</string>
+    <string name="cn_ask_ai">Ask AI about this crash</string>
+</resources>

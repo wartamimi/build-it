@@ -51,14 +51,16 @@ Flow throughout; blocking I/O runs on the injected `io` dispatcher.
 | `feature:code` | Android + Compose | Code editor: file tabs, `EditText`-based editor with gutter and highlighting, find/replace, go to line, problems, conflict handling; contributed as the Code tab and opened from Files. |
 | `engine:build` | JVM | On-device build: resource compiler (binary XML, resources.arsc, R.java), ECJ Java compiler, D8, APK packaging, apksig signing/verification, build pipeline with steps and diagnostics, toolchain manager (official platform download, license, SHA-1). |
 | `feature:build` | Android + Compose | Build tab: platform install with license, build with live steps, problems that open the file at the line, install/share the APK. |
+| `engine:ai` | JVM | AI providers (Claude via the official Anthropic Java SDK; OpenAI-compatible endpoints), prompt assembly, proposal parser, line diff, change set that applies files only if unchanged (D15). |
+| `feature:ai` | Android + Compose | AI tab: provider setup (Keystore-encrypted key), chat with attached files and build problems, per-file diff review with Apply/Discard. |
+| `feature:console` | Android + Compose | Console tab and the exported insert-only console provider fed by the debug bridge (D16): log levels, search, crash cards with stack frames that open the source, "Ask AI". |
 | `feature:home` | Android + Compose | Dashboard: quick actions, recent projects, storage. |
 | `feature:projects` | Android + Compose | Project list, search/sort, create sheet, rename/duplicate/delete, ZIP import/export (SAF), backups. |
 | `feature:workspace` | Android + Compose | Open project: project settings (app ID, versions, SDK levels) and file explorer. Editor tabs are added per phase. |
 | `feature:settings` | Android + Compose | Theme, dynamic color, language, editor font size, auto-save, rescan workspace, about. |
 | `build-logic` | Gradle | Convention plugins shared by all modules. |
 
-Planned modules: `engine:ai`, `feature:ai`, `feature:console` (Phase 7);
-`feature:resources` (later).
+Planned modules: `feature:resources` (later).
 
 ## 3. Storage
 

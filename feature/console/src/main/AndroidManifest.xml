@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!--
+            Receives logs, lifecycle events and crashes from debug builds made by Build It on this
+            device. Insert-only; each caller must be signed with this device's Build It debug key.
+        -->
+        <provider
+            android:name="dev.buildit.feature.console.ConsoleProvider"
+            android:authorities="${applicationId}.console"
+            android:exported="true" />
+    </application>
+</manifest>

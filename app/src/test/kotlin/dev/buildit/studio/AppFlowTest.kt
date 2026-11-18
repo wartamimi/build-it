@@ -55,7 +55,7 @@ class AppFlowTest {
         assertTrue(layout.readText(), layout.readText().contains("android:id=\"@+id/button"))
 
         // Blocks tab: add a block from the palette and save; the block file is written.
-        compose.onNodeWithText("Blocks").performClick()
+        compose.onNodeWithText("Blocks").performScrollTo().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("App").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("App").performScrollTo().performClick()
         compose.onNodeWithText("close this screen").performScrollTo().performClick()
@@ -63,9 +63,9 @@ class AppFlowTest {
         compose.onNodeWithContentDescription("Save").performClick()
         compose.waitUntil(10_000) { File(workspace, ".buildit/blocks/MainActivity.json").let { it.isFile && it.readText().contains("app_finish") } }
 
-        compose.onNodeWithText("Project").performClick()
+        compose.onNodeWithText("Project").performScrollTo().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Application ID").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Files").performClick()
+        compose.onNodeWithText("Files").performScrollTo().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("buildit.json").fetchSemanticsNodes().isNotEmpty() }
 
         // A text file opens in the Code tab with its own editor tab.
@@ -75,8 +75,18 @@ class AppFlowTest {
         compose.onNodeWithText("Go to line").assertExists()
 
         // Build tab: no platform is installed in a fresh app, so it offers the official download.
-        compose.onNodeWithText("Build").performClick()
+        compose.onNodeWithText("Build").performScrollTo().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Download platform").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Build debug APK").assertIsNotEnabled()
+
+        // Console tab: nothing has run yet, so it explains how to connect a debug build.
+        compose.onNodeWithText("Console").performScrollTo().performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Install and open a debug build", substring = true).fetchSemanticsNodes().isNotEmpty() }
+
+        // AI tab: no key yet, so it opens the provider setup with Claude selected and Save disabled.
+        compose.onNodeWithText("AI").performScrollTo().performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Enter an API key.").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Save").assertIsNotEnabled()
+        assertTrue(compose.onAllNodesWithText("claude-opus-5-5").fetchSemanticsNodes().isNotEmpty())
     }
 }
