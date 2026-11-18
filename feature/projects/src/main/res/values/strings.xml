@@ -31,8 +31,6 @@
     <string name="projects_field_package">Package name</string>
     <string name="projects_field_package_hint">Unique ID of your app, e.g. com.yourname.app</string>
     <string name="projects_field_language">Template</string>
-    <string name="projects_template_java">Empty Activity (Java)</string>
-    <string name="projects_template_kotlin">Empty Activity (Kotlin)</string>
     <string name="projects_template_empty_desc">One screen with a text label</string>
     <string name="projects_msg_created">Created “%1$s”</string>
     <string name="projects_msg_imported">Imported “%1$s”</string>
@@ -54,4 +52,19 @@
     <string name="projects_restore_confirm_title">Restore this backup?</string>
     <string name="projects_restore_confirm_body">The project goes back to this backup. Its current state is saved as a new backup first, so you can undo this.</string>
     <string name="projects_msg_restored">Backup restored</string>
+    <string name="projects_field_template">Start from</string>
+    <string name="projects_kotlin_hint">Kotlin projects download the Kotlin compiler (about 60 MB) the first time they are built.</string>
+    <string name="projects_template_empty">Empty screen</string>
+    <string name="projects_template_counter">Counter</string>
+    <string name="projects_template_counter_desc">Plus, minus and reset buttons with a variable</string>
+    <string name="projects_template_calculator">Calculator</string>
+    <string name="projects_template_calculator_desc">Two numbers and the four operations, with input checks</string>
+    <string name="projects_template_todo">To-do list</string>
+    <string name="projects_template_todo_desc">A list that is saved; tap a task to remove it</string>
+    <string name="projects_template_notes">Notes</string>
+    <string name="projects_template_notes_desc">One note kept between launches</string>
+    <string name="projects_template_stopwatch">Stopwatch</string>
+    <string name="projects_template_stopwatch_desc">Start, stop and reset with a timer component</string>
+    <string name="projects_template_dice">Dice</string>
+    <string name="projects_template_dice_desc">Random numbers and a roll count</string>
 </resources>

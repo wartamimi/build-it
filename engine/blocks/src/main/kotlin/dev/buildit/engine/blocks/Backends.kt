@@ -494,7 +494,7 @@ object KotlinBackend : Backend {
             is ChangeVar -> line("${s.name} += ${e(s.by)}")
             is ListAdd -> line("${s.list}.add(${e(s.item)})")
             is ListClear -> line("${s.list}.clear()")
-            is SetViewText -> line("${s.view}.text = ${c(s.text)}")
+            is SetViewText -> line("${s.view}.setText(${c(s.text)})")
             is SetVisibility -> line("${s.view}.visibility = View.${s.visibility.uppercase()}")
             is SetEnabled -> line("${s.view}.isEnabled = ${e(s.value)}")
             is SetChecked -> line("${s.view}.isChecked = ${e(s.value)}")

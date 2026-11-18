@@ -60,4 +60,5 @@ dependencies {
     implementation(libs.r8)
     implementation(libs.apksig)
     implementation(libs.kotlinx.serialization.json)
+    testImplementation(project(":engine:blocks"))
 }
