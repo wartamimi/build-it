@@ -17,8 +17,20 @@ android {
         generateLocaleConfig = true
     }
 
+    // Release signing comes from the environment (CI secrets); without it the release APK is unsigned.
+    val keystore = providers.environmentVariable("BUILDIT_KEYSTORE").orNull
+    signingConfigs {
+        if (keystore != null) create("release") {
+            storeFile = file(keystore)
+            storePassword = providers.environmentVariable("BUILDIT_KEYSTORE_PASSWORD").get()
+            keyAlias = providers.environmentVariable("BUILDIT_KEY_ALIAS").get()
+            keyPassword = providers.environmentVariable("BUILDIT_KEY_PASSWORD").get()
+        }
+    }
+
     buildTypes {
         release {
+            if (keystore != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -53,6 +65,11 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
+
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(project(":engine:build"))
+    androidTestImplementation(project(":engine:ai"))
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

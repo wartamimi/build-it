@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Plain HTTP is needed for AI servers on the device or the local network (e.g. a local model).
+    The app itself only allows http:// for localhost and private network addresses (AiConfig);
+    the platform download and Claude always use HTTPS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
