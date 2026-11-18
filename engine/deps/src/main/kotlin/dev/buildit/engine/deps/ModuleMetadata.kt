@@ -12,7 +12,8 @@ import kotlinx.serialization.json.contentOrNull
  * (`available-at`) for Kotlin Multiplatform libraries.
  */
 sealed interface ModuleVariant {
-    data class Local(val files: List<Pair<String, String>>, val dependencies: List<Declared>) : ModuleVariant // (name, url)
+    /** [constraints] raise the version of a module when something else brings it in (Gradle `dependencyConstraints`). */
+    data class Local(val files: List<Pair<String, String>>, val dependencies: List<Declared>, val constraints: List<Declared> = emptyList()) : ModuleVariant // (name, url)
     data class Redirect(val to: Coordinate) : ModuleVariant
 }
 
@@ -46,12 +47,12 @@ object ModuleMetadata {
             return ModuleVariant.Redirect(Coordinate(g, m, ver))
         }
         val files = (v["files"] as? JsonArray)?.mapNotNull { f -> (f as? JsonObject)?.let { o -> (o.str("name") ?: return@mapNotNull null) to (o.str("url") ?: return@mapNotNull null) } }.orEmpty()
-        val deps = (v["dependencies"] as? JsonArray)?.mapNotNull { d ->
+        fun declared(key: String) = (v[key] as? JsonArray)?.mapNotNull { d ->
             val o = d as? JsonObject ?: return@mapNotNull null
             val ver = o["version"] as? JsonObject
             val version = ver?.str("strictly") ?: ver?.str("requires") ?: ver?.str("prefers") ?: ""
             Declared(o.str("group") ?: return@mapNotNull null, o.str("module") ?: return@mapNotNull null, version)
         }.orEmpty()
-        return ModuleVariant.Local(files, deps)
+        return ModuleVariant.Local(files, declared("dependencies"), declared("dependencyConstraints").filter { it.version.isNotEmpty() })
     }
 }

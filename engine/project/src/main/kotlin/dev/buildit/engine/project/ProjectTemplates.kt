@@ -192,7 +192,13 @@ object GradleFiles {
         |        versionName = "${app.versionName}"
         |    }
         |}
-        |""".trimMargin()
+        |""".trimMargin() + dependencies(app)
+
+    private fun dependencies(app: AppConfig): String {
+        val enabled = app.dependencies.filter { it.enabled }
+        if (enabled.isEmpty()) return ""
+        return "\ndependencies {\n" + enabled.joinToString("") { "    implementation(\"${it.coordinate}\")\n" } + "}\n"
+    }
 }
 
 object XmlEscape {

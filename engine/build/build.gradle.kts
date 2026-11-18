@@ -54,6 +54,7 @@ val patchEcj = tasks.register("patchEcj") {
 dependencies {
     ecjOriginal(libs.ecj)
     api(project(":engine:project"))
+    api(project(":engine:deps"))
     implementation(project(":engine:layout"))
     implementation(files(patchedEcj).builtBy(patchEcj))
     implementation(libs.r8)

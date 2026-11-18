@@ -161,6 +161,7 @@ private fun Steps(steps: List<StepRow>) {
 private fun stepName(s: BuildStep) = stringResource(
     when (s) {
         BuildStep.Check -> R.string.bd_step_check
+        BuildStep.Libraries -> R.string.bd_step_libraries
         BuildStep.Resources -> R.string.bd_step_resources
         BuildStep.Compile -> R.string.bd_step_compile
         BuildStep.Dex -> R.string.bd_step_dex

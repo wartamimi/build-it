@@ -32,8 +32,20 @@ data class AppConfig(
     val language: SourceLanguage = SourceLanguage.Java,
     /** Source package of generated R/BuildConfig classes. Null means "same as [packageName]". */
     val namespace: String? = null,
+    /** Maven libraries (`group:artifact:version`) the app uses, managed in the Libraries tab. */
+    val dependencies: List<LibraryDependency> = emptyList(),
 ) {
     val effectiveNamespace: String get() = namespace ?: packageName
+}
+
+/** A library added to the project. Disabled libraries stay listed but are not built or bundled. */
+@Serializable
+data class LibraryDependency(
+    val coordinate: String,
+    val enabled: Boolean = true,
+) {
+    /** `group:artifact` without the version. */
+    val module: String get() = coordinate.substringBeforeLast(':')
 }
 
 @Serializable

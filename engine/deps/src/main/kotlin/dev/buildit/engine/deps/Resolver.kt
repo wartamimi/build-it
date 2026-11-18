@@ -21,7 +21,7 @@ class ResolveCancelledException : Exception("Cancelled")
  * the same module, the highest wins. Files are downloaded into the [MavenCache].
  */
 class Resolver(private val cache: MavenCache) {
-    private class Node(val coordinate: Coordinate, val file: Pair<String, String>?, val deps: List<Declared>, val redirect: Coordinate?)
+    private class Node(val coordinate: Coordinate, val file: Pair<String, String>?, val deps: List<Declared>, val redirect: Coordinate?, val constraints: List<Declared> = emptyList())
 
     private val nodes = HashMap<String, Node?>()
     private val raws = HashMap<String, Pom.Raw?>()
@@ -38,7 +38,7 @@ class Resolver(private val cache: MavenCache) {
                 is ModuleVariant.Redirect -> Node(c, null, emptyList(), v.to)
                 is ModuleVariant.Local -> {
                     val main = v.files.firstOrNull { it.first.endsWith(".aar") } ?: v.files.firstOrNull { it.first.endsWith(".jar") }
-                    Node(c, main, v.dependencies, null)
+                    Node(c, main, v.dependencies, null, v.constraints)
                 }
             }
         }
@@ -62,6 +62,7 @@ class Resolver(private val cache: MavenCache) {
         repeat(20) {
             val requested = HashMap<String, String>(selected)
             val seen = LinkedHashSet<String>()
+            val constrained = HashMap<String, String>()
             requesters = HashMap()
             val queue = ArrayDeque(roots.map { it.module })
             roots.forEach { requesters.getOrPut(it.module) { mutableSetOf() } += "project" }
@@ -85,7 +86,14 @@ class Resolver(private val cache: MavenCache) {
                     requesters.getOrPut(dm) { mutableSetOf() } += m
                     queue += dm
                 }
+                n.constraints.forEach { c ->
+                    // Only exact versions; ranges in constraints are rare and left to the dependency itself.
+                    if (c.version.none { it in "[](),+" }) constrained.merge("${c.group}:${c.artifact}", c.version) { x, y -> maxOf(x, y, Versions) }
+                }
             }
+            // A constraint applies only to modules that are in the graph (e.g. kotlin-stdlib aligning
+            // kotlin-stdlib-jdk8, whose old versions duplicate classes of the new stdlib).
+            constrained.forEach { (m, v) -> if (m in seen) requested.merge(m, v) { x, y -> maxOf(x, y, Versions) } }
             order = seen.toList()
             if (requested == selected) return finish(order, selected, requesters, problems, isCancelled)
             selected.clear(); selected += requested

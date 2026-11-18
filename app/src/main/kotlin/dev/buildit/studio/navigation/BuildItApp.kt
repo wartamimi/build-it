@@ -167,7 +167,7 @@ fun BuildItApp(container: AppContainer) {
                         initializer { CodeViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers) }
                     })
                     val build: BuildViewModel = viewModel(key = "bd-$id", factory = viewModelFactory {
-                        initializer { BuildViewModel(id, container.projectRepository, container.toolchain, container.debugKeystore, container.dispatchers, console = container.consoleHost) }
+                        initializer { BuildViewModel(id, container.projectRepository, container.toolchain, container.debugKeystore, container.dispatchers, console = container.consoleHost, maven = container.maven) }
                     })
                     val console: ConsoleViewModel = viewModel(key = "cn-$id", factory = viewModelFactory {
                         initializer { ConsoleViewModel(id, container.projectRepository, ConsoleLog.shared, container.dispatchers) }

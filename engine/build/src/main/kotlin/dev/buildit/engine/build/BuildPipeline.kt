@@ -1,12 +1,18 @@
 package dev.buildit.engine.build
 
 import dev.buildit.engine.build.res.FrameworkResources
+import dev.buildit.engine.build.res.LibraryManifest
 import dev.buildit.engine.build.res.ManifestOptions
+import dev.buildit.engine.build.res.ResSource
 import dev.buildit.engine.build.res.ResourceCompiler
+import dev.buildit.engine.deps.Coordinate
+import dev.buildit.engine.deps.MavenCache
+import dev.buildit.engine.deps.ResolveCancelledException
+import dev.buildit.engine.deps.Resolver
 import dev.buildit.engine.project.AppConfig
 import java.io.File
 
-enum class BuildStep { Check, Resources, Compile, Dex, Package, Sign, Verify }
+enum class BuildStep { Check, Libraries, Resources, Compile, Dex, Package, Sign, Verify }
 
 enum class BuildType { Debug, Release }
 
@@ -23,6 +29,8 @@ data class BuildRequest(
     val toolCache: File? = null,
     /** Debug builds connect to this console host (see [DebugBridge]); null leaves the bridge out. */
     val console: DebugBridge.Host? = null,
+    /** Where libraries are downloaded and kept; needed when the project has libraries. */
+    val maven: MavenCache? = null,
 )
 
 sealed interface BuildEvent {
@@ -78,22 +86,55 @@ class BuildPipeline(private val frameworkCache: (File) -> FrameworkResources = :
                 all.filter { it.name.endsWith(".kt") }.forEach {
                     d.error("Kotlin sources are not supported by the on-device builder yet; use Java for this project or build it with Android Studio", rel(it))
                 }
+                val declared = app.dependencies.filter { it.enabled }.map { it.coordinate }.toSet()
                 dependencies(module).forEach { (dep, line, file) ->
-                    d.error("Dependency $dep: the on-device builder does not resolve libraries yet", rel(file), line)
+                    if (dep !in declared) d.error("Dependency $dep is not in the project's library list: add it in the Libraries tab (Build It builds from that list)", rel(file), line)
                 }
+                app.dependencies.filter { it.enabled && Coordinate.parse(it.coordinate) == null }.forEach { d.error("Library '${it.coordinate}' is not a valid group:artifact:version") }
                 if (!request.androidJar.isFile) d.error("Android platform (android.jar) is not installed")
-                if (File(main, "jniLibs").isDirectory) d.warning("Native libraries in jniLibs are not packaged yet", rel(File(main, "jniLibs")))
                 all.filter { it.name.endsWith(".java") }
             }
             if (d.hasErrors) return fail()
             onEvent(BuildEvent.Log("${sources.size} Java file(s)"))
+
+            // 1b. Libraries: resolve (from the local cache, downloading what is missing) and unpack.
+            val toolCache = request.toolCache ?: File(project, "build/buildit/tools")
+            val libraries = step(BuildStep.Libraries) {
+                val roots = app.dependencies.filter { it.enabled }.mapNotNull { Coordinate.parse(it.coordinate) }
+                if (roots.isEmpty()) return@step emptyList()
+                val maven = request.maven ?: run { d.error("This build has no library cache configured"); return@step emptyList() }
+                val resolution = try {
+                    Resolver(maven).resolve(roots, progress = { onEvent(BuildEvent.Log(it)) }, isCancelled = isCancelled)
+                } catch (_: ResolveCancelledException) { throw BuildCancelledException() }
+                resolution.problems.forEach { d.error("Libraries: $it") }
+                resolution.artifacts.map { a -> PreparedLibrary.prepare(a.coordinate.toString(), a.coordinate.module, a.file, toolCache) }
+            }
+            if (d.hasErrors) return fail()
+            if (libraries.isNotEmpty()) onEvent(BuildEvent.Log("${libraries.size} librar${if (libraries.size == 1) "y" else "ies"}"))
+            val libJars = libraries.flatMap { it.jars }
 
             // 2. Resources and manifest.
             val options = ManifestOptions(app.packageName, app.effectiveNamespace, app.versionCode, app.versionName, app.minSdk, app.targetSdk, request.type == BuildType.Debug,
                 debugBridge = request.console.takeIf { request.type == BuildType.Debug })
             val resources = step(BuildStep.Resources) {
                 val fw = frameworkCache(request.androidJar)
-                ResourceCompiler(fw, d, ::rel).compile(File(main, "res"), File(main, "AndroidManifest.xml"), options)
+                val res = mutableListOf<ResSource>()
+                // Lowest priority first: the last library resolved, ..., the first, then the app.
+                libraries.asReversed().forEach { l -> l.res?.let { res += ResSource(it, l.label) } }
+                File(module, "google-services.json").takeIf { it.isFile }?.let { json ->
+                    val xml = GoogleServices.valuesXml(json, app.packageName, d, rel(json)) ?: return@step null
+                    val dir = File(work, "generated/google-services/res").apply { deleteRecursively() }
+                    File(dir, "values/google-services.xml").apply { parentFile.mkdirs() }.writeText(xml)
+                    res += ResSource(dir, "google-services.json")
+                    onEvent(BuildEvent.Log("google-services.json: Firebase values generated"))
+                }
+                res += ResSource(File(main, "res"))
+                val modules = libraries.map { it.module }.toSet()
+                ResourceCompiler(fw, d, ::rel, modules).compile(
+                    res, File(main, "AndroidManifest.xml"),
+                    libraries.mapNotNull { l -> l.manifest?.let { LibraryManifest(it, l.label) } },
+                    options, libraries.mapNotNull { it.packageName },
+                )
             } ?: return fail()
             onEvent(BuildEvent.Log("${resources.ids.size} resource(s), ${resources.files.size} file(s)"))
 
@@ -105,6 +146,9 @@ class BuildPipeline(private val frameworkCache: (File) -> FrameworkResources = :
                 File(pkgDir, "R.java").writeText(resources.rJava)
                 File(pkgDir, "BuildConfig.java").writeText(buildConfig(app, request.type))
                 val extra = mutableListOf(File(pkgDir, "R.java"), File(pkgDir, "BuildConfig.java"))
+                resources.libraryRJava.forEach { (pkg, src) ->
+                    extra += File(gen, pkg.replace('.', '/') + "/R.java").apply { parentFile.mkdirs(); writeText(src) }
+                }
                 if (options.debugBridge != null) {
                     val bridge = File(gen, DebugBridge.CLASS.replace('.', '/') + ".java").apply { parentFile.mkdirs() }
                     bridge.writeText(DebugBridge.source(options.debugBridge))
@@ -112,17 +156,38 @@ class BuildPipeline(private val frameworkCache: (File) -> FrameworkResources = :
                 }
                 classes.deleteRecursively()
                 val stubs = LambdaStubs.classes(request.androidJar, request.toolCache ?: File(project, "build/buildit/tools"))
-                JavaCompiler.compile(sources + extra, request.androidJar, classes, d, ::rel, stubs)
+                JavaCompiler.compile(sources + extra, request.androidJar, classes, d, ::rel, stubs, libJars)
             }.let { ok -> if (!ok || d.hasErrors) return fail() }
 
             // 4. Dex.
             val dex = File(work, "dex")
-            step(BuildStep.Dex) { Dexer.dex(classes, request.androidJar, app.minSdk, request.type == BuildType.Debug, dex, d) }
-                .let { ok -> if (!ok) return fail() }
+            val libraryDex = mutableListOf<File>()
+            step(BuildStep.Dex) {
+                if (!Dexer.dex(classes, request.androidJar, app.minSdk, request.type == BuildType.Debug, dex, d, libJars)) return@step false
+                libraries.forEach { l ->
+                    l.jars.forEach { jar ->
+                        if (isCancelled()) throw BuildCancelledException()
+                        libraryDex += LibraryDexer.dex(jar, request.androidJar, app.minSdk, request.type == BuildType.Debug, toolCache, d, l.label) ?: return@step false
+                    }
+                }
+                true
+            }.let { ok -> if (!ok) return fail() }
 
             // 5. Package.
             val unsigned = File(work, "unsigned.apk")
-            step(BuildStep.Package) { ApkWriter.write(unsigned, resources.manifest, resources.table, resources.files, dex, File(main, "assets")) }
+            step(BuildStep.Package) {
+                val native = LinkedHashMap<String, File>()
+                (listOf(File(main, "jniLibs")) + libraries.mapNotNull { it.jni }).filter { it.isDirectory }.forEach { dir ->
+                    dir.walkTopDown().filter { it.isFile && it.name.endsWith(".so") }.forEach { f ->
+                        native.putIfAbsent("lib/" + f.relativeTo(dir).invariantSeparatorsPath, f)
+                    }
+                }
+                ApkWriter.write(
+                    unsigned, resources.manifest, resources.table, resources.files, dex, File(main, "assets"),
+                    libraryDex = libraryDex, javaResources = JavaResources.collect(libJars), nativeLibs = native,
+                    libraryAssets = libraries.mapNotNull { it.assets },
+                )
+            }
 
             // 6. Sign.
             val name = File(project.name).name.ifBlank { "app" }

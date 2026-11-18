@@ -19,6 +19,7 @@
     <string name="bd_license_accept">Setuju dan unduh</string>
     <string name="bd_license_decline">Tolak</string>
     <string name="bd_step_check">Periksa proyek</string>
+    <string name="bd_step_libraries">Library</string>
     <string name="bd_step_resources">Kompilasi resource dan manifest</string>
     <string name="bd_step_compile">Kompilasi Java</string>
     <string name="bd_step_dex">Ubah ke DEX</string>

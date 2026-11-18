@@ -123,6 +123,90 @@ class DeviceTests {
         }
     }
 
+    /** AndroidX + Material + ConstraintLayout, downloaded from Google Maven on the device. */
+    @Test fun projectWithAndroidXAndMaterialBuildsAndRunsOnTheDevice() = runBlocking {
+        val pkg = "com.example.libcheck"
+        val repo = container.projectRepository
+        val toolchain = container.toolchain
+        val summary = repo.create("Lib Check", pkg)
+        try {
+            var project = repo.open(summary.id)
+            val api = project.manifest.app.compileSdk
+            if (toolchain.androidJar(api) == null) {
+                val index = toolchain.fetchIndex()
+                val platform = index.platform(api) ?: error("API $api not in Google's index")
+                platform.licenseId?.let { id -> toolchain.acceptLicense(id, index.licenses.getValue(id)) }
+                toolchain.install(platform)
+            }
+            val app = project.manifest.app.copy(dependencies = listOf(
+                dev.buildit.engine.project.LibraryDependency("androidx.appcompat:appcompat:1.7.1"),
+                dev.buildit.engine.project.LibraryDependency("com.google.android.material:material:1.13.0"),
+                dev.buildit.engine.project.LibraryDependency("androidx.constraintlayout:constraintlayout:2.2.1"),
+            ))
+            repo.saveSettings(summary.id, project.manifest.copy(app = app))
+            project = repo.open(summary.id)
+            val main = File(project.directory, "app/src/main")
+            File(main, "java/com/example/libcheck/MainActivity.java").writeText(
+                """
+                package com.example.libcheck;
+
+                import android.os.Bundle;
+                import android.util.Log;
+                import androidx.appcompat.app.AppCompatActivity;
+                import com.google.android.material.button.MaterialButton;
+
+                public class MainActivity extends AppCompatActivity {
+                    @Override
+                    protected void onCreate(Bundle savedInstanceState) {
+                        super.onCreate(savedInstanceState);
+                        setContentView(R.layout.activity_main);
+                        MaterialButton b = findViewById(R.id.button);
+                        Log.i("LibCheck", "material button " + (b != null) + " " + getSupportActionBar());
+                    }
+                }
+                """.trimIndent() + "\n",
+            )
+            File(main, "res/layout/activity_main.xml").writeText(
+                """
+                <?xml version="1.0" encoding="utf-8"?>
+                <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                    xmlns:app="http://schemas.android.com/apk/res-auto"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/app_name"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintStart_toStartOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+                """.trimIndent(),
+            )
+            File(main, "res/values/themes.xml").writeText(
+                "<resources><style name=\"AppTheme\" parent=\"Theme.Material3.DayNight\" /></resources>",
+            )
+            val start = System.nanoTime()
+            val result = BuildPipeline().run(
+                BuildRequest(project.directory, project.manifest.app, toolchain.androidJar(api)!!, BuildType.Debug,
+                    key = { Keys.debugKey(container.debugKeystore) }, toolCache = toolchain.cacheDir, console = container.consoleHost, maven = container.maven),
+            )
+            Log.i("DeviceTests", "On-device library build took ${(System.nanoTime() - start) / 1_000_000} ms")
+            assertTrue(result.diagnostics.filter { it.severity == dev.buildit.engine.build.BuildDiagnostic.Severity.Error }.take(20).joinToString("\n"), result.success)
+            val out = install(result.apk!!)
+            assertTrue(out, out.contains("Success"))
+            shell("am start -W -n $pkg/.MainActivity")
+            waitFor("the app's log line", 60_000) { entries(pkg).any { it.tag == "LibCheck" && it.text.startsWith("material button true") } }
+            waitFor("the resumed event") { entries(pkg).any { it.level == ConsoleLevel.Event && it.text == "$pkg.MainActivity resumed" } }
+            Thread.sleep(1500)
+            val crash = entries(pkg).firstOrNull { it.level == ConsoleLevel.Crash }
+            assertNull(crash?.text, crash)
+        } finally {
+            shell("pm uninstall $pkg")
+            repo.delete(summary.id)
+        }
+    }
+
     @Test fun apiKeysAreEncryptedWithTheKeystore() {
         val store = KeystoreSecretStore(instrumentation.targetContext)
         store.write("test-key", "sk-ant-secret-value")

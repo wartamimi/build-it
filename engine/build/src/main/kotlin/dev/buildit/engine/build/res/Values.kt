@@ -17,17 +17,20 @@ data class Reference(val pkg: String?, val type: String, val name: String, val c
 
     companion object {
         private val ref = Regex("@(\\+)?(\\*)?(?:([a-zA-Z0-9_.]+):)?([a-z-]+)/(.+)")
-        private val attr = Regex("\\?(?:([a-zA-Z0-9_.]+):)?(?:(attr)/)?([A-Za-z0-9_.]+)")
+        private val attr = Regex("\\?(?:([a-zA-Z0-9_.]+):)?(?:(attr)/)?([A-Za-z0-9_.:]+)")
 
         fun parse(text: String): Reference? {
             val t = text.trim()
+            // The package may also follow the type: @id/android:icon2, ?attr/android:textColor.
             ref.matchEntire(t)?.let { m ->
                 val (plus, _, pkg, type, name) = m.destructured
-                return Reference(pkg.ifEmpty { null }, type, name, create = plus == "+")
+                val p = pkg.ifEmpty { null } ?: name.substringBefore(':', "").ifEmpty { null }
+                return Reference(p, type, name.substringAfter(':'), create = plus == "+")
             }
             attr.matchEntire(t)?.let { m ->
                 val (pkg, _, name) = m.destructured
-                return Reference(pkg.ifEmpty { null }, "attr", name, attribute = true)
+                val p = pkg.ifEmpty { null } ?: name.substringBefore(':', "").ifEmpty { null }
+                return Reference(p, "attr", name.substringAfter(':'), attribute = true)
             }
             return null
         }

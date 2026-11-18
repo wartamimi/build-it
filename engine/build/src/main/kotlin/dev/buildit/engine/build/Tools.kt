@@ -25,8 +25,8 @@ import com.android.tools.r8.Diagnostic as D8Diagnostic
 object JavaCompiler {
     private val line = Regex("^(.+?):(\\d+): (error|warning): (.*)$")
 
-    fun compile(sources: List<File>, androidJar: File, outDir: File, diagnostics: Diagnostics, relative: (File) -> String, stubs: File? = null): Boolean =
-        run(listOf("-17"), sources, listOfNotNull(androidJar, stubs), outDir, diagnostics, relative)
+    fun compile(sources: List<File>, androidJar: File, outDir: File, diagnostics: Diagnostics, relative: (File) -> String, stubs: File? = null, classpath: List<File> = emptyList()): Boolean =
+        run(listOf("-17") + if (classpath.isEmpty()) emptyList() else listOf("-classpath", classpath.joinToString(File.pathSeparator) { it.path }), sources, listOfNotNull(androidJar, stubs), outDir, diagnostics, relative)
 
     /** Compiles the [LambdaStubs] (Java 8 rules, which allow defining java.* classes). */
     internal fun compileStubs(sources: List<File>, androidJar: File, outDir: File, diagnostics: Diagnostics): Boolean =
@@ -61,7 +61,7 @@ object JavaCompiler {
 
 /** DEX conversion with D8 (in process), including Java 8+ language desugaring for [minSdk]. */
 object Dexer {
-    fun dex(classesDir: File, androidJar: File, minSdk: Int, debug: Boolean, outDir: File, diagnostics: Diagnostics): Boolean {
+    fun dex(classesDir: File, androidJar: File, minSdk: Int, debug: Boolean, outDir: File, diagnostics: Diagnostics, classpath: List<File> = emptyList()): Boolean {
         outDir.deleteRecursively(); outDir.mkdirs()
         val classes = classesDir.walkTopDown().filter { it.isFile && it.name.endsWith(".class") }.map { it.toPath() }.toList()
         if (classes.isEmpty()) { diagnostics.error("No compiled classes to convert"); return false }
@@ -78,6 +78,7 @@ object Dexer {
             val cmd = D8Command.builder(handler)
                 .addProgramFiles(classes)
                 .addLibraryFiles(androidJar.toPath())
+                .addClasspathFiles(classpath.map { it.toPath() })
                 .setMinApiLevel(minSdk)
                 .setMode(if (debug) CompilationMode.DEBUG else CompilationMode.RELEASE)
                 .setOutput(outDir.toPath(), OutputMode.DexIndexed)
@@ -96,10 +97,23 @@ object Dexer {
  * apksig aligns stored entries when signing.
  */
 object ApkWriter {
-    fun write(out: File, manifest: ByteArray, table: ByteArray, files: Map<String, ByteArray>, dexDir: File, assetsDir: File?) {
+    /**
+     * [libraryDex] are added after the app's dex files (classes2.dex, ...); [javaResources] are
+     * non-class files from library JARs; [nativeLibs] maps `lib/<abi>/x.so` to files; assets of
+     * [assetsDirs] are merged with the first directory winning.
+     */
+    fun write(
+        out: File, manifest: ByteArray, table: ByteArray, files: Map<String, ByteArray>, dexDir: File, assetsDir: File?,
+        libraryDex: List<File> = emptyList(),
+        javaResources: Map<String, ByteArray> = emptyMap(),
+        nativeLibs: Map<String, File> = emptyMap(),
+        libraryAssets: List<File> = emptyList(),
+    ) {
         out.parentFile?.mkdirs()
+        val written = HashSet<String>()
         ZipOutputStream(out.outputStream().buffered()).use { z ->
             fun put(name: String, bytes: ByteArray, store: Boolean = false) {
+                if (!written.add(name)) return
                 val e = ZipEntry(name)
                 e.time = FIXED_TIME
                 if (store) {
@@ -112,10 +126,15 @@ object ApkWriter {
             put("AndroidManifest.xml", manifest)
             put("resources.arsc", table, store = true)
             files.toSortedMap().forEach { (n, b) -> put(n, b, store = n.endsWith(".png") || n.endsWith(".jpg") || n.endsWith(".webp")) }
-            dexDir.listFiles().orEmpty().filter { it.name.endsWith(".dex") }.sortedBy { it.name }.forEach { put(it.name, it.readBytes()) }
-            assetsDir?.takeIf { it.isDirectory }?.walkTopDown()?.filter { it.isFile }?.sortedBy { it.path }?.forEach { f ->
-                put("assets/" + f.relativeTo(assetsDir).invariantSeparatorsPath, f.readBytes())
+            val dex = dexDir.listFiles().orEmpty().filter { it.name.endsWith(".dex") }.sortedWith(compareBy({ it.name.length }, { it.name })) + libraryDex
+            dex.forEachIndexed { i, f -> put(if (i == 0) "classes.dex" else "classes${i + 1}.dex", f.readBytes()) }
+            (listOfNotNull(assetsDir) + libraryAssets).filter { it.isDirectory }.forEach { dir ->
+                dir.walkTopDown().filter { it.isFile }.sortedBy { it.path }.forEach { f ->
+                    put("assets/" + f.relativeTo(dir).invariantSeparatorsPath, f.readBytes())
+                }
             }
+            nativeLibs.toSortedMap().forEach { (n, f) -> put(n, f.readBytes()) }
+            javaResources.toSortedMap().forEach { (n, b) -> if (!n.startsWith("assets/") && !n.startsWith("lib/") && n != "AndroidManifest.xml" && n != "resources.arsc" && !n.matches(Regex("classes\\d*\\.dex"))) put(n, b) }
         }
     }
 

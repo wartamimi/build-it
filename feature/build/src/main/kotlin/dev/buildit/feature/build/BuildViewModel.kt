@@ -67,6 +67,8 @@ class BuildViewModel(
     private val pipeline: BuildPipeline = BuildPipeline(),
     /** Debug builds connect to this console (null leaves the console bridge out). */
     private val console: DebugBridge.Host? = null,
+    /** Library cache; projects with libraries need it. */
+    private val maven: dev.buildit.engine.deps.MavenCache? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(BuildUiState())
     val state: StateFlow<BuildUiState> = _state.asStateFlow()
@@ -160,7 +162,7 @@ class BuildViewModel(
                     _state.update { it.copy(running = false, steps = emptyList(), api = app.compileSdk, platform = PlatformState.Missing(app.compileSdk)) }
                     return@launch
                 }
-                val request = BuildRequest(project.directory, app, jar, type, key = { Keys.debugKey(debugKeystore) }, toolCache = toolchain.cacheDir, console = console)
+                val request = BuildRequest(project.directory, app, jar, type, key = { Keys.debugKey(debugKeystore) }, toolCache = toolchain.cacheDir, console = console, maven = maven)
                 val result = withContext(dispatchers.default) { pipeline.run(request, ::onEvent, cancel::get) }
                 _state.update { s ->
                     s.copy(

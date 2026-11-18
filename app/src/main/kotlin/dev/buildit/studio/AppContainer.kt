@@ -31,6 +31,8 @@ class AppContainer(context: Context) {
     val toolchainDir: File = File(appContext.filesDir, "toolchain")
     val toolchain: Toolchain by lazy { Toolchain(toolchainDir) }
     val debugKeystore: File get() = File(toolchainDir, "keys/debug.p12")
+    /** Libraries downloaded from Google Maven and Maven Central, shared by all projects. */
+    val maven: dev.buildit.engine.deps.MavenCache by lazy { dev.buildit.engine.deps.MavenCache(File(toolchainDir, "maven")) }
 
     /** AI provider settings; the API key itself is kept encrypted by the Android Keystore. */
     val aiSettings: AiSettingsStore by lazy { AiSettingsStore(File(appContext.filesDir, "ai/config.json"), KeystoreSecretStore(appContext)) }

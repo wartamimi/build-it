@@ -19,6 +19,7 @@
     <string name="bd_license_accept">Accept and download</string>
     <string name="bd_license_decline">Decline</string>
     <string name="bd_step_check">Check project</string>
+    <string name="bd_step_libraries">Libraries</string>
     <string name="bd_step_resources">Compile resources and manifest</string>
     <string name="bd_step_compile">Compile Java</string>
     <string name="bd_step_dex">Convert to DEX</string>

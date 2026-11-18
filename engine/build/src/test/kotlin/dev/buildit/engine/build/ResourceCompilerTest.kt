@@ -35,7 +35,7 @@ class ResourceCompilerTest {
     }
 
     private fun compile(dir: File, d: Diagnostics = Diagnostics()) =
-        ResourceCompiler(fw!!, d) { it.relativeTo(dir).path }.compile(File(dir, "app/src/main/res"), File(dir, "app/src/main/AndroidManifest.xml"), options)
+        ResourceCompiler(fw!!, d, { it.relativeTo(dir).path }).compile(File(dir, "app/src/main/res"), File(dir, "app/src/main/AndroidManifest.xml"), options)
 
     private fun apk(r: dev.buildit.engine.build.res.CompiledResources): File {
         val f = tmp.newFile("res.apk")
