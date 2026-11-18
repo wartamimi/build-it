@@ -71,6 +71,9 @@ dependencies {
     androidTestImplementation(project(":engine:build"))
     androidTestImplementation(project(":engine:ai"))
 
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
