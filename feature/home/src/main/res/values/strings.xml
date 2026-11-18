@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_title">Build It</string>
+    <string name="home_tagline">Design. Build. Create.</string>
+    <string name="home_new_project">New project</string>
+    <string name="home_import_project">Import</string>
+    <string name="home_recent">Continue working</string>
+    <string name="home_all_projects">All projects (%1$d)</string>
+    <string name="home_recent_none_opened">Projects you open will show up here.</string>
+    <string name="home_empty_title">Start your first app</string>
+    <string name="home_empty_body">Create a project from a template. You can design screens, add logic and edit code, all on this device.</string>
+    <string name="home_opened">Opened %1$s</string>
+    <string name="home_storage">Workspace storage</string>
+    <string name="home_storage_detail">Projects use %1$s · %2$s free on device</string>
+</resources>

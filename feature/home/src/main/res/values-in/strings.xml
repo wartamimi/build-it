@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_title">Build It</string>
+    <string name="home_tagline">Rancang. Bangun. Kreasikan.</string>
+    <string name="home_new_project">Proyek baru</string>
+    <string name="home_import_project">Impor</string>
+    <string name="home_recent">Lanjutkan pekerjaan</string>
+    <string name="home_all_projects">Semua proyek (%1$d)</string>
+    <string name="home_recent_none_opened">Proyek yang Anda buka akan muncul di sini.</string>
+    <string name="home_empty_title">Mulai aplikasi pertama Anda</string>
+    <string name="home_empty_body">Buat proyek dari template. Anda bisa merancang layar, menambah logika, dan mengedit kode, semuanya di perangkat ini.</string>
+    <string name="home_opened">Dibuka %1$s</string>
+    <string name="home_storage">Penyimpanan workspace</string>
+    <string name="home_storage_detail">Proyek memakai %1$s · %2$s kosong di perangkat</string>
+</resources>

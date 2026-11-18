@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Pengaturan</string>
+    <string name="settings_appearance">Tampilan</string>
+    <string name="settings_theme">Tema</string>
+    <string name="settings_theme_system">Sistem</string>
+    <string name="settings_theme_light">Terang</string>
+    <string name="settings_theme_dark">Gelap</string>
+    <string name="settings_dynamic_color">Warna dinamis</string>
+    <string name="settings_dynamic_color_summary">Gunakan warna dari wallpaper Anda</string>
+    <string name="settings_dynamic_color_unsupported">Memerlukan Android 12 atau lebih baru</string>
+    <string name="settings_language">Bahasa</string>
+    <string name="settings_language_system">Sistem</string>
+    <string name="settings_editor">Editor</string>
+    <string name="settings_font_size">Ukuran font kode: %1$d sp</string>
+    <string name="settings_autosave">Simpan otomatis</string>
+    <string name="settings_autosave_summary">Simpan perubahan proyek secara otomatis saat bekerja</string>
+    <string name="settings_workspace">Workspace</string>
+    <string name="settings_reindex">Pindai ulang proyek</string>
+    <string name="settings_reindex_summary">Bangun ulang daftar proyek dari file di perangkat ini</string>
+    <string name="settings_reindexed">Daftar proyek dibangun ulang</string>
+    <string name="settings_reindexed_skipped">Daftar proyek dibangun ulang. %1$d folder tidak dapat dibaca dan dilewati.</string>
+    <string name="settings_failed">Gagal: %1$s</string>
+    <string name="settings_about">Tentang</string>
+    <string name="settings_about_detail">Build It %1$s · format proyek v%2$d</string>
+</resources>

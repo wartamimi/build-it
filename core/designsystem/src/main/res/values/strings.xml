@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bi_back">Back</string>
+    <string name="bi_retry">Try again</string>
+    <string name="bi_cancel">Cancel</string>
+    <string name="bi_ok">OK</string>
+    <string name="bi_loading">Loading…</string>
+</resources>

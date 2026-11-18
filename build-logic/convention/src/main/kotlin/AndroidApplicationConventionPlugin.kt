@@ -1,0 +1,26 @@
+import com.android.build.api.dsl.ApplicationExtension
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+import org.gradle.kotlin.dsl.configure
+
+class AndroidApplicationConventionPlugin : Plugin<Project> {
+    override fun apply(target: Project) = with(target) {
+        pluginManager.apply("com.android.application")
+        extensions.configure<ApplicationExtension> {
+            compileSdk = BuildItConfig.COMPILE_SDK
+            defaultConfig {
+                minSdk = BuildItConfig.MIN_SDK
+                targetSdk = BuildItConfig.TARGET_SDK
+                testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+            }
+            compileOptions {
+                sourceCompatibility = BuildItConfig.JAVA_VERSION
+                targetCompatibility = BuildItConfig.JAVA_VERSION
+            }
+            testOptions {
+                unitTests.isIncludeAndroidResources = true
+            }
+        }
+        configureKotlinCompile()
+    }
+}
