@@ -245,8 +245,9 @@ Known gaps
 
 Done
 - Release APK (R8 shrinking, 13.6 MB, signed with the Build It release key, version 0.8.0)
-  published on GitHub Releases. CI builds a release APK after the unit tests pass; it is signed
-  when the release key is stored as repository secrets, otherwise unsigned.
+  built and delivered to the owner. CI builds a release APK after the unit tests pass; once the
+  release key is stored as repository secrets, pushing a `v*` tag signs it and publishes a GitHub
+  release (this session was not allowed to create releases or set secrets itself).
 - Emulator job in CI (API 34) with instrumented tests. On ART these pass: the Claude SDK streams
   (Jackson/OkHttp work on Android), API keys are encrypted and read back with the Keystore, and
   an OpenAI-compatible server on plain http on the device is reachable.
@@ -270,7 +271,7 @@ Done
 - `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:ai:test` —
   passing locally (130 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
-- APK: release 0.8.0 published on GitHub Releases (signed). Emulator job: runs, reports the on-device compile failure, non-blocking.
+- APK: release 0.8.0 built and signed; GitHub release pending the signing secrets (then tag `v0.8.0`). Emulator job: runs, reports the on-device compile failure, non-blocking.
 
 ## Test results (latest local run)
 

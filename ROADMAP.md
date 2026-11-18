@@ -15,7 +15,7 @@ are updated (§19). Status details are in [DEVELOPMENT_STATUS.md](DEVELOPMENT_ST
 | 6 | Local build engine: Toolchain Manager, Kotlin-on-ART spike, dependency resolver, AAPT2/ECJ/D8/R8, APK/AAB, signing, verification | Partly done: Java projects build to signed, verified APKs on the device; see known gaps (dependencies, Kotlin, AAB) |
 | 6b | Gradle compatibility mode (experimental, non-Play builds) | Not started |
 | 7 | AI providers and assistant (reviewed proposals), debug console, runtime log bridge | Done: Claude (official SDK) and OpenAI-compatible providers, reviewed per-file diffs, console bridge in debug builds; not yet run on a device (Phase 8) |
-| 8 | Integration, performance and memory work, compatibility testing, security review, release (APK built and published here) | Partly done: APK 0.8.0 published, emulator CI added; on-device Java compile fails on ART (ECJ needs Java 9+ APIs) and is the top open item |
+| 8 | Integration, performance and memory work, compatibility testing, security review, release (APK built and published here) | Partly done: signed APK 0.8.0 built, tag-triggered GitHub release ready once secrets are set, emulator CI added; on-device Java compile fails on ART (ECJ needs Java 9+ APIs) and is the top open item |
 
 ## Phase 1 implementation plan (as executed)
 
