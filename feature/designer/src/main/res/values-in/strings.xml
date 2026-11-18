@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ds_tab">Desain</string>
+    <string name="ds_layout">Layout</string>
+    <string name="ds_new_layout">Layout baru</string>
+    <string name="ds_new_activity">Activity baru</string>
+    <string name="ds_undo">Urungkan</string>
+    <string name="ds_redo">Ulangi</string>
+    <string name="ds_save">Simpan</string>
+    <string name="ds_saved">Tersimpan</string>
+    <string name="ds_saving">Menyimpan…</string>
+    <string name="ds_unsaved">Ada perubahan belum disimpan</string>
+    <string name="ds_device">Perangkat</string>
+    <string name="ds_rotate">Putar</string>
+    <string name="ds_night">Pratinjau mode malam</string>
+    <string name="ds_zoom_in">Perbesar</string>
+    <string name="ds_zoom_out">Perkecil</string>
+    <string name="ds_more">Lainnya</string>
+
+    <string name="ds_panel_library">Komponen</string>
+    <string name="ds_panel_tree">Pohon</string>
+    <string name="ds_panel_properties">Properti</string>
+    <string name="ds_panel_problems">Masalah</string>
+
+    <string name="ds_search_components">Cari komponen</string>
+    <string name="ds_library_hint">Ketuk untuk menambah di samping pilihan, atau tekan lama lalu seret ke kanvas.</string>
+    <string name="ds_needs_dependency">Butuh %1$s</string>
+    <string name="ds_move_up">Naikkan</string>
+    <string name="ds_move_down">Turunkan</string>
+    <string name="ds_duplicate">Duplikat</string>
+    <string name="ds_delete">Hapus</string>
+
+    <string name="ds_no_selection_title">Belum ada yang dipilih</string>
+    <string name="ds_no_selection_body">Ketuk view di kanvas atau di pohon untuk mengubah propertinya.</string>
+    <string name="ds_custom_attributes">Atribut lain</string>
+    <string name="ds_add_attribute">Tambah atribut</string>
+    <string name="ds_attribute_name">Nama (mis. android:alpha)</string>
+    <string name="ds_attribute_value">Nilai</string>
+    <string name="ds_unset">Tidak diatur</string>
+    <string name="ds_custom_size">Kustom (mis. 120dp)</string>
+    <string name="ds_add">Tambah</string>
+    <string name="ds_cancel">Batal</string>
+    <string name="ds_create">Buat</string>
+
+    <string name="ds_no_problems">Tidak ada masalah.</string>
+    <string name="ds_problem_missing_width">layout_width belum diisi</string>
+    <string name="ds_problem_missing_height">layout_height belum diisi</string>
+    <string name="ds_problem_invalid_id">Id \"%1$s\" tidak valid</string>
+    <string name="ds_problem_duplicate_id">Id \"%1$s\" dipakai lebih dari sekali</string>
+    <string name="ds_problem_unknown_view">%1$s tidak ada di pustaka komponen; pratinjaunya mungkin tidak lengkap</string>
+    <string name="ds_problem_children_not_allowed">%1$s tidak bisa berisi view lain</string>
+    <string name="ds_problem_too_many_children">%1$s hanya boleh berisi satu anak</string>
+    <string name="ds_problem_missing_content_description">Gambar tanpa contentDescription (aksesibilitas)</string>
+    <string name="ds_problem_weight_outside_linear">layout_weight hanya berlaku di dalam LinearLayout</string>
+    <string name="ds_problem_preview">Pratinjau: %1$s</string>
+
+    <string name="ds_empty_title">Belum ada layout</string>
+    <string name="ds_empty_body">Buat file layout untuk mulai mendesain.</string>
+    <string name="ds_parse_error_title">Layout ini tidak bisa dibaca</string>
+    <string name="ds_parse_error_body">Perbaiki XML-nya di tab Berkas, lalu muat ulang. %1$s</string>
+    <string name="ds_reload">Muat ulang</string>
+
+    <string name="ds_conflict_title">Layout diubah di luar desainer</string>
+    <string name="ds_conflict_body">File ini diubah di tempat lain sejak dibuka. Timpa dengan versi desainer, atau muat ulang file dan buang perubahan di desainer?</string>
+    <string name="ds_conflict_overwrite">Timpa</string>
+    <string name="ds_conflict_reload">Muat ulang file</string>
+    <string name="ds_leave_title">Simpan perubahan layout?</string>
+    <string name="ds_leave_body">Simpan otomatis mati dan layout ini punya perubahan yang belum disimpan.</string>
+    <string name="ds_leave_save">Simpan</string>
+    <string name="ds_leave_discard">Buang</string>
+
+    <string name="ds_layout_name">Nama file layout</string>
+    <string name="ds_root_view">View akar</string>
+    <string name="ds_activity_name">Nama kelas Activity</string>
+    <string name="ds_activity_hint">Contoh: SettingsActivity. Layout dan entri manifest akan dibuat.</string>
+    <string name="ds_activity_added">Activity %1$s ditambahkan</string>
+    <string name="ds_failed">Terjadi kesalahan: %1$s</string>
+    <string name="ds_rejected_invalid_resource">Gunakan huruf kecil, angka, dan garis bawah, diawali huruf.</string>
+    <string name="ds_rejected_exists">Layout dengan nama itu sudah ada.</string>
+    <string name="ds_rejected_not_container">View itu tidak bisa berisi anak.</string>
+    <string name="ds_rejected_generic">Perubahan itu tidak diizinkan (%1$s).</string>
+    <string name="ds_rejected_duplicate_id">Id itu sudah dipakai view lain.</string>
+    <string name="ds_rejected_invalid_id">Id memakai huruf, angka, dan garis bawah, diawali huruf.</string>
+    <string name="ds_rejected_move_into_self">View tidak bisa dipindah ke dalam dirinya sendiri.</string>
+    <string name="ds_rejected_remove_root">View akar tidak bisa dihapus atau dipindah.</string>
+    <string name="ds_rejected_too_many_children">Container itu hanya boleh berisi satu anak.</string>
+    <string name="ds_rejected_size_required">Lebar dan tinggi tidak boleh dihapus.</string>
+    <string name="ds_rejected_activity_invalid">Gunakan nama kelas seperti SettingsActivity (huruf dan angka, diawali huruf kapital).</string>
+    <string name="ds_rejected_activity_exists">Activity dengan nama itu sudah ada.</string>
+    <string name="ds_preview_too_many_views">Pratinjau berhenti setelah %1$s view</string>
+    <string name="ds_preview_not_previewable">%1$s tidak bisa dipratinjau di sini; ditampilkan sebagai placeholder</string>
+    <string name="ds_preview_create_failed">View tidak bisa dibuat: %1$s</string>
+    <string name="ds_preview_attribute_failed">Ada atribut yang tidak bisa diterapkan: %1$s</string>
+    <string name="ds_preview_attach_failed">Anak view tidak bisa ditambahkan: %1$s</string>
+    <string name="ds_preview_children_ignored">%1$s tidak menampilkan anak</string>
+    <string name="ds_preview_runtime_content">Isi %1$s hanya muncul saat aplikasi berjalan</string>
+    <string name="ds_preview_menu_not_previewed">Menu %1$s tidak dipratinjau</string>
+    <string name="ds_preview_attribute_not_previewed">%1$s tetap ada di XML tetapi tidak tampil di pratinjau</string>
+</resources>

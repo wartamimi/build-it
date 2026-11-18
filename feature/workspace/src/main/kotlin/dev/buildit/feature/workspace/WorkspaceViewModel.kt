@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class WorkspaceTab { Project, Files }
 
 /** Editable copy of the project settings; strings so partially typed numbers are allowed. */
 data class SettingsDraft(
@@ -65,7 +64,6 @@ data class WorkspaceUiState(
     val loading: Boolean = true,
     val error: String? = null,
     val project: OpenProject? = null,
-    val tab: WorkspaceTab = WorkspaceTab.Project,
     val draft: SettingsDraft? = null,
     val issues: List<ValidationIssue> = emptyList(),
     val saving: Boolean = false,
@@ -105,7 +103,6 @@ class WorkspaceViewModel(
         }
     }
 
-    fun selectTab(tab: WorkspaceTab) = _state.update { it.copy(tab = tab) }
 
     fun editDraft(transform: (SettingsDraft) -> SettingsDraft) = _state.update { s ->
         val d = s.draft?.let(transform)

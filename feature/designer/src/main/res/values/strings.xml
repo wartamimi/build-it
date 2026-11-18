@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ds_tab">Design</string>
+    <string name="ds_layout">Layout</string>
+    <string name="ds_new_layout">New layout</string>
+    <string name="ds_new_activity">New activity</string>
+    <string name="ds_undo">Undo</string>
+    <string name="ds_redo">Redo</string>
+    <string name="ds_save">Save</string>
+    <string name="ds_saved">Saved</string>
+    <string name="ds_saving">Saving…</string>
+    <string name="ds_unsaved">Unsaved changes</string>
+    <string name="ds_device">Device</string>
+    <string name="ds_rotate">Rotate</string>
+    <string name="ds_night">Night mode preview</string>
+    <string name="ds_zoom_in">Zoom in</string>
+    <string name="ds_zoom_out">Zoom out</string>
+    <string name="ds_more">More</string>
+
+    <string name="ds_panel_library">Components</string>
+    <string name="ds_panel_tree">Tree</string>
+    <string name="ds_panel_properties">Properties</string>
+    <string name="ds_panel_problems">Problems</string>
+
+    <string name="ds_search_components">Search components</string>
+    <string name="ds_library_hint">Tap to add next to the selection, or long-press and drag onto the canvas.</string>
+    <string name="ds_needs_dependency">Needs %1$s</string>
+    <string name="ds_move_up">Move up</string>
+    <string name="ds_move_down">Move down</string>
+    <string name="ds_duplicate">Duplicate</string>
+    <string name="ds_delete">Delete</string>
+
+    <string name="ds_no_selection_title">Nothing selected</string>
+    <string name="ds_no_selection_body">Tap a view on the canvas or in the tree to edit its properties.</string>
+    <string name="ds_custom_attributes">Other attributes</string>
+    <string name="ds_add_attribute">Add attribute</string>
+    <string name="ds_attribute_name">Name (e.g. android:alpha)</string>
+    <string name="ds_attribute_value">Value</string>
+    <string name="ds_unset">Not set</string>
+    <string name="ds_custom_size">Custom (e.g. 120dp)</string>
+    <string name="ds_add">Add</string>
+    <string name="ds_cancel">Cancel</string>
+    <string name="ds_create">Create</string>
+
+    <string name="ds_no_problems">No problems found.</string>
+    <string name="ds_problem_missing_width">layout_width is missing</string>
+    <string name="ds_problem_missing_height">layout_height is missing</string>
+    <string name="ds_problem_invalid_id">Invalid id \"%1$s\"</string>
+    <string name="ds_problem_duplicate_id">Id \"%1$s\" is used more than once</string>
+    <string name="ds_problem_unknown_view">%1$s is not in the component library; its preview may be incomplete</string>
+    <string name="ds_problem_children_not_allowed">%1$s cannot contain other views</string>
+    <string name="ds_problem_too_many_children">%1$s can only hold one child</string>
+    <string name="ds_problem_missing_content_description">Image has no contentDescription (accessibility)</string>
+    <string name="ds_problem_weight_outside_linear">layout_weight only works inside a LinearLayout</string>
+    <string name="ds_problem_preview">Preview: %1$s</string>
+
+    <string name="ds_empty_title">No layouts yet</string>
+    <string name="ds_empty_body">Create a layout file to start designing.</string>
+    <string name="ds_parse_error_title">This layout could not be read</string>
+    <string name="ds_parse_error_body">Fix the XML in the Files tab, then reload. %1$s</string>
+    <string name="ds_reload">Reload</string>
+
+    <string name="ds_conflict_title">Layout changed outside the designer</string>
+    <string name="ds_conflict_body">The file was modified elsewhere since you opened it. Overwrite it with the designer version, or reload the file and lose your designer edits?</string>
+    <string name="ds_conflict_overwrite">Overwrite</string>
+    <string name="ds_conflict_reload">Reload file</string>
+    <string name="ds_leave_title">Save layout changes?</string>
+    <string name="ds_leave_body">Autosave is off and this layout has unsaved changes.</string>
+    <string name="ds_leave_save">Save</string>
+    <string name="ds_leave_discard">Discard</string>
+
+    <string name="ds_layout_name">Layout file name</string>
+    <string name="ds_root_view">Root view</string>
+    <string name="ds_activity_name">Activity class name</string>
+    <string name="ds_activity_hint">For example SettingsActivity. A layout and a manifest entry are created for it.</string>
+    <string name="ds_activity_added">Activity %1$s added</string>
+    <string name="ds_failed">Something went wrong: %1$s</string>
+    <string name="ds_rejected_invalid_resource">Use lowercase letters, digits and underscores, starting with a letter.</string>
+    <string name="ds_rejected_exists">A layout with that name already exists.</string>
+    <string name="ds_rejected_not_container">That view cannot contain children.</string>
+    <string name="ds_rejected_generic">That change is not allowed (%1$s).</string>
+    <string name="ds_rejected_duplicate_id">Another view already uses that id.</string>
+    <string name="ds_rejected_invalid_id">Ids use letters, digits and underscores and start with a letter.</string>
+    <string name="ds_rejected_move_into_self">A view cannot be moved inside itself.</string>
+    <string name="ds_rejected_remove_root">The root view cannot be removed or moved.</string>
+    <string name="ds_rejected_too_many_children">That container can only hold one child.</string>
+    <string name="ds_rejected_size_required">Width and height cannot be removed.</string>
+    <string name="ds_rejected_activity_invalid">Use a class name like SettingsActivity (letters and digits, starting with a capital letter).</string>
+    <string name="ds_rejected_activity_exists">An activity with that name already exists.</string>
+    <string name="ds_preview_too_many_views">Preview stops after %1$s views</string>
+    <string name="ds_preview_not_previewable">%1$s can\'t be previewed here; shown as a placeholder</string>
+    <string name="ds_preview_create_failed">View could not be created: %1$s</string>
+    <string name="ds_preview_attribute_failed">An attribute could not be applied: %1$s</string>
+    <string name="ds_preview_attach_failed">Child could not be added: %1$s</string>
+    <string name="ds_preview_children_ignored">%1$s does not show children</string>
+    <string name="ds_preview_runtime_content">%1$s content only appears when the app runs</string>
+    <string name="ds_preview_menu_not_previewed">Menu %1$s is not previewed</string>
+    <string name="ds_preview_attribute_not_previewed">%1$s is kept in the XML but not shown in the preview</string>
+</resources>

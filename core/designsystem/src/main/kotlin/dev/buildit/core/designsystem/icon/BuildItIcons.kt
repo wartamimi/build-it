@@ -94,6 +94,91 @@ object BiIcons {
         }
     }
 
+    /** Curved arrow pointing back. */
+    val Undo: ImageVector by lazy {
+        outline("Undo") {
+            moveTo(9f, 6f); lineTo(5f, 10f); lineTo(9f, 14f)
+            moveTo(5f, 10f); lineTo(14f, 10f); arcTo(5f, 5f, 0f, false, true, 14f, 20f); lineTo(11f, 20f)
+        }
+    }
+
+    /** Curved arrow pointing forward. */
+    val Redo: ImageVector by lazy {
+        outline("Redo") {
+            moveTo(15f, 6f); lineTo(19f, 10f); lineTo(15f, 14f)
+            moveTo(19f, 10f); lineTo(10f, 10f); arcTo(5f, 5f, 0f, false, false, 10f, 20f); lineTo(13f, 20f)
+        }
+    }
+
+    val MoveUp: ImageVector by lazy { outline("MoveUp") { moveTo(6f, 14f); lineTo(12f, 8f); lineTo(18f, 14f) } }
+    val MoveDown: ImageVector by lazy { outline("MoveDown") { moveTo(6f, 10f); lineTo(12f, 16f); lineTo(18f, 10f) } }
+
+    /** Floppy-less save: tray with downward arrow. */
+    val Save: ImageVector by lazy {
+        outline("Save") {
+            moveTo(12f, 4f); lineTo(12f, 14f); moveTo(8f, 10f); lineTo(12f, 14f); lineTo(16f, 10f)
+            moveTo(4f, 15f); lineTo(4f, 20f); lineTo(20f, 20f); lineTo(20f, 15f)
+        }
+    }
+
+    /** Stacked sheets: component tree. */
+    val Layers: ImageVector by lazy {
+        outline("Layers") {
+            moveTo(12f, 4f); lineTo(20f, 8.5f); lineTo(12f, 13f); lineTo(4f, 8.5f); close()
+            moveTo(4f, 12.5f); lineTo(12f, 17f); lineTo(20f, 12.5f)
+            moveTo(4f, 16f); lineTo(12f, 20.5f); lineTo(20f, 16f)
+        }
+    }
+
+    /** Four tiles: component library. */
+    val Widgets: ImageVector by lazy {
+        outline("Widgets") {
+            moveTo(4f, 4f); lineTo(10f, 4f); lineTo(10f, 10f); lineTo(4f, 10f); close()
+            moveTo(14f, 4f); lineTo(20f, 4f); lineTo(20f, 10f); lineTo(14f, 10f); close()
+            moveTo(4f, 14f); lineTo(10f, 14f); lineTo(10f, 20f); lineTo(4f, 20f); close()
+            moveTo(14f, 14f); lineTo(20f, 14f); lineTo(20f, 20f); lineTo(14f, 20f); close()
+        }
+    }
+
+    /** Sliders: properties inspector. */
+    val Tune: ImageVector by lazy {
+        outline("Tune") {
+            moveTo(4f, 7f); lineTo(20f, 7f); moveTo(4f, 12f); lineTo(20f, 12f); moveTo(4f, 17f); lineTo(20f, 17f)
+            moveTo(9f, 5f); lineTo(9f, 9f); moveTo(15f, 10f); lineTo(15f, 14f); moveTo(7f, 15f); lineTo(7f, 19f)
+        }
+    }
+
+    /** Triangle with exclamation: problems. */
+    val Warning: ImageVector by lazy {
+        outline("Warning") {
+            moveTo(12f, 4f); lineTo(21f, 20f); lineTo(3f, 20f); close()
+            moveTo(12f, 10f); lineTo(12f, 14f); moveTo(12f, 17f); lineTo(12f, 17.01f)
+        }
+    }
+
+    /** Phone outline: device / preview. */
+    val Device: ImageVector by lazy {
+        outline("Device") {
+            moveTo(7f, 3f); lineTo(17f, 3f); lineTo(17f, 21f); lineTo(7f, 21f); close()
+            moveTo(11f, 18f); lineTo(13f, 18f)
+        }
+    }
+
+    /** Rotate: orientation toggle. */
+    val Rotate: ImageVector by lazy {
+        outline("Rotate") {
+            moveTo(19f, 12f); arcTo(7f, 7f, 0f, true, true, 16.9f, 7f)
+            moveTo(17f, 3f); lineTo(17f, 7f); lineTo(13f, 7f)
+        }
+    }
+
+    /** Crescent: night preview. */
+    val Night: ImageVector by lazy {
+        outline("Night") {
+            moveTo(20f, 14.5f); arcTo(8f, 8f, 0f, true, true, 9.5f, 4f); arcTo(6.5f, 6.5f, 0f, false, false, 20f, 14.5f)
+        }
+    }
+
     private fun outline(name: String, stroke: Float = 1.8f, block: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply {
             path(

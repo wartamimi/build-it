@@ -9,7 +9,7 @@ are updated (§19). Status details are in [DEVELOPMENT_STATUS.md](DEVELOPMENT_ST
 | 0 | Technical assessment, architecture, decisions | Done |
 | 1 | Foundation: project setup, architecture, design system, navigation, database, home dashboard, settings | Done |
 | 2 | Project management: create, explorer, file management, templates, import/export, backups, auto-recovery | Done (see known gaps) |
-| 3 | UI designer: layout model, XML parse/serialize, component catalog, drag-and-drop canvas, tree, inspector, live preview | Not started |
+| 3 | UI designer: layout model, XML parse/serialize, component catalog, drag-and-drop canvas, tree, inspector, live preview | Done (see known gaps) |
 | 4 | Block engine: model, definitions, validation, AST/IR, Java/Kotlin codegen, Canvas renderer, undo/redo | Not started |
 | 5 | Code editor: editor abstraction, Java/Kotlin/XML/JSON/Gradle highlighting, find/replace, tabs, diagnostics | Not started |
 | 6 | Local build engine: Toolchain Manager, Kotlin-on-ART spike, dependency resolver, AAPT2/ECJ/D8/R8, APK/AAB, signing, verification | Not started |

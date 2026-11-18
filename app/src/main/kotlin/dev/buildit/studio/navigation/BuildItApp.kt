@@ -12,6 +12,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -38,6 +39,10 @@ import dev.buildit.feature.projects.ProjectsStartAction
 import dev.buildit.feature.projects.ProjectsViewModel
 import dev.buildit.feature.settings.SettingsScreen
 import dev.buildit.feature.settings.SettingsViewModel
+import dev.buildit.feature.designer.DesignerScreen
+import dev.buildit.feature.designer.DesignerViewModel
+import dev.buildit.feature.designer.R as DesignerR
+import dev.buildit.feature.workspace.WorkspaceExtraTab
 import dev.buildit.feature.workspace.WorkspaceScreen
 import dev.buildit.feature.workspace.WorkspaceViewModel
 import dev.buildit.studio.AppContainer
@@ -132,7 +137,13 @@ fun BuildItApp(container: AppContainer) {
                     val vm: WorkspaceViewModel = viewModel(key = "ws-$id", factory = viewModelFactory {
                         initializer { WorkspaceViewModel(id, container.projectRepository, container.dispatchers) }
                     })
-                    WorkspaceScreen(vm, onBack = { nav.popBackStack() })
+                    val designer: DesignerViewModel = viewModel(key = "ds-$id", factory = viewModelFactory {
+                        initializer { DesignerViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers) }
+                    })
+                    val tabs = remember(designer) {
+                        listOf(WorkspaceExtraTab(title = { stringResource(DesignerR.string.ds_tab) }, content = { leave -> DesignerScreen(designer, onExit = leave) }))
+                    }
+                    WorkspaceScreen(vm, onBack = { nav.popBackStack() }, extraTabs = tabs)
                 }
             }
         }

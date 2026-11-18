@@ -43,13 +43,15 @@ Flow throughout; blocking I/O runs on the injected `io` dispatcher.
 | `core:database` | Android (Room) | Project index (`projects` table), exported schemas for migrations. |
 | `core:data` | Android | `ProjectRepository`, `SettingsRepository` (DataStore), `WorkspaceInfo`. |
 | `engine:project` | JVM | Project format v1, validation, store (create/load/save/rename/duplicate/delete), migrations, ZIP import/export, backups/restore, templates, generated-file tracking, safe project file operations. |
+| `engine:layout` | JVM | Layout XML model (lossless parser/writer), component catalog, edit commands with undo/redo, validation, drop resolution, resource values. |
+| `feature:designer` | Android + Compose | Visual designer: real-View preview renderer, canvas host, component library, tree, properties inspector, problems; contributed to the workspace as the Design tab. |
 | `feature:home` | Android + Compose | Dashboard: quick actions, recent projects, storage. |
 | `feature:projects` | Android + Compose | Project list, search/sort, create sheet, rename/duplicate/delete, ZIP import/export (SAF), backups. |
 | `feature:workspace` | Android + Compose | Open project: project settings (app ID, versions, SDK levels) and file explorer. Editor tabs are added per phase. |
 | `feature:settings` | Android + Compose | Theme, dynamic color, language, editor font size, auto-save, rescan workspace, about. |
 | `build-logic` | Gradle | Convention plugins shared by all modules. |
 
-Planned modules: `engine:layout`, `feature:designer` (Phase 3); `engine:blocks`, `feature:blocks`
+Planned modules: `engine:blocks`, `feature:blocks`
 (Phase 4); `feature:code` + editor abstraction (Phase 5); `engine:build`, `toolchain:*`,
 `feature:build` (Phase 6); `engine:ai`, `feature:ai`, `feature:console` (Phase 7);
 `feature:resources` (with Phase 3/5).
@@ -150,8 +152,8 @@ IR (language-neutral, explicit types, structured control flow, resolved imports/
 
 ## 6. UI designer architecture (Phase 3, §20 item 8)
 
-- **Source of truth:** `res/layout/*.xml`, parsed into a typed `LayoutDocument` (tree of
-  `ViewNode(id, type, attributes, children)`), unknown elements/attributes preserved verbatim.
+- **Source of truth:** `res/layout/*.xml`, parsed into an immutable `XmlElement` tree (each node
+  has a session-stable `uid`); comments, text, unknown elements and attributes are preserved.
 - **Component catalog:** definitions of supported views (TextView … BottomNavigation, custom view)
   with their editable attributes, container rules (which parents accept which children) and
   defaults.
@@ -163,7 +165,11 @@ IR (language-neutral, explicit types, structured control flow, resolved imports/
   per device profile (size, density, orientation, night mode) via `createConfigurationContext`;
   selection overlays map back to node ids; render errors are reported per node.
 - **Panels:** component library (search + categories) · canvas · properties inspector ·
-  component tree (bottom). On phones the side panels become bottom sheets.
+  component tree · problems. On wide screens they are side panes; on phones the canvas sits
+  above a tabbed panel so the library can be dragged onto the canvas directly.
+- **Workspace integration:** `WorkspaceScreen` accepts `WorkspaceExtraTab`s, so feature modules
+  add tabs without the workspace depending on them; the app module wires the designer in.
+  The top-bar back routes through the back dispatcher so a tab can save before leaving.
 
 ## 7. Build engine architecture (Phase 6, §20 item 9)
 

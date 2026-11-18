@@ -10,7 +10,7 @@ android {
     defaultConfig {
         applicationId = "dev.buildit.studio"
         versionCode = 1
-        versionName = "0.2.0"
+        versionName = "0.3.0"
     }
 
     androidResources {
@@ -36,6 +36,7 @@ dependencies {
     implementation(project(":feature:home"))
     implementation(project(":feature:projects"))
     implementation(project(":feature:workspace"))
+    implementation(project(":feature:designer"))
     implementation(project(":feature:settings"))
 
     implementation(libs.androidx.core.ktx)

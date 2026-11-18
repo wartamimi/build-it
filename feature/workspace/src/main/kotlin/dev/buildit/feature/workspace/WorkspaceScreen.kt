@@ -1,6 +1,7 @@
 package dev.buildit.feature.workspace
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -24,7 +25,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -35,7 +36,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +63,7 @@ import dev.buildit.engine.project.ProjectEntry
 import dev.buildit.engine.project.ValidationIssue
 
 @Composable
-fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit) {
+fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit, extraTabs: List<WorkspaceExtraTab> = emptyList()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val msgSaved = stringResource(R.string.ws_saved)
@@ -74,6 +77,8 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit) {
         }
     }
     var confirmLeave by remember { mutableStateOf(false) }
+    var selected by rememberSaveable { mutableIntStateOf(0) }
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val leave = { if (state.dirty) confirmLeave = true else onBack() }
     BackHandler(enabled = state.dirty) { confirmLeave = true }
 
@@ -82,7 +87,8 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit) {
             BiTopBar(
                 title = state.project?.manifest?.name ?: stringResource(R.string.ws_title),
                 subtitle = state.project?.manifest?.app?.packageName,
-                onBack = leave,
+                // Route through the back dispatcher so a tab (e.g. the designer) can finish its work first.
+                onBack = { backDispatcher?.onBackPressed() ?: leave() },
                 backLabel = stringResource(R.string.ws_back),
             )
         },
@@ -93,16 +99,17 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit) {
                 state.loading -> BiLoadingState()
                 state.error != null -> BiErrorState(stringResource(R.string.ws_open_failed), state.error!!, retryLabel = stringResource(R.string.ws_retry), onRetry = { viewModel.load() })
                 else -> {
-                    PrimaryTabRow(selectedTabIndex = state.tab.ordinal) {
-                        WorkspaceTab.entries.forEach { t ->
-                            Tab(selected = state.tab == t, onClick = { viewModel.selectTab(t) }, text = {
-                                Text(stringResource(if (t == WorkspaceTab.Project) R.string.ws_tab_project else R.string.ws_tab_files))
-                            })
+                    val titles = extraTabs.map { it.title() } + listOf(stringResource(R.string.ws_tab_project), stringResource(R.string.ws_tab_files))
+                    val current = selected.coerceIn(0, titles.lastIndex)
+                    PrimaryScrollableTabRow(selectedTabIndex = current, edgePadding = Spacing.sm) {
+                        titles.forEachIndexed { i, t ->
+                            Tab(selected = current == i, onClick = { selected = i }, text = { Text(t) })
                         }
                     }
-                    when (state.tab) {
-                        WorkspaceTab.Project -> ProjectSettingsTab(state, viewModel)
-                        WorkspaceTab.Files -> FilesTab(state.files, viewModel)
+                    when (val extra = current) {
+                        in extraTabs.indices -> extraTabs[extra].content(leave)
+                        extraTabs.size -> ProjectSettingsTab(state, viewModel)
+                        else -> FilesTab(state.files, viewModel)
                     }
                 }
             }
@@ -132,6 +139,15 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit) {
         )
     }
 }
+
+/**
+ * A tab contributed by another feature (e.g. the designer). Extra tabs come first. [content]
+ * receives the workspace's leave action so it can finish its own work before leaving.
+ */
+class WorkspaceExtraTab(
+    val title: @Composable () -> String,
+    val content: @Composable (leave: () -> Unit) -> Unit,
+)
 
 @Composable
 private fun ProjectSettingsTab(state: WorkspaceUiState, vm: WorkspaceViewModel) {

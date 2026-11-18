@@ -5,6 +5,7 @@ import dev.buildit.core.common.DispatcherProvider
 import dev.buildit.core.database.ProjectDao
 import dev.buildit.core.database.ProjectEntity
 import dev.buildit.core.model.ProjectSummary
+import dev.buildit.engine.project.Activities
 import dev.buildit.engine.project.LoadResult
 import dev.buildit.engine.project.ManifestSync
 import dev.buildit.engine.project.ProjectManifest
@@ -43,6 +44,9 @@ interface ProjectRepository {
      */
     suspend fun saveSettings(id: String, manifest: ProjectManifest, force: Boolean = false): SaveResult
     suspend fun rename(id: String, newName: String)
+
+    /** Adds an activity with a new layout; returns the saved manifest and any generated-file conflicts. */
+    suspend fun addActivity(id: String, name: String, layout: String, layoutXml: String): SaveResult
     suspend fun duplicate(id: String, newName: String): ProjectSummary
     suspend fun delete(id: String)
     suspend fun import(input: InputStream): ProjectSummary
@@ -102,6 +106,17 @@ class DefaultProjectRepository(
         val dir = File(entity.directory)
         val saved = store.save(dir, manifest)
         val sync = ManifestSync.apply(dir, saved, force)
+        index(dir, saved, entity.lastOpenedAt)
+        SaveResult(saved, sync.conflicts)
+    }
+
+    override suspend fun addActivity(id: String, name: String, layout: String, layoutXml: String): SaveResult = io {
+        val entity = dao.get(id) ?: throw IOException("Unknown project $id")
+        val dir = File(entity.directory)
+        val loaded = store.load(dir) as? LoadResult.Loaded ?: throw IOException("Cannot load project")
+        val updated = Activities.add(dir, loaded.manifest, name, layout, layoutXml)
+        val saved = store.save(dir, updated)
+        val sync = ManifestSync.apply(dir, saved)
         index(dir, saved, entity.lastOpenedAt)
         SaveResult(saved, sync.conflicts)
     }
