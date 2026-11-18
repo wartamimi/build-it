@@ -264,6 +264,40 @@ class DeviceTests {
         }
     }
 
+    /** Every app template (Java) builds on the device, installs and starts without crashing. */
+    @Test fun appTemplatesBuildAndStartOnTheDevice() = runBlocking {
+        val repo = container.projectRepository
+        val toolchain = container.toolchain
+        dev.buildit.engine.blocks.AppTemplates.Kind.entries.forEach { kind ->
+            val pkg = "com.example.tpl${kind.id}"
+            val summary = repo.create("Template ${kind.id}", pkg, dev.buildit.engine.blocks.AppTemplates.of(kind, dev.buildit.engine.project.SourceLanguage.Java))
+            try {
+                val project = repo.open(summary.id)
+                val api = project.manifest.app.compileSdk
+                if (toolchain.androidJar(api) == null) {
+                    val index = toolchain.fetchIndex()
+                    val platform = index.platform(api) ?: error("API $api not in Google's index")
+                    platform.licenseId?.let { id -> toolchain.acceptLicense(id, index.licenses.getValue(id)) }
+                    toolchain.install(platform)
+                }
+                val result = BuildPipeline().run(
+                    BuildRequest(project.directory, project.manifest.app, toolchain.androidJar(api)!!, BuildType.Debug,
+                        key = { Keys.debugKey(container.debugKeystore) }, toolCache = toolchain.cacheDir, console = container.consoleHost, maven = container.maven),
+                )
+                assertTrue("${kind.id}: " + result.diagnostics.joinToString("\n"), result.success)
+                val out = install(result.apk!!)
+                assertTrue(out, out.contains("Success"))
+                shell("am start -W -n $pkg/.MainActivity")
+                waitFor("${kind.id} resumed") { entries(pkg).any { it.level == ConsoleLevel.Event && it.text == "$pkg.MainActivity resumed" } }
+                val crash = entries(pkg).firstOrNull { it.level == ConsoleLevel.Crash }
+                assertNull(crash?.text, crash)
+            } finally {
+                shell("pm uninstall $pkg")
+                repo.delete(summary.id)
+            }
+        }
+    }
+
     @Test fun apiKeysAreEncryptedWithTheKeystore() {
         val store = KeystoreSecretStore(instrumentation.targetContext)
         store.write("test-key", "sk-ant-secret-value")

@@ -324,6 +324,44 @@ standalone layout XML fragment. Placing them always assigns fresh block ids and 
 *Why:* AppCompatActivity crashes without an AppCompat theme, so the switch has to own the theme;
 keeping the user's edits safe follows the same rule as every other generated file (D5).
 
+## D22 — Kotlin on the device, release keys and app templates
+
+*Decision (Kotlin):* Kotlin sources are compiled by the real Kotlin compiler
+(kotlin-compiler-embeddable, same version as Build It's own Kotlin) running inside Build It. It is
+not shipped in the APK: it is downloaded from Maven Central on the first Kotlin build like a
+library, converted to DEX once with D8 (in chunks of 2,500 classes so memory stays bounded) and
+loaded with its own class loader whose parent is the boot class path, so it never sees Build It's
+shrunk copy of the Kotlin standard library. Kotlin is compiled first, with the Java sources
+visible; ECJ then compiles the Java sources against the Kotlin classes, so both languages can call
+each other. The compiler touches a few JDK APIs Android does not have: java.lang.management and
+javax.management (its own timing and memory reports), java.beans.Introspector and StAX
+(javax.xml.stream, used to read its extension descriptors). While converting, references to them
+are renamed byte for byte to packages of the same length: small stand-ins in Build It
+(`jvbuildit.*`) and the StAX API jar from Maven Central renamed the same way. Nothing else in the
+compiler is changed.
+
+*Why:* writing a Kotlin compiler is out of the question, and shipping kotlinc would add ~60 MB to
+every install; most users build Java projects. The renames are the same technique as the ECJ patch
+(D14) and keep class files valid because every name keeps its length.
+
+*Decision (release keys):* release APKs are signed with the user's own key. Keys are PKCS#12
+keystores created in the app (RSA 2048, self-signed, 25 years by default) or imported (.p12/.pfx;
+JKS is refused with the keytool command that converts it, because Android cannot read JKS). The
+keystores live in app-private storage, never in a project, so a project ZIP or share never carries
+them; their passwords are kept only in the Android Keystore-encrypted store used for AI keys. The
+user can export the keystore to back it up, and the UI says why that matters.
+
+*Decision (AAB):* not built. An App Bundle needs resources and manifests in aapt2's protobuf
+format, which Build It's resource compiler (D13) does not write; producing it means a second
+serializer for the whole resource table. Release APKs signed with the user's key cover installing
+and sharing; Play publishing needs the bundle, which is left for later rather than shipped
+half-working.
+
+*Decision (templates):* new projects can start from small apps (counter, calculator, to-do list,
+notes, stopwatch, dice) in Java or Kotlin. Each is an ordinary project: a layout and a block program;
+the activity source is generated from the blocks exactly as when the user saves them. A test
+builds every template in both languages through the real pipeline.
+
 ## Part C — Risks and mitigations (§20 item 11)
 
 | Risk | Likelihood | Impact | Mitigation |
