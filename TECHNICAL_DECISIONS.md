@@ -244,6 +244,15 @@ the first bridge start (e.g. a crash in `Application` static init) may be missed
 is verified with the emulator job in Phase 8; the JVM tests check the compiled APK with aapt2 and
 dexdump and the provider with Robolectric.
 
+### D17. ECJ made to run on Android by patching two Java-only API uses
+*Decision:* ECJ 3.46 references `javax.lang.model.SourceVersion` and `java.lang.Runtime.Version`,
+neither of which exists on Android. The app ships a small `javax.lang.model.SourceVersion` enum,
+and a Gradle task (`patchEcj`) rewrites ECJ's class files so `java/lang/Runtime$Version` becomes
+`dev/buildit/compat/RtVer1` (same name length, so the constant pool is patched byte for byte),
+a Kotlin re-implementation of the parts ECJ uses. The original jar is unchanged for JVM tests.
+*Consequences:* upgrading ECJ needs the emulator job to confirm no new Java-only API is used.
+Verified on ART by the on-device build test.
+
 ---
 
 ## Part C — Risks and mitigations (§20 item 11)

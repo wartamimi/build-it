@@ -241,37 +241,34 @@ Known gaps
 - Console entries live in memory (newest 5,000); logs from before the bridge starts (very early
   process start) can be missed.
 
-## Phase 8 — Integration and release: APK published, on-device build not working yet
+## Phase 8 — Integration and release: on-device build working
 
 Done
-- Release APK (R8 shrinking, 13.6 MB, signed with the Build It release key, version 0.8.0)
-  built and delivered to the owner. CI builds a release APK after the unit tests pass; once the
-  release key is stored as repository secrets, pushing a `v*` tag signs it and publishes a GitHub
-  release (this session was not allowed to create releases or set secrets itself).
-- Emulator job in CI (API 34) with instrumented tests. On ART these pass: the Claude SDK streams
-  (Jackson/OkHttp work on Android), API keys are encrypted and read back with the Keystore, and
-  an OpenAI-compatible server on plain http on the device is reachable.
-- Fixed from device testing: plain http to local AI servers was blocked by Android's default
-  network policy (now allowed; the app itself still only accepts http for local addresses).
+- Release APK (R8 shrinking, ~13.6 MB, signed with the Build It release key). CI builds a release
+  APK after the unit tests pass and, with the signing secrets stored in the repository, publishes
+  a signed GitHub release for every push to main (`v<version>-build.<run>`) or `v*` tag.
+- Emulator job in CI (API 34) with instrumented tests. On ART these pass: building a Java project
+  on the device (ECJ -> D8 -> apksig), installing it, launching it, and seeing its log and an
+  intentional crash (with the source line) arrive through the debug console bridge; the Claude
+  SDK streaming; API keys encrypted with the Keystore; a plain-http OpenAI-compatible server.
+- Fixed from device testing:
+  - ECJ 3.46 needs `javax.lang.model.SourceVersion` and `java.lang.Runtime.Version`, which Android
+    lacks. A stand-in `SourceVersion` ships in the app, and the ECJ jar is patched at build time
+    to use `dev.buildit.compat.RtVer1` instead of `Runtime$Version` (D17).
+  - The Blocks tab crashed on open: Android's ICU regex rejects an unescaped `}`.
+  - Plain http to local AI servers was blocked by Android's default network policy.
+- UI test on the emulator: create a project, add a block, save, open every workspace tab.
 
-**Not working on a device yet (the most important open item)**
-- The emulator test that builds a Java project on the device **fails**: the Eclipse compiler
-  (ECJ 3.46) needs Java APIs that Android does not have. The first one (`javax.lang.model.SourceVersion`)
-  is now provided; the next is `java.lang.Runtime.Version` (Java 9+). Until this is solved the
-  Build tab will fail at the Compile step on a phone, even though the same pipeline passes every
-  JVM test. Options: an ECJ version that targets an older Java runtime, or desugaring ECJ's use of
-  these APIs. At the owner's request the emulator job reports this but does not block the release.
-- Because of that, the debug console bridge has not been seen working end to end on a device
-  (it depends on building and installing an app on the device).
-- Not done in this phase: Kotlin-on-ART spike, separate build process, memory checks before
-  builds, a formal security review.
+Not done in this phase
+- Kotlin-on-ART spike, separate build process, memory checks before builds, a formal security
+  review. Library dependencies are Phase 9 (in progress).
 
 ## Build status
 
 - `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:ai:test` —
   passing locally (130 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
-- APK: release 0.8.0 built and signed; GitHub release pending the signing secrets (then tag `v0.8.0`). Emulator job: runs, reports the on-device compile failure, non-blocking.
+- APK: CI publishes a signed GitHub release for each push to main. Emulator job: on-device build, install and console pass.
 
 ## Test results (latest local run)
 

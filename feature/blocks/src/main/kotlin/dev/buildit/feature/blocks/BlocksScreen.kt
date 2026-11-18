@@ -49,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -267,6 +268,9 @@ private fun SelectionBar(id: String, state: BlocksUiState, vm: BlocksViewModel, 
 
 // ------------------------------------------------------------ palette
 
+/** Test tag of the palette list, so tests can scroll to blocks that are not on screen yet. */
+const val PALETTE_TAG = "blocks-palette"
+
 @Composable
 private fun Palette(
     state: BlocksUiState,
@@ -285,7 +289,7 @@ private fun Palette(
                     leadingIcon = { Box(Modifier.width(10.dp).height(10.dp).background(categoryColor(c), RoundedCornerShape(5.dp))) })
             }
         }
-        LazyColumn(Modifier.fillMaxSize().padding(horizontal = Spacing.sm)) {
+        LazyColumn(Modifier.fillMaxSize().padding(horizontal = Spacing.sm).testTag(PALETTE_TAG)) {
             item { Text(stringResource(R.string.bk_palette_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Spacing.xs)) }
             if (category == BlockCategory.Variables || category == BlockCategory.Lists) {
                 item { TextButton(onClick = onNewVariable) { Icon(BiIcons.Add, null); Text(stringResource(R.string.bk_new_variable)) } }

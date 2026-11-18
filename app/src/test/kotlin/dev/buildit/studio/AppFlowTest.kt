@@ -1,5 +1,8 @@
 package dev.buildit.studio
 
+import dev.buildit.feature.blocks.PALETTE_TAG
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
@@ -58,7 +61,8 @@ class AppFlowTest {
         compose.onNodeWithText("Blocks").performScrollTo().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("App").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("App").performScrollTo().performClick()
-        compose.onNodeWithText("close this screen").performScrollTo().performClick()
+        compose.onNodeWithTag(PALETTE_TAG).performScrollToNode(hasText("close this screen"))
+        compose.onNodeWithText("close this screen").performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Save").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Save").performClick()
         compose.waitUntil(10_000) { File(workspace, ".buildit/blocks/MainActivity.json").let { it.isFile && it.readText().contains("app_finish") } }
