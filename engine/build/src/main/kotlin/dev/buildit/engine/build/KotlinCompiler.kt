@@ -92,7 +92,11 @@ object KotlinCompiler {
             if (error.toBoolean()) diagnostics.error(msg, relative(File(path)), ln.toInt()) else diagnostics.warning(msg, relative(File(path)), ln.toInt())
         }
         val ok = exit == "OK"
-        if (!ok && !matched) diagnostics.error("Kotlin compilation failed ($exit): ${text.lineSequence().firstOrNull { it.isNotBlank() } ?: "no output"}")
+        if (!ok && !matched) {
+            // An internal error: keep the exception and its first frames, without the compiler's notices.
+            val detail = text.lineSequence().filter { it.isNotBlank() && !it.startsWith("warning:") }.take(25).joinToString("\n").take(4000)
+            diagnostics.error("Kotlin compilation failed ($exit): ${detail.ifEmpty { "no output" }}")
+        }
         return ok
     }
 }
