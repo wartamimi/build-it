@@ -52,7 +52,7 @@ data class BlockDef(
      */
     fun parse(template: String): List<MessagePart> {
         val out = mutableListOf<MessagePart>()
-        val re = Regex("\\{(\\w+)}")
+        val re = Regex("\\{(\\w+)\\}")
         var last = 0
         re.findAll(template).forEach { m ->
             if (m.range.first > last) out += MessagePart.Label(template.substring(last, m.range.first).trim())
@@ -70,7 +70,7 @@ data class BlockDef(
 
     /** True when [template] uses exactly this block's placeholders (for validating translations). */
     fun matches(template: String): Boolean {
-        val names = Regex("\\{(\\w+)}").findAll(template).map { it.groupValues[1] }.toList()
+        val names = Regex("\\{(\\w+)\\}").findAll(template).map { it.groupValues[1] }.toList()
         return names.sorted() == (fields.map { it.name } + inputs.map { it.name }).sorted()
     }
 }
