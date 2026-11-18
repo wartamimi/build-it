@@ -1,5 +1,8 @@
 package dev.buildit.studio
 
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.Role
 import dev.buildit.feature.blocks.PALETTE_TAG
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onNodeWithTag
@@ -46,7 +49,7 @@ class UiDeviceTest {
         compose.waitUntil(10_000) { File(dir, ".buildit/blocks/MainActivity.json").let { it.isFile && it.readText().contains("app_finish") } }
 
         for (tab in listOf("Code", "Build", "Console", "AI", "Project", "Files", "Design")) {
-            compose.onNodeWithText(tab).performScrollTo().performClick()
+            compose.onAllNodes(hasText(tab) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).onFirst().performScrollTo().performClick()
             compose.waitForIdle()
         }
         assertTrue(dir.isDirectory)
