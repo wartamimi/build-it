@@ -164,7 +164,7 @@ class BuildPipeline(private val frameworkCache: (File) -> FrameworkResources = :
                 classes.deleteRecursively()
                 if (kotlinSources.isNotEmpty()) {
                     val resolution = try {
-                        Resolver(request.maven!!).resolve(listOf(KotlinCompiler.compiler), progress = { onEvent(BuildEvent.Log(it)) }, isCancelled = isCancelled)
+                        Resolver(request.maven!!).resolve(listOf(KotlinCompiler.compiler) + request.kotlin!!.extraLibraries, progress = { onEvent(BuildEvent.Log(it)) }, isCancelled = isCancelled)
                     } catch (_: ResolveCancelledException) { throw BuildCancelledException() }
                     resolution.problems.forEach { d.error("Kotlin compiler: $it") }
                     if (d.hasErrors) return@step false

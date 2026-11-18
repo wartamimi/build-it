@@ -13,6 +13,9 @@ import java.io.PrintStream
  */
 fun interface KotlinCompilerHost {
     fun classLoader(jars: List<File>, log: (String) -> Unit, isCancelled: () -> Boolean): ClassLoader
+
+    /** Libraries the host needs next to the compiler (JDK APIs that its platform lacks). */
+    val extraLibraries: List<Coordinate> get() = emptyList()
 }
 
 /** JVM host: the JARs as they are, with the platform class loader as parent. */
