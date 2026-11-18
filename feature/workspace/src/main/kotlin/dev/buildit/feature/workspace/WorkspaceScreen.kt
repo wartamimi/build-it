@@ -25,7 +25,15 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.vector.ImageVector
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -63,7 +71,13 @@ import dev.buildit.engine.project.ProjectEntry
 import dev.buildit.engine.project.ValidationIssue
 
 @Composable
-fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit, extraTabs: List<WorkspaceExtraTab> = emptyList()) {
+fun WorkspaceScreen(
+    viewModel: WorkspaceViewModel,
+    onBack: () -> Unit,
+    extraTabs: List<WorkspaceExtraTab> = emptyList(),
+    /** Shown under the main editor tabs (e.g. the screen picker and Run button). */
+    bottomBar: (@Composable (WorkspaceTabScope) -> Unit)? = null,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val msgSaved = stringResource(R.string.ws_saved)
@@ -82,43 +96,90 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit, extraTabs
     val leave = { if (state.dirty) confirmLeave = true else onBack() }
     BackHandler(enabled = state.dirty) { confirmLeave = true }
 
-    Scaffold(
-        topBar = {
-            BiTopBar(
-                title = state.project?.manifest?.name ?: stringResource(R.string.ws_title),
-                subtitle = state.project?.manifest?.app?.packageName,
-                // Route through the back dispatcher so a tab (e.g. the designer) can finish its work first.
-                onBack = { backDispatcher?.onBackPressed() ?: leave() },
-                backLabel = stringResource(R.string.ws_back),
-            )
+    // Tabs: contributed ones first, then the built-in Project and Files tools.
+    val allTabs = extraTabs + listOf(
+        WorkspaceExtraTab(title = { stringResource(R.string.ws_tab_project) }, content = { ProjectSettingsTab(state, viewModel) }, icon = BiIcons.Settings, tool = true, key = PROJECT_TAB),
+        WorkspaceExtraTab(title = { stringResource(R.string.ws_tab_files) }, content = { scope -> FilesTab(state.files, viewModel, openInTab = scope.openFile) }, icon = BiIcons.Folder, tool = true, key = FILES_TAB),
+    )
+    val primary = allTabs.indices.filter { !allTabs[it].tool }
+    val current = selected.coerceIn(0, allTabs.lastIndex)
+    var lastPrimary by rememberSaveable { mutableIntStateOf(primary.firstOrNull() ?: 0) }
+    LaunchedEffect(current) { if (current in primary) lastPrimary = current }
+    val onTool = current !in primary
+    // Back from a tool returns to the editor it was opened from.
+    BackHandler(enabled = onTool && !state.dirty) { selected = lastPrimary }
+
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    val scopeCoroutine = rememberCoroutineScope()
+    val openInTab = { path: String ->
+        val i = allTabs.indexOfFirst { it.opens?.invoke(path) == true }
+        if (i >= 0) selected = i
+        i >= 0
+    }
+    val showTab = { key: String ->
+        val i = allTabs.indexOfFirst { it.key == key }
+        if (i >= 0) selected = i
+    }
+    val tabScope = WorkspaceTabScope(leave, openInTab, showTab)
+
+    ModalNavigationDrawer(
+        drawerState = drawer,
+        gesturesEnabled = drawer.isOpen,
+        drawerContent = {
+            ModalDrawerSheet(Modifier.widthIn(max = 320.dp)) {
+                Text(
+                    stringResource(R.string.ws_tools), style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.lg),
+                )
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    allTabs.forEachIndexed { i, t ->
+                        if (!t.tool) return@forEachIndexed
+                        NavigationDrawerItem(
+                            label = { Text(t.title()) },
+                            icon = t.icon?.let { ic -> { Icon(ic, null) } },
+                            selected = i == current,
+                            onClick = { selected = i; scopeCoroutine.launch { drawer.close() } },
+                            modifier = Modifier.padding(horizontal = Spacing.md),
+                        )
+                    }
+                }
+            }
         },
-        snackbarHost = { SnackbarHost(snackbar) },
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            when {
-                state.loading -> BiLoadingState()
-                state.error != null -> BiErrorState(stringResource(R.string.ws_open_failed), state.error!!, retryLabel = stringResource(R.string.ws_retry), onRetry = { viewModel.load() })
-                else -> {
-                    val titles = extraTabs.map { it.title() } + listOf(stringResource(R.string.ws_tab_project), stringResource(R.string.ws_tab_files))
-                    val current = selected.coerceIn(0, titles.lastIndex)
-                    PrimaryScrollableTabRow(selectedTabIndex = current, edgePadding = Spacing.sm) {
-                        titles.forEachIndexed { i, t ->
-                            Tab(selected = current == i, onClick = { selected = i }, text = { Text(t) })
+    ) {
+        Scaffold(
+            topBar = {
+                BiTopBar(
+                    title = if (onTool) allTabs[current].title() else state.project?.manifest?.name ?: stringResource(R.string.ws_title),
+                    subtitle = if (onTool) state.project?.manifest?.name else state.project?.manifest?.app?.packageName,
+                    // Route through the back dispatcher so a tab (e.g. the designer) can finish its work first.
+                    onBack = { if (onTool) selected = lastPrimary else backDispatcher?.onBackPressed() ?: leave() },
+                    backLabel = stringResource(if (onTool) R.string.ws_back_to_editor else R.string.ws_back),
+                    actions = {
+                        BiIconButton(BiIcons.Menu, stringResource(R.string.ws_tools), { scopeCoroutine.launch { drawer.open() } })
+                    },
+                )
+            },
+            bottomBar = { if (!onTool && !state.loading && state.error == null) bottomBar?.invoke(tabScope) },
+            snackbarHost = { SnackbarHost(snackbar) },
+        ) { padding ->
+            Column(Modifier.padding(padding).fillMaxSize()) {
+                when {
+                    state.loading -> BiLoadingState()
+                    state.error != null -> BiErrorState(stringResource(R.string.ws_open_failed), state.error!!, retryLabel = stringResource(R.string.ws_retry), onRetry = { viewModel.load() })
+                    else -> {
+                        if (!onTool && primary.size > 1) {
+                            PrimaryTabRow(selectedTabIndex = primary.indexOf(current)) {
+                                primary.forEach { i ->
+                                    val t = allTabs[i]
+                                    Tab(
+                                        selected = current == i, onClick = { selected = i },
+                                        text = { Text(t.title(), maxLines = 1) },
+                                        icon = t.icon?.let { ic -> { Icon(ic, null) } },
+                                    )
+                                }
+                            }
                         }
-                    }
-                    val openInTab = { path: String ->
-                        val i = extraTabs.indexOfFirst { it.opens?.invoke(path) == true }
-                        if (i >= 0) selected = i
-                        i >= 0
-                    }
-                    val showTab = { key: String ->
-                        val i = extraTabs.indexOfFirst { it.key == key }
-                        if (i >= 0) selected = i
-                    }
-                    when (val extra = current) {
-                        in extraTabs.indices -> extraTabs[extra].content(WorkspaceTabScope(leave, openInTab, showTab))
-                        extraTabs.size -> ProjectSettingsTab(state, viewModel)
-                        else -> FilesTab(state.files, viewModel, openInTab = openInTab)
+                        Box(Modifier.fillMaxSize()) { allTabs[current].content(tabScope) }
                     }
                 }
             }
@@ -163,7 +224,13 @@ class WorkspaceExtraTab(
     val opens: ((path: String) -> Boolean)? = null,
     /** Lets other tabs switch to this one with [WorkspaceTabScope.showTab]. */
     val key: String? = null,
+    val icon: ImageVector? = null,
+    /** Tools live in the project tools drawer; the others are the main editor tabs. */
+    val tool: Boolean = false,
 )
+
+const val PROJECT_TAB = "project"
+const val FILES_TAB = "files"
 
 @Composable
 private fun ProjectSettingsTab(state: WorkspaceUiState, vm: WorkspaceViewModel) {

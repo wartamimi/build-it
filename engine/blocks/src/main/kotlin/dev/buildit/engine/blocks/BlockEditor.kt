@@ -155,7 +155,7 @@ object BlockOps {
 
     fun addVariable(doc: BlockDocument, v: Variable): BlockDocument {
         if (!Names.isIdentifier(v.name)) throw BlockEditException("invalid_name")
-        if (doc.variables.any { it.name == v.name }) throw BlockEditException("duplicate_name")
+        if (doc.variables.any { it.name == v.name } || doc.components.any { it.name == v.name }) throw BlockEditException("duplicate_name")
         return doc.copy(variables = doc.variables + v)
     }
 
@@ -179,6 +179,36 @@ object BlockOps {
 
     fun usesVariable(doc: BlockDocument, name: String): Boolean = doc.allBlocks().any { b ->
         BlockRegistry.find(b.type)?.fields?.any { it.kind is FieldKind.VariableRef && b.fields[it.name] == name } == true
+    }
+
+    // Components
+
+    fun addComponent(doc: BlockDocument, c: Component): BlockDocument {
+        if (!Names.isIdentifier(c.name)) throw BlockEditException("invalid_name")
+        if (doc.components.any { it.name == c.name } || doc.variables.any { it.name == c.name }) throw BlockEditException("duplicate_name")
+        return doc.copy(components = doc.components + c)
+    }
+
+    /** Renames a component and every block that refers to it. */
+    fun renameComponent(doc: BlockDocument, old: String, new: String): BlockDocument {
+        if (!Names.isIdentifier(new)) throw BlockEditException("invalid_name")
+        if (old != new && (doc.components.any { it.name == new } || doc.variables.any { it.name == new })) throw BlockEditException("duplicate_name")
+        val renamed = doc.copy(components = doc.components.map { if (it.name == old) it.copy(name = new) else it })
+        return mapAll(renamed) { b ->
+            val def = BlockRegistry.find(b.type) ?: return@mapAll b
+            val refs = def.fields.filter { it.kind is FieldKind.ComponentRef && b.fields[it.name] == old }
+            if (refs.isEmpty()) b else b.copy(fields = b.fields + refs.associate { it.name to new })
+        }
+    }
+
+    /** Removes a component that no block uses. */
+    fun removeComponent(doc: BlockDocument, name: String): BlockDocument {
+        if (usesComponent(doc, name)) throw BlockEditException("in_use")
+        return doc.copy(components = doc.components.filterNot { it.name == name })
+    }
+
+    fun usesComponent(doc: BlockDocument, name: String): Boolean = doc.allBlocks().any { b ->
+        BlockRegistry.find(b.type)?.fields?.any { it.kind is FieldKind.ComponentRef && b.fields[it.name] == name } == true
     }
 
     // Tree helpers

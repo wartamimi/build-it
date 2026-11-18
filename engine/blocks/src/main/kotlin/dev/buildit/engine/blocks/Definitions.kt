@@ -1,6 +1,7 @@
 package dev.buildit.engine.blocks
 
-enum class BlockCategory { Events, Control, Logic, Math, Text, Variables, Lists, Components, App, Code }
+/** Palette categories. [Components] holds view blocks; [Parts] holds blocks of non-visual components. */
+enum class BlockCategory { Events, Control, Logic, Math, Text, Variables, Lists, Components, Parts, App, Code }
 
 /** How a block connects: event hats start a stack, statements chain, values plug into inputs. */
 enum class BlockShape { Hat, Statement, Value }
@@ -18,6 +19,10 @@ sealed interface FieldKind {
     data class Procedure(val defines: Boolean) : FieldKind
     data object Activity : FieldKind
     data object Code : FieldKind
+    /** A component of the screen of the given type. */
+    data class ComponentRef(val type: ComponentType) : FieldKind
+    /** Name of a sound file in res/raw (without extension). */
+    data object RawResource : FieldKind
 }
 
 data class FieldDef(val name: String, val kind: FieldKind)
@@ -94,6 +99,9 @@ object BlockRegistry {
         BlockDef("event_click", BlockCategory.Events, BlockShape.Hat, "when {view} is clicked", fields = listOf(FieldDef("view", FieldKind.View())), statements = listOf(StatementDef("do", ""))),
         BlockDef("event_checked", BlockCategory.Events, BlockShape.Hat, "when {view} is checked or unchecked", fields = listOf(FieldDef("view", FieldKind.View(ViewKind.Compound))), statements = listOf(StatementDef("do", ""))),
         BlockDef("proc_define", BlockCategory.Events, BlockShape.Hat, "define procedure {name}", fields = listOf(FieldDef("name", FieldKind.Procedure(defines = true))), statements = listOf(StatementDef("do", ""))),
+        BlockDef("event_timer", BlockCategory.Events, BlockShape.Hat, "when {timer} ticks", fields = listOf(FieldDef("timer", FieldKind.ComponentRef(ComponentType.Timer))), statements = listOf(StatementDef("do", ""))),
+        BlockDef("event_dialog_ok", BlockCategory.Events, BlockShape.Hat, "when OK is pressed in {dialog}", fields = listOf(FieldDef("dialog", FieldKind.ComponentRef(ComponentType.Dialog))), statements = listOf(StatementDef("do", ""))),
+        BlockDef("event_sound_done", BlockCategory.Events, BlockShape.Hat, "when {sound} finishes", fields = listOf(FieldDef("sound", FieldKind.ComponentRef(ComponentType.Sound))), statements = listOf(StatementDef("do", ""))),
 
         // Control
         BlockDef("ctrl_if", BlockCategory.Control, BlockShape.Statement, "if {cond}", inputs = listOf(InputDef("cond", ValueType.Boolean)), statements = listOf(StatementDef("then", "then"))),
@@ -148,11 +156,29 @@ object BlockRegistry {
         BlockDef("view_set_checked", BlockCategory.Components, BlockShape.Statement, "set {view} checked to {checked}", fields = listOf(FieldDef("view", FieldKind.View(ViewKind.Compound))), inputs = listOf(InputDef("checked", ValueType.Boolean))),
         BlockDef("view_set_text_color", BlockCategory.Components, BlockShape.Statement, "set text color of {view} to {color}", fields = listOf(FieldDef("view", FieldKind.View(ViewKind.Text)), FieldDef("color", FieldKind.Text("#FF000000")))),
 
+        // Parts (non-visual components)
+        BlockDef("timer_start", BlockCategory.Parts, BlockShape.Statement, "start {timer} {mode} after {ms} ms",
+            fields = listOf(FieldDef("timer", FieldKind.ComponentRef(ComponentType.Timer)), FieldDef("mode", FieldKind.Dropdown(listOf("once", "repeating")))),
+            inputs = listOf(InputDef("ms", ValueType.Number))),
+        BlockDef("timer_stop", BlockCategory.Parts, BlockShape.Statement, "stop {timer}", fields = listOf(FieldDef("timer", FieldKind.ComponentRef(ComponentType.Timer)))),
+        BlockDef("storage_set", BlockCategory.Parts, BlockShape.Statement, "in {store} save {value} as {key}",
+            fields = listOf(FieldDef("store", FieldKind.ComponentRef(ComponentType.Storage))), inputs = listOf(InputDef("value", ValueType.Text), InputDef("key", ValueType.Text))),
+        BlockDef("storage_get", BlockCategory.Parts, BlockShape.Value, "{key} from {store}",
+            fields = listOf(FieldDef("store", FieldKind.ComponentRef(ComponentType.Storage))), inputs = listOf(InputDef("key", ValueType.Text)), output = ValueType.Text),
+        BlockDef("storage_remove", BlockCategory.Parts, BlockShape.Statement, "in {store} remove {key}",
+            fields = listOf(FieldDef("store", FieldKind.ComponentRef(ComponentType.Storage))), inputs = listOf(InputDef("key", ValueType.Text))),
+        BlockDef("dialog_show", BlockCategory.Parts, BlockShape.Statement, "show {dialog} titled {title} saying {message}",
+            fields = listOf(FieldDef("dialog", FieldKind.ComponentRef(ComponentType.Dialog))), inputs = listOf(InputDef("title", ValueType.Text), InputDef("message", ValueType.Text))),
+        BlockDef("sound_play", BlockCategory.Parts, BlockShape.Statement, "play {file} with {sound}",
+            fields = listOf(FieldDef("sound", FieldKind.ComponentRef(ComponentType.Sound)), FieldDef("file", FieldKind.RawResource))),
+        BlockDef("sound_stop", BlockCategory.Parts, BlockShape.Statement, "stop {sound}", fields = listOf(FieldDef("sound", FieldKind.ComponentRef(ComponentType.Sound)))),
+
         // App
         BlockDef("app_toast", BlockCategory.App, BlockShape.Statement, "show message {text}", inputs = listOf(InputDef("text", ValueType.Text))),
         BlockDef("app_log", BlockCategory.App, BlockShape.Statement, "write to log {text}", inputs = listOf(InputDef("text", ValueType.Text))),
         BlockDef("app_start", BlockCategory.App, BlockShape.Statement, "open screen {activity}", fields = listOf(FieldDef("activity", FieldKind.Activity))),
         BlockDef("app_finish", BlockCategory.App, BlockShape.Statement, "close this screen"),
+        BlockDef("app_open_link", BlockCategory.App, BlockShape.Statement, "open web page {url}", inputs = listOf(InputDef("url", ValueType.Text))),
 
         // Custom code
         BlockDef("code_stmt", BlockCategory.Code, BlockShape.Statement, "code {code}", fields = listOf(FieldDef("code", FieldKind.Code))),
@@ -168,7 +194,7 @@ object BlockRegistry {
      * A new block of [type] with default field values and default literal blocks in its value
      * inputs, so freshly added blocks are valid wherever possible.
      */
-    fun create(type: String, ids: () -> String, variables: List<Variable> = emptyList(), views: List<ViewInfo> = emptyList()): Block {
+    fun create(type: String, ids: () -> String, variables: List<Variable> = emptyList(), views: List<ViewInfo> = emptyList(), components: List<Component> = emptyList(), sounds: List<String> = emptyList()): Block {
         val def = get(type)
         val fields = def.fields.associate { f ->
             f.name to when (val k = f.kind) {
@@ -179,6 +205,8 @@ object BlockRegistry {
                 is FieldKind.VariableRef -> variables.firstOrNull { k.type == null || it.type == k.type }?.name.orEmpty()
                 is FieldKind.Procedure -> if (k.defines) "doSomething" else ""
                 FieldKind.Activity -> ""
+                is FieldKind.ComponentRef -> components.firstOrNull { it.type == k.type }?.name.orEmpty()
+                FieldKind.RawResource -> sounds.firstOrNull().orEmpty()
                 FieldKind.Code -> ""
             }
         }

@@ -97,6 +97,7 @@ fun categoryColor(c: BlockCategory?): Color = when (c) {
     BlockCategory.Variables -> Color(0xFFB0457A)
     BlockCategory.Lists -> Color(0xFF7653B8)
     BlockCategory.Components -> Color(0xFF4554B0)
+    BlockCategory.Parts -> Color(0xFF8C4FA0)
     BlockCategory.App -> Color(0xFF6D5B4A)
     BlockCategory.Code -> Color(0xFF55606E)
     null -> Color(0xFF8A2C2C)

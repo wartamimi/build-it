@@ -2,6 +2,7 @@ package dev.buildit.core.designsystem.icon
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Delete
@@ -28,6 +29,7 @@ object BiIcons {
     val Home = Icons.Filled.Home
     val Projects = Icons.AutoMirrored.Filled.List
     val Settings = Icons.Filled.Settings
+    val Back = Icons.AutoMirrored.Filled.ArrowBack
     val Add = Icons.Filled.Add
     val Build = Icons.Filled.Build
     val Delete = Icons.Filled.Delete
@@ -177,6 +179,75 @@ object BiIcons {
         outline("Night") {
             moveTo(20f, 14.5f); arcTo(8f, 8f, 0f, true, true, 9.5f, 4f); arcTo(6.5f, 6.5f, 0f, false, false, 20f, 14.5f)
         }
+    }
+
+    /** Triangle: run the app. */
+    val Run: ImageVector by lazy { outline("Run") { moveTo(8f, 5f); lineTo(19f, 12f); lineTo(8f, 19f); close() } }
+
+    /** Three lines: open the project tools drawer. */
+    val Menu: ImageVector by lazy { outline("Menu") { moveTo(4f, 7f); lineTo(20f, 7f); moveTo(4f, 12f); lineTo(20f, 12f); moveTo(4f, 17f); lineTo(20f, 17f) } }
+
+    /** Lightning bolt: events. */
+    val Event: ImageVector by lazy { outline("Event") { moveTo(13f, 3f); lineTo(5f, 13f); lineTo(11f, 13f); lineTo(10f, 21f); lineTo(19f, 10f); lineTo(13f, 10f); close() } }
+
+    /** Hexagon with a dot: components (non-visual parts of a screen). */
+    val Component: ImageVector by lazy {
+        outline("Component") {
+            moveTo(12f, 3f); lineTo(20f, 7.5f); lineTo(20f, 16.5f); lineTo(12f, 21f); lineTo(4f, 16.5f); lineTo(4f, 7.5f); close()
+            moveTo(12f, 11f); lineTo(12f, 13f)
+        }
+    }
+
+    /** Stacked notched bars: the block editor. */
+    val Blocks: ImageVector by lazy {
+        outline("Blocks") {
+            moveTo(4f, 5f); lineTo(8f, 5f); lineTo(9f, 6.5f); lineTo(11f, 6.5f); lineTo(12f, 5f); lineTo(20f, 5f); lineTo(20f, 10f); lineTo(4f, 10f); close()
+            moveTo(4f, 13f); lineTo(8f, 13f); lineTo(9f, 14.5f); lineTo(11f, 14.5f); lineTo(12f, 13f); lineTo(16f, 13f); lineTo(16f, 18f); lineTo(4f, 18f); close()
+        }
+    }
+
+    /** Frame with a hill and sun: images. */
+    val Image: ImageVector by lazy {
+        outline("Image") {
+            moveTo(4f, 5f); lineTo(20f, 5f); lineTo(20f, 19f); lineTo(4f, 19f); close()
+            moveTo(4f, 16f); lineTo(9f, 11f); lineTo(14f, 16f); moveTo(13f, 14f); lineTo(15f, 12f); lineTo(20f, 17f)
+            moveTo(15.5f, 8.5f); lineTo(15.5f, 8.51f)
+        }
+    }
+
+    /** Note: sounds. */
+    val Sound: ImageVector by lazy {
+        outline("Sound") {
+            moveTo(9f, 17f); lineTo(9f, 5f); lineTo(19f, 3f); lineTo(19f, 15f)
+            moveTo(9f, 17f); arcTo(2.5f, 2.5f, 0f, true, true, 4f, 17f); arcTo(2.5f, 2.5f, 0f, true, true, 9f, 17f)
+            moveTo(19f, 15f); arcTo(2.5f, 2.5f, 0f, true, true, 14f, 15f); arcTo(2.5f, 2.5f, 0f, true, true, 19f, 15f)
+        }
+    }
+
+    /** Letter A with baseline: fonts. */
+    val Font: ImageVector by lazy { outline("Font") { moveTo(5f, 19f); lineTo(12f, 4f); lineTo(19f, 19f); moveTo(8f, 13f); lineTo(16f, 13f) } }
+
+    /** Angle brackets: source code. */
+    val Code: ImageVector by lazy { outline("Code") { moveTo(8f, 7f); lineTo(3f, 12f); lineTo(8f, 17f); moveTo(16f, 7f); lineTo(21f, 12f); lineTo(16f, 17f); moveTo(14f, 5f); lineTo(10f, 19f) } }
+
+    /** Prompt: console / logs. */
+    val Terminal: ImageVector by lazy {
+        outline("Terminal") { moveTo(3f, 5f); lineTo(21f, 5f); lineTo(21f, 19f); lineTo(3f, 19f); close(); moveTo(7f, 9f); lineTo(10f, 12f); lineTo(7f, 15f); moveTo(12f, 15f); lineTo(16f, 15f) }
+    }
+
+    /** Four-point star: assistant. */
+    val Assistant: ImageVector by lazy {
+        outline("Assistant") { moveTo(12f, 3f); lineTo(14f, 10f); lineTo(21f, 12f); lineTo(14f, 14f); lineTo(12f, 21f); lineTo(10f, 14f); lineTo(3f, 12f); lineTo(10f, 10f); close() }
+    }
+
+    /** Books on a shelf: libraries. */
+    val Library: ImageVector by lazy {
+        outline("Library") { moveTo(4f, 4f); lineTo(4f, 20f); moveTo(8f, 4f); lineTo(8f, 20f); moveTo(12f, 5f); lineTo(16f, 19f); moveTo(3f, 20f); lineTo(21f, 20f) }
+    }
+
+    /** Two stacked screens: the screens (activities) of a project. */
+    val Screens: ImageVector by lazy {
+        outline("Screens") { moveTo(9f, 3f); lineTo(19f, 3f); lineTo(19f, 17f); moveTo(5f, 7f); lineTo(15f, 7f); lineTo(15f, 21f); lineTo(5f, 21f); close() }
     }
 
     private fun outline(name: String, stroke: Float = 1.8f, block: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit): ImageVector =

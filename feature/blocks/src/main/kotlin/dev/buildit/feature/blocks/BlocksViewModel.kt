@@ -15,6 +15,8 @@ import dev.buildit.engine.blocks.BlockOps
 import dev.buildit.engine.blocks.BlockRegistry
 import dev.buildit.engine.blocks.BlockShape
 import dev.buildit.engine.blocks.BlockStore
+import dev.buildit.engine.blocks.Component
+import dev.buildit.engine.blocks.ComponentType
 import dev.buildit.engine.blocks.BlockSync
 import dev.buildit.engine.blocks.BlockValidator
 import dev.buildit.engine.blocks.Slot
@@ -53,9 +55,13 @@ data class BlocksUiState(
     val loading: Boolean = true,
     val error: String? = null,
     val activities: List<String> = emptyList(),
+    /** Layout of each activity (activity name -> layout name). */
+    val layouts: Map<String, String> = emptyMap(),
     val activity: String? = null,
     val document: BlockDocument? = null,
     val views: List<ViewInfo> = emptyList(),
+    /** Sound files in res/raw (resource names), for sound blocks. */
+    val sounds: List<String> = emptyList(),
     val diagnostics: List<BlockDiagnostic> = emptyList(),
     val selectedId: String? = null,
     val canUndo: Boolean = false,
@@ -113,11 +119,13 @@ class BlocksViewModel(
                 val (doc, views) = withContext(dispatchers.io) {
                     store!!.load(chosen.name, ids) to readViews(File(p.directory, "app/src/main/res/layout/${chosen.layout}.xml"))
                 }
+                val sounds = withContext(dispatchers.io) { readSounds(p.directory) }
                 editor = BlockEditor(doc)
                 _state.update {
                     it.copy(
                         loading = false, error = null, activities = activities.map { a -> a.name }, activity = chosen.name,
-                        document = doc, views = views, selectedId = null, canUndo = false, canRedo = false, dirty = false,
+                        layouts = activities.associate { a -> a.name to a.layout },
+                        document = doc, views = views, sounds = sounds, selectedId = null, canUndo = false, canRedo = false, dirty = false,
                         codeStatus = CodeStatus.Unknown, keepHandEdits = false,
                         sourcePath = BlockSync.sourcePath(p.manifest, chosen.name),
                     )
@@ -129,6 +137,16 @@ class BlocksViewModel(
         }
     }
 
+    /** Re-reads the project's activities (one may have been added in the designer) without reloading the blocks. */
+    fun refreshActivities() {
+        viewModelScope.launch {
+            val m = try { repository.open(projectId).manifest } catch (_: Exception) { return@launch }
+            manifest = m
+            val activities = m.modules.flatMap { it.activities }
+            _state.update { it.copy(activities = activities.map { a -> a.name }, layouts = activities.associate { a -> a.name to a.layout }) }
+        }
+    }
+
     /** Re-reads the layout's views (they may have changed in the designer) without touching the blocks. */
     fun refreshViews() {
         val dir = projectDir ?: return
@@ -136,12 +154,13 @@ class BlocksViewModel(
         val activity = m.modules.flatMap { it.activities }.firstOrNull { it.name == _state.value.activity } ?: return
         viewModelScope.launch {
             val views = withContext(dispatchers.io) { readViews(File(dir, "app/src/main/res/layout/${activity.layout}.xml")) }
-            _state.update { it.copy(views = views) }
+            val sounds = withContext(dispatchers.io) { readSounds(dir) }
+            _state.update { it.copy(views = views, sounds = sounds) }
             refreshDiagnostics()
         }
     }
 
-    private fun context() = BlockContext(_state.value.views, _state.value.activities)
+    private fun context() = BlockContext(_state.value.views, _state.value.activities, _state.value.sounds)
 
     private fun refreshDiagnostics() {
         val doc = _state.value.document ?: return
@@ -195,7 +214,7 @@ class BlocksViewModel(
      */
     fun add(type: String, x: Float, y: Float) {
         val doc = _state.value.document ?: return
-        val block = BlockRegistry.create(type, ids, doc.variables, _state.value.views)
+        val block = BlockRegistry.create(type, ids, doc.variables, _state.value.views, doc.components, _state.value.sounds)
         val shape = BlockRegistry[type].shape
         val selected = _state.value.selectedId?.let { doc.find(it) }
         edit { d ->
@@ -240,6 +259,37 @@ class BlocksViewModel(
     fun removeVariable(name: String) = edit { BlockOps.removeVariable(it, name) }
 
     fun newId(): String = ids()
+
+    // ------------------------------------------------------------ events and components
+
+    /**
+     * Adds an event block (with [fields], e.g. the view it listens to) below the existing stacks,
+     * or finds the one already there. Returns the event block's id, or null if nothing is open.
+     */
+    fun addEvent(type: String, fields: Map<String, String> = emptyMap()): String? {
+        val doc = _state.value.document ?: return null
+        doc.stacks.firstOrNull { s -> s.blocks.firstOrNull()?.let { h -> h.type == type && fields.all { (k, v) -> h.field(k) == v } } == true }
+            ?.let { return it.blocks.first().id }
+        val base = BlockRegistry.create(type, ids, doc.variables, _state.value.views, doc.components, _state.value.sounds)
+        val block = base.copy(fields = base.fields + fields)
+        // Below the lowest stack, estimating each block's height generously so nothing overlaps.
+        val y = doc.stacks.maxOfOrNull { st -> st.y + st.blocks.sumOf { b -> b.walk().count() } * 56f } ?.plus(EVENT_SPACING) ?: 40f
+        edit { d -> BlockOps.addStack(d, listOf(block), 40f, y) }
+        _state.update { it.copy(selectedId = block.id) }
+        return block.id
+    }
+
+    fun addComponent(name: String, type: ComponentType) = edit { BlockOps.addComponent(it, Component(name.trim(), type)) }
+    fun renameComponent(old: String, new: String) = edit { BlockOps.renameComponent(it, old, new.trim()) }
+    fun removeComponent(name: String) = edit { BlockOps.removeComponent(it, name) }
+
+    /** A free name like `timer1` for a new component of [type]. */
+    fun suggestComponentName(type: ComponentType): String {
+        val doc = _state.value.document
+        val taken = doc?.components.orEmpty().map { it.name }.toSet() + doc?.variables.orEmpty().map { it.name } + _state.value.views.map { it.id }
+        val base = type.name.lowercase()
+        return generateSequence(1) { it + 1 }.map { "$base$it" }.first { it !in taken }
+    }
 
     val autoSaveEnabled get() = settings.settings
 
@@ -316,6 +366,12 @@ class BlocksViewModel(
         const val SAVE_DELAY_MS = 800L
 
         /** Views with an id in the layout, in document order. Unreadable layouts give no views. */
+        private const val EVENT_SPACING = 120f
+
+        /** Resource names of the files in res/raw. */
+        fun readSounds(projectDir: File): List<String> =
+            File(projectDir, "app/src/main/res/raw").listFiles().orEmpty().filter { it.isFile }.map { it.name.substringBefore('.') }.distinct().sorted()
+
         fun readViews(layout: File): List<ViewInfo> {
             if (!layout.isFile) return emptyList()
             val root = runCatching { XmlParser.parse(layout.readText()) }.getOrNull() ?: return emptyList()

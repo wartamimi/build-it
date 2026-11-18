@@ -32,6 +32,8 @@ data class BlockDocument(
     val activity: String,
     val variables: List<Variable> = emptyList(),
     val stacks: List<BlockStack> = emptyList(),
+    /** Non-visual parts of the screen (timers, stored values, dialogs, sound players). */
+    val components: List<Component> = emptyList(),
 ) {
     fun allBlocks(): Sequence<Block> = stacks.asSequence().flatMap { s -> s.blocks.asSequence().flatMap { it.walk() } }
     fun find(id: String): Block? = allBlocks().firstOrNull { it.id == id }
@@ -43,6 +45,22 @@ data class BlockDocument(
 
 @Serializable
 data class Variable(val name: String, val type: ValueType)
+
+/** Kinds of non-visual components a screen can have; each comes with its own blocks. */
+@Serializable
+enum class ComponentType {
+    /** Runs blocks after a delay, once or repeatedly (android.os.Handler). */
+    @SerialName("timer") Timer,
+    /** Keeps text values between app launches (SharedPreferences). */
+    @SerialName("storage") Storage,
+    /** A message box with an OK button (android.app.AlertDialog). */
+    @SerialName("dialog") Dialog,
+    /** Plays a sound from res/raw (android.media.MediaPlayer). */
+    @SerialName("sound") Sound,
+}
+
+@Serializable
+data class Component(val name: String, val type: ComponentType)
 
 @Serializable
 data class BlockStack(val x: Float, val y: Float, val blocks: List<Block>)

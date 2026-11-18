@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -78,15 +79,18 @@ class LibraryDrag {
 
 // ---------------------------------------------------------------- Library
 
+/** Test tag of the component library list. */
+const val LIBRARY_TAG = "designer-library"
+
 @Composable
-fun ComponentLibrary(onAdd: (String) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit, modifier: Modifier = Modifier) {
+fun ComponentLibrary(onAdd: (String) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
     var query by remember { mutableStateOf("") }
     val filtered = remember(query) {
         ComponentCatalog.all.filter { query.isBlank() || it.displayName.contains(query, ignoreCase = true) || it.tag.contains(query, ignoreCase = true) }
             .groupBy { it.category }
     }
     Column(modifier) {
-        OutlinedTextField(
+        if (!compact) OutlinedTextField(
             value = query,
             onValueChange = { query = it },
             placeholder = { Text(stringResource(R.string.ds_search_components)) },
@@ -94,30 +98,30 @@ fun ComponentLibrary(onAdd: (String) -> Unit, drag: LibraryDrag, onDragMove: () 
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(Spacing.sm),
         )
-        Text(
+        if (!compact) Text(
             stringResource(R.string.ds_library_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = Spacing.md),
         )
-        LazyColumn(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize().testTag(LIBRARY_TAG)) {
             filtered.forEach { (category, defs) ->
                 item(key = "h-$category") {
                     Text(
                         category.name,
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = Spacing.md, top = Spacing.md, bottom = Spacing.xs),
+                        modifier = Modifier.padding(start = if (compact) Spacing.sm else Spacing.md, top = Spacing.md, bottom = Spacing.xs),
                     )
                 }
-                items(defs, key = { it.tag }) { def -> LibraryItem(def, onAdd, drag, onDragMove, onDrop) }
+                items(defs, key = { it.tag }) { def -> LibraryItem(def, onAdd, drag, onDragMove, onDrop, compact) }
             }
         }
     }
 }
 
 @Composable
-private fun LibraryItem(def: ComponentDef, onAdd: (String) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit) {
+private fun LibraryItem(def: ComponentDef, onAdd: (String) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit, compact: Boolean) {
     var origin by remember { mutableStateOf(Offset.Zero) }
     Row(
         Modifier
@@ -132,18 +136,18 @@ private fun LibraryItem(def: ComponentDef, onAdd: (String) -> Unit, drag: Librar
                 )
             }
             .clickable { onAdd(def.tag) }
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            .padding(horizontal = if (compact) Spacing.sm else Spacing.md, vertical = if (compact) Spacing.xs else Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(28.dp).background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp)),
+            Modifier.size(if (compact) 24.dp else 28.dp).background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Text(def.displayName.take(2), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
         }
-        Column(Modifier.padding(start = Spacing.md).weight(1f)) {
-            Text(def.displayName, style = MaterialTheme.typography.bodyMedium)
-            def.requiresDependency?.let {
+        Column(Modifier.padding(start = if (compact) Spacing.sm else Spacing.md).weight(1f)) {
+            Text(def.displayName, style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyMedium, maxLines = if (compact) 1 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
+            if (!compact) def.requiresDependency?.let {
                 Text(stringResource(R.string.ds_needs_dependency, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }

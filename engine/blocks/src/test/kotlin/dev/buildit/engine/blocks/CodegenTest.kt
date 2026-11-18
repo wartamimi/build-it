@@ -40,6 +40,17 @@ class CodegenTest {
             "photo.setVisibility(View.GONE);",
             "private void runReset() {",
             "protected void onPause() {",
+            "private final Handler ticker = new Handler(Looper.getMainLooper());",
+            "prefs = getSharedPreferences(\"prefs\", MODE_PRIVATE);",
+            "startTicker((long) 1000.0, true);",
+            "private void onTickerTick() {",
+            "prefs.edit().putString(\"last\", formatNumber(count)).apply();",
+            "setMessage(prefs.getString(\"last\", \"\"))",
+            "private void onConfirmOk() {",
+            "playPlayer(R.raw.ding);",
+            "private void onPlayerDone() {",
+            "startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(\"https://example.com\")));",
+            "ticker.removeCallbacksAndMessages(null);\n        stopPlayer();\n        super.onDestroy();",
         ).forEach { assertTrue("missing: $it\n$code", code.contains(it)) }
     }
 
@@ -58,6 +69,13 @@ class CodegenTest {
             "startActivity(Intent(this, SettingsActivity::class.java))",
             "photo.visibility = View.GONE",
             "count += 1.0",
+            "private val ticker = Handler(Looper.getMainLooper())",
+            "private lateinit var prefs: SharedPreferences",
+            "private var player: MediaPlayer? = null",
+            "startTicker(1000.0.toLong(), true)",
+            "setPositiveButton(android.R.string.ok) { _, _ -> onConfirmOk() }",
+            "(prefs.getString(\"last\", \"\") ?: \"\")",
+            "val player = MediaPlayer.create(this, sound) ?: return",
         ).forEach { assertTrue("missing: $it\n$code", code.contains(it)) }
     }
 
@@ -76,6 +94,7 @@ class CodegenTest {
             package com.example.demo;
             public final class R {
                 public static final class layout { public static final int activity_main = 1; }
+                public static final class raw { public static final int ding = 6; }
                 public static final class id { public static final int greeting = 2, button1 = 3, agree = 4, photo = 5; }
             }
             """.trimIndent(),

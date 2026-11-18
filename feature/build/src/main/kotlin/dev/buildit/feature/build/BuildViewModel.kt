@@ -147,7 +147,8 @@ class BuildViewModel(
     /** Leaving the project stops a running build or download at its next step boundary. */
     override fun onCleared() = cancel.set(true)
 
-    fun build(type: BuildType = BuildType.Debug) {
+    /** Builds the project; [onSuccess] gets the APK when the build succeeds (e.g. to install it). */
+    fun build(type: BuildType = BuildType.Debug, onSuccess: ((File) -> Unit)? = null) {
         if (_state.value.running) return
         cancel.set(false)
         _state.update {
@@ -174,6 +175,7 @@ class BuildViewModel(
                         cancelled = result.cancelled,
                     )
                 }
+                if (result.success) result.apk?.let { onSuccess?.invoke(it) }
             } catch (e: Exception) {
                 _state.update { it.copy(running = false, diagnostics = listOf(BuildDiagnostic(BuildDiagnostic.Severity.Error, e.message ?: e.javaClass.simpleName))) }
             }

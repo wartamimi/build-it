@@ -271,6 +271,19 @@ Java), Gradle plugins other than google-services, manifest placeholders other th
 `${applicationId}`, and R8 shrinking of the user's APK. Library resources are recompiled on every
 build (seconds on a phone for Material). Verified on ART by the emulator test.
 
+## D19 — Sketchware-style workflow, own identity; components in the block file
+
+*Decision:* the workspace is organised the way Sketchware Pro users expect (Design / Events /
+Components, screen picker and Run at the bottom, tools in a drawer), but with Build It's own
+names, icons, colours and block shapes. Non-visual components are stored in the screen's block
+document (`components`), so they move, undo and save with the blocks; each type has blocks and an
+event, lowered to IR and printed by the Java and Kotlin backends like other blocks. Images, sounds
+and fonts are plain files in res/drawable, res/raw and res/font (the project stays a normal
+Android project); import refuses to replace a resource of the same name.
+*Consequences:* old block files load unchanged (the field defaults to empty). Sound blocks name a
+res/raw file and are checked against the folder. Component kinds need code in the engine; there
+is no plugin system for them.
+
 ---
 
 ## Part C — Risks and mitigations (§20 item 11)

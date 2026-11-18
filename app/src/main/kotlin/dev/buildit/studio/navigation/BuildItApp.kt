@@ -43,7 +43,8 @@ import dev.buildit.feature.projects.ProjectsStartAction
 import dev.buildit.feature.projects.ProjectsViewModel
 import dev.buildit.feature.settings.SettingsScreen
 import dev.buildit.feature.settings.SettingsViewModel
-import dev.buildit.feature.blocks.BlocksScreen
+import dev.buildit.feature.blocks.ComponentsScreen
+import dev.buildit.feature.blocks.EventsScreen
 import dev.buildit.feature.blocks.BlocksViewModel
 import dev.buildit.feature.blocks.R as BlocksR
 import dev.buildit.feature.code.CodeScreen
@@ -64,6 +65,11 @@ import dev.buildit.feature.designer.DesignerScreen
 import dev.buildit.feature.designer.DesignerViewModel
 import dev.buildit.feature.designer.R as DesignerR
 import dev.buildit.feature.workspace.WorkspaceExtraTab
+import dev.buildit.feature.workspace.AssetsScreen
+import dev.buildit.feature.workspace.AssetsViewModel
+import dev.buildit.feature.workspace.assetsIcon
+import dev.buildit.feature.workspace.assetsTitle
+import dev.buildit.engine.project.AssetKind
 import dev.buildit.feature.workspace.WorkspaceScreen
 import dev.buildit.feature.workspace.WorkspaceViewModel
 import dev.buildit.studio.AppContainer
@@ -71,6 +77,10 @@ import dev.buildit.studio.R
 import kotlin.reflect.KClass
 
 private const val AI_TAB = "ai"
+private const val BUILD_TAB = "build"
+private const val DESIGN_TAB = "design"
+private const val EVENTS_TAB = "events"
+private const val COMPONENTS_TAB = "components"
 
 private enum class TopLevel(val route: Any, val routeClass: KClass<*>, val label: Int, val icon: ImageVector) {
     Home(HomeRoute, HomeRoute::class, R.string.nav_home, BiIcons.Home),
@@ -187,27 +197,40 @@ fun BuildItApp(container: AppContainer) {
                             )
                         }
                     })
+                    val assets: AssetsViewModel = viewModel(key = "as-$id", factory = viewModelFactory {
+                        initializer { AssetsViewModel(id, container.projectRepository, container.dispatchers) }
+                    })
                     val context = LocalContext.current
-                    val tabs = remember(designer, blocks, code, build, console, ai, libraries) {
+                    val install = { apk: java.io.File -> ApkActions.install(context, apk) { m -> context.getString(BuildR.string.bd_install_failed, m) } }
+                    val share = { apk: java.io.File -> ApkActions.share(context, apk) }
+                    val tabs = remember(designer, blocks, code, build, console, ai, libraries, assets) {
                         listOf(
-                            WorkspaceExtraTab(title = { stringResource(DesignerR.string.ds_tab) }, content = { scope -> DesignerScreen(designer, onExit = scope.leave) }),
-                            WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_tab) }, content = { scope -> BlocksScreen(blocks, onExit = scope.leave) }),
+                            // Main editors
+                            WorkspaceExtraTab(title = { stringResource(DesignerR.string.ds_tab) }, content = { scope -> DesignerScreen(designer, onExit = scope.leave) }, icon = BiIcons.Widgets, key = DESIGN_TAB),
+                            WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_events_tab) }, content = { scope -> EventsScreen(blocks, onExit = scope.leave) }, icon = BiIcons.Event, key = EVENTS_TAB),
+                            WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_components_tab) }, content = { ComponentsScreen(blocks) }, icon = BiIcons.Component, key = COMPONENTS_TAB),
+                            // Project tools (drawer)
                             WorkspaceExtraTab(
                                 title = { stringResource(CodeR.string.cd_tab) },
                                 content = { scope -> CodeScreen(code, onExit = scope.leave) },
                                 opens = { path -> CodeViewModel.canOpen(path).also { if (it) code.open(path) } },
+                                icon = BiIcons.Code, tool = true,
                             ),
-                            WorkspaceExtraTab(title = { stringResource(LibrariesR.string.lb_tab) }, content = { LibrariesScreen(libraries) }),
+                            WorkspaceExtraTab(title = { stringResource(LibrariesR.string.lb_tab) }, content = { LibrariesScreen(libraries) }, icon = BiIcons.Library, tool = true),
+                            WorkspaceExtraTab(title = { assetsTitle(AssetKind.Image) }, content = { AssetsScreen(assets, AssetKind.Image) }, icon = assetsIcon(AssetKind.Image), tool = true),
+                            WorkspaceExtraTab(title = { assetsTitle(AssetKind.Sound) }, content = { AssetsScreen(assets, AssetKind.Sound) }, icon = assetsIcon(AssetKind.Sound), tool = true),
+                            WorkspaceExtraTab(title = { assetsTitle(AssetKind.Font) }, content = { AssetsScreen(assets, AssetKind.Font) }, icon = assetsIcon(AssetKind.Font), tool = true),
                             WorkspaceExtraTab(
                                 title = { stringResource(BuildR.string.bd_tab) },
                                 content = { scope ->
                                     BuildScreen(
                                         build,
                                         onOpenFile = { path, line -> if (CodeViewModel.canOpen(path)) { code.reveal(path, line); scope.openFile(path) } },
-                                        onInstall = { apk -> ApkActions.install(context, apk) { m -> context.getString(BuildR.string.bd_install_failed, m) } },
-                                        onShare = { apk -> ApkActions.share(context, apk) },
+                                        onInstall = install,
+                                        onShare = share,
                                     )
                                 },
+                                icon = BiIcons.Build, tool = true, key = BUILD_TAB,
                             ),
                             WorkspaceExtraTab(
                                 title = { stringResource(ConsoleR.string.cn_tab) },
@@ -219,11 +242,15 @@ fun BuildItApp(container: AppContainer) {
                                         onAskAi = { text, path -> ai.prefill(askTemplate.format(text), listOfNotNull(path)); scope.showTab(AI_TAB) },
                                     )
                                 },
+                                icon = BiIcons.Terminal, tool = true,
                             ),
-                            WorkspaceExtraTab(title = { stringResource(AiR.string.ai_tab) }, content = { AiScreen(ai) }, key = AI_TAB),
+                            WorkspaceExtraTab(title = { stringResource(AiR.string.ai_tab) }, content = { AiScreen(ai) }, key = AI_TAB, icon = BiIcons.Assistant, tool = true),
                         )
                     }
-                    WorkspaceScreen(vm, onBack = { nav.popBackStack() }, extraTabs = tabs)
+                    WorkspaceScreen(
+                        vm, onBack = { nav.popBackStack() }, extraTabs = tabs,
+                        bottomBar = { scope -> RunBar(blocks, designer, build, scope, BUILD_TAB, onInstall = install, onShare = share) },
+                    )
                 }
             }
         }

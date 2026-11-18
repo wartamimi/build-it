@@ -96,4 +96,8 @@
     <string name="ds_preview_runtime_content">%1$s content only appears when the app runs</string>
     <string name="ds_preview_menu_not_previewed">Menu %1$s is not previewed</string>
     <string name="ds_preview_attribute_not_previewed">%1$s is kept in the XML but not shown in the preview</string>
+    <string name="ds_bar_hint">Tap a view on the screen to edit it, or a widget on the left to add it.</string>
+    <string name="ds_all_properties">All properties</string>
+    <string name="ds_width">Width</string>
+    <string name="ds_height">Height</string>
 </resources>

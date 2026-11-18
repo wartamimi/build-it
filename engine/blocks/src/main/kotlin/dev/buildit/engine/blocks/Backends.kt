@@ -48,8 +48,16 @@ private fun usesClass(p: Program, predicate: (Stmt) -> Boolean): Boolean {
         }
     }
     return any(p.onCreate) || p.lifecycle.values.any(::any) || p.clicks.any { any(it.body) } ||
-        p.checkedChanges.any { any(it.body) } || p.procedures.any { any(it.body) }
+        p.checkedChanges.any { any(it.body) } || p.procedures.any { any(it.body) } || p.componentEvents.values.any(::any)
 }
+
+private fun Program.has(t: ComponentType) = components.any { it.type == t }
+private fun Program.ofType(t: ComponentType) = components.filter { it.type == t }
+
+/** Lines that stop timers and release players when the screen is destroyed. */
+private fun Program.cleanup(kotlin: Boolean): List<String> =
+    ofType(ComponentType.Timer).map { "${it.name}.removeCallbacksAndMessages(null)" + if (kotlin) "" else ";" } +
+        ofType(ComponentType.Sound).map { handlerName("stop", it.name, "") + "()" + if (kotlin) "" else ";" }
 
 private fun imports(p: Program): List<String> {
     val set = sortedSetOf("android.app.Activity", "android.os.Bundle")
@@ -60,6 +68,11 @@ private fun imports(p: Program): List<String> {
     if (usesClass(p) { it is StartActivity }) set += "android.content.Intent"
     if (usesClass(p) { it is SetVisibility }) set += "android.view.View"
     if (usesClass(p) { it is SetTextColor }) set += "android.graphics.Color"
+    if (usesClass(p) { it is OpenLink }) { set += "android.content.Intent"; set += "android.net.Uri" }
+    if (p.has(ComponentType.Timer)) { set += "android.os.Handler"; set += "android.os.Looper" }
+    if (p.has(ComponentType.Storage)) set += "android.content.SharedPreferences"
+    if (p.has(ComponentType.Dialog)) set += "android.app.AlertDialog"
+    if (p.has(ComponentType.Sound)) set += "android.media.MediaPlayer"
     return set.toList()
 }
 
@@ -74,21 +87,33 @@ object JavaBackend : Backend {
             if (Helper.RandomInt in p.helpers) line("private static final java.util.Random RANDOM = new java.util.Random();")
             p.variables.forEach { v -> line("private ${type(v.type)} ${v.name} = ${initial(v.type)};") }
             p.views.forEach { v -> line("private ${v.className.substringAfterLast('.')} ${v.id};") }
-            if (p.variables.isNotEmpty() || p.views.isNotEmpty() || Helper.RandomInt in p.helpers) line()
+            p.components.forEach { c ->
+                when (c.type) {
+                    ComponentType.Timer -> line("private final Handler ${c.name} = new Handler(Looper.getMainLooper());")
+                    ComponentType.Storage -> line("private SharedPreferences ${c.name};")
+                    ComponentType.Sound -> line("private MediaPlayer ${c.name};")
+                    ComponentType.Dialog -> Unit
+                }
+            }
+            if (p.variables.isNotEmpty() || p.views.isNotEmpty() || p.components.any { it.type != ComponentType.Dialog } || Helper.RandomInt in p.helpers) line()
 
             line("@Override")
             block("protected void onCreate(Bundle savedInstanceState) {") {
                 line("super.onCreate(savedInstanceState);")
                 line("setContentView(R.layout.${p.layout});")
                 p.views.forEach { line("${it.id} = findViewById(R.id.${it.id});") }
+                p.ofType(ComponentType.Storage).forEach { line("${it.name} = getSharedPreferences(${str(it.name)}, MODE_PRIVATE);") }
                 p.clicks.forEach { line("${it.view}.setOnClickListener(v -> ${handlerName("on", it.view, "Click")}());") }
                 p.checkedChanges.forEach { line("${it.view}.setOnCheckedChangeListener((button, isChecked) -> ${handlerName("on", it.view, "CheckedChange")}());") }
                 stmts(p.onCreate)
             }
-            p.lifecycle.toSortedMap().forEach { (lc, body) ->
+            val cleanup = p.cleanup(kotlin = false)
+            val lifecycle = if (cleanup.isNotEmpty() && Lifecycle.Destroy !in p.lifecycle) p.lifecycle + (Lifecycle.Destroy to emptyList()) else p.lifecycle
+            lifecycle.toSortedMap().forEach { (lc, body) ->
                 line()
                 line("@Override")
                 block("protected void ${lc.method}() {") {
+                    if (lc == Lifecycle.Destroy) cleanup.forEach { line(it) }
                     line("super.${lc.method}();")
                     stmts(body)
                 }
@@ -96,9 +121,47 @@ object JavaBackend : Backend {
             p.clicks.forEach { h -> line(); block("private void ${handlerName("on", h.view, "Click")}() {") { stmts(h.body) } }
             p.checkedChanges.forEach { h -> line(); block("private void ${handlerName("on", h.view, "CheckedChange")}() {") { stmts(h.body) } }
             p.procedures.forEach { pr -> line(); block("private void ${procName(pr.name)}() {") { stmts(pr.body) } }
+            p.components.forEach { c -> component(c, p.componentEvents[c.name].orEmpty()) }
             helpers(p.helpers)
         }
     }.toString()
+
+    private fun Out.component(c: Component, event: List<Stmt>) {
+        val n = c.name
+        when (c.type) {
+            ComponentType.Timer -> {
+                line()
+                block("private void ${handlerName("start", n, "")}(final long delay, final boolean repeat) {") {
+                    line("$n.removeCallbacksAndMessages(null);")
+                    block("$n.postDelayed(new Runnable() {", "}, Math.max(delay, 0));") {
+                        line("@Override")
+                        block("public void run() {") {
+                            line("if (repeat) $n.postDelayed(this, Math.max(delay, 1));")
+                            line("${handlerName("on", n, "Tick")}();")
+                        }
+                    }
+                }
+                line(); block("private void ${handlerName("on", n, "Tick")}() {") { stmts(event) }
+            }
+            ComponentType.Dialog -> { line(); block("private void ${handlerName("on", n, "Ok")}() {") { stmts(event) } }
+            ComponentType.Sound -> {
+                line()
+                block("private void ${handlerName("play", n, "")}(int sound) {") {
+                    line("${handlerName("stop", n, "")}();")
+                    line("$n = MediaPlayer.create(this, sound);")
+                    line("if ($n == null) return;")
+                    line("$n.setOnCompletionListener(player -> { ${handlerName("stop", n, "")}(); ${handlerName("on", n, "Done")}(); });")
+                    line("$n.start();")
+                }
+                line()
+                block("private void ${handlerName("stop", n, "")}() {") {
+                    block("if ($n != null) {") { line("$n.release();"); line("$n = null;") }
+                }
+                line(); block("private void ${handlerName("on", n, "Done")}() {") { stmts(event) }
+            }
+            ComponentType.Storage -> Unit
+        }
+    }
 
     private fun type(t: ValueType) = when (t) {
         ValueType.Boolean -> "boolean"; ValueType.Number -> "double"; ValueType.Text -> "String"; ValueType.TextList -> "ArrayList<String>"
@@ -135,6 +198,14 @@ object JavaBackend : Backend {
             Finish -> line("finish();")
             is CallProcedure -> line("${procName(s.name)}();")
             is RawStmt -> raw(s.code)
+            is TimerStart -> line("${handlerName("start", s.timer, "")}((long) ${e(s.delayMs)}, ${s.repeating});")
+            is TimerStop -> line("${s.timer}.removeCallbacksAndMessages(null);")
+            is StorageSet -> line("${s.store}.edit().putString(${c(s.key)}, ${c(s.value)}).apply();")
+            is StorageRemove -> line("${s.store}.edit().remove(${c(s.key)}).apply();")
+            is DialogShow -> line("new AlertDialog.Builder(this).setTitle(${c(s.title)}).setMessage(${c(s.message)}).setPositiveButton(android.R.string.ok, (dialog, which) -> ${handlerName("on", s.dialog, "Ok")}()).show();")
+            is SoundPlay -> line("${handlerName("play", s.sound, "")}(R.raw.${s.file});")
+            is SoundStop -> line("${handlerName("stop", s.sound, "")}();")
+            is OpenLink -> line("startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(${c(s.url)})));")
         }
     }
 
@@ -148,6 +219,7 @@ object JavaBackend : Backend {
     private fun e(x: Expr): String = when (x) {
         is BoolLit -> x.value.toString()
         is NumLit -> num(x.value)
+        is StorageGet -> "${x.store}.getString(${c(x.key)}, \"\")"
         is TextLit -> str(x.value)
         is VarRef -> x.name
         is Binary -> "(${e(x.a)} ${x.op.symbol} ${e(x.b)})"
@@ -220,19 +292,31 @@ object KotlinBackend : Backend {
         block("class ${p.className} : Activity() {") {
             p.variables.forEach { v -> line("private ${if (v.type == ValueType.TextList) "val" else "var"} ${v.name}: ${type(v.type)} = ${initial(v.type)}") }
             p.views.forEach { v -> line("private lateinit var ${v.id}: ${v.className.substringAfterLast('.')}") }
-            if (p.variables.isNotEmpty() || p.views.isNotEmpty()) line()
+            p.components.forEach { c ->
+                when (c.type) {
+                    ComponentType.Timer -> line("private val ${c.name} = Handler(Looper.getMainLooper())")
+                    ComponentType.Storage -> line("private lateinit var ${c.name}: SharedPreferences")
+                    ComponentType.Sound -> line("private var ${c.name}: MediaPlayer? = null")
+                    ComponentType.Dialog -> Unit
+                }
+            }
+            if (p.variables.isNotEmpty() || p.views.isNotEmpty() || p.components.any { it.type != ComponentType.Dialog }) line()
 
             block("override fun onCreate(savedInstanceState: Bundle?) {") {
                 line("super.onCreate(savedInstanceState)")
                 line("setContentView(R.layout.${p.layout})")
                 p.views.forEach { line("${it.id} = findViewById(R.id.${it.id})") }
+                p.ofType(ComponentType.Storage).forEach { line("${it.name} = getSharedPreferences(${str(it.name)}, MODE_PRIVATE)") }
                 p.clicks.forEach { line("${it.view}.setOnClickListener { ${handlerName("on", it.view, "Click")}() }") }
                 p.checkedChanges.forEach { line("${it.view}.setOnCheckedChangeListener { _, _ -> ${handlerName("on", it.view, "CheckedChange")}() }") }
                 stmts(p.onCreate)
             }
-            p.lifecycle.toSortedMap().forEach { (lc, body) ->
+            val cleanup = p.cleanup(kotlin = true)
+            val lifecycle = if (cleanup.isNotEmpty() && Lifecycle.Destroy !in p.lifecycle) p.lifecycle + (Lifecycle.Destroy to emptyList()) else p.lifecycle
+            lifecycle.toSortedMap().forEach { (lc, body) ->
                 line()
                 block("override fun ${lc.method}() {") {
+                    if (lc == Lifecycle.Destroy) cleanup.forEach { line(it) }
                     line("super.${lc.method}()")
                     stmts(body)
                 }
@@ -240,9 +324,47 @@ object KotlinBackend : Backend {
             p.clicks.forEach { h -> line(); block("private fun ${handlerName("on", h.view, "Click")}() {") { stmts(h.body) } }
             p.checkedChanges.forEach { h -> line(); block("private fun ${handlerName("on", h.view, "CheckedChange")}() {") { stmts(h.body) } }
             p.procedures.forEach { pr -> line(); block("private fun ${procName(pr.name)}() {") { stmts(pr.body) } }
+            p.components.forEach { c -> component(c, p.componentEvents[c.name].orEmpty()) }
             helpers(p.helpers)
         }
     }.toString()
+
+    private fun Out.component(c: Component, event: List<Stmt>) {
+        val n = c.name
+        when (c.type) {
+            ComponentType.Timer -> {
+                line()
+                block("private fun ${handlerName("start", n, "")}(delay: Long, repeat: Boolean) {") {
+                    line("$n.removeCallbacksAndMessages(null)")
+                    block("$n.postDelayed(object : Runnable {", "}, maxOf(delay, 0L))") {
+                        block("override fun run() {") {
+                            line("if (repeat) $n.postDelayed(this, maxOf(delay, 1L))")
+                            line("${handlerName("on", n, "Tick")}()")
+                        }
+                    }
+                }
+                line(); block("private fun ${handlerName("on", n, "Tick")}() {") { stmts(event) }
+            }
+            ComponentType.Dialog -> { line(); block("private fun ${handlerName("on", n, "Ok")}() {") { stmts(event) } }
+            ComponentType.Sound -> {
+                line()
+                block("private fun ${handlerName("play", n, "")}(sound: Int) {") {
+                    line("${handlerName("stop", n, "")}()")
+                    line("val player = MediaPlayer.create(this, sound) ?: return")
+                    line("$n = player")
+                    line("player.setOnCompletionListener { ${handlerName("stop", n, "")}(); ${handlerName("on", n, "Done")}() }")
+                    line("player.start()")
+                }
+                line()
+                block("private fun ${handlerName("stop", n, "")}() {") {
+                    line("$n?.release()")
+                    line("$n = null")
+                }
+                line(); block("private fun ${handlerName("on", n, "Done")}() {") { stmts(event) }
+            }
+            ComponentType.Storage -> Unit
+        }
+    }
 
     private fun type(t: ValueType) = when (t) {
         ValueType.Boolean -> "Boolean"; ValueType.Number -> "Double"; ValueType.Text -> "String"; ValueType.TextList -> "ArrayList<String>"
@@ -282,6 +404,14 @@ object KotlinBackend : Backend {
             Finish -> line("finish()")
             is CallProcedure -> line("${procName(s.name)}()")
             is RawStmt -> raw(s.code)
+            is TimerStart -> line("${handlerName("start", s.timer, "")}(${e(s.delayMs)}.toLong(), ${s.repeating})")
+            is TimerStop -> line("${s.timer}.removeCallbacksAndMessages(null)")
+            is StorageSet -> line("${s.store}.edit().putString(${c(s.key)}, ${c(s.value)}).apply()")
+            is StorageRemove -> line("${s.store}.edit().remove(${c(s.key)}).apply()")
+            is DialogShow -> line("AlertDialog.Builder(this).setTitle(${c(s.title)}).setMessage(${c(s.message)}).setPositiveButton(android.R.string.ok) { _, _ -> ${handlerName("on", s.dialog, "Ok")}() }.show()")
+            is SoundPlay -> line("${handlerName("play", s.sound, "")}(R.raw.${s.file})")
+            is SoundStop -> line("${handlerName("stop", s.sound, "")}()")
+            is OpenLink -> line("startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(${c(s.url)})))")
         }
     }
 
@@ -314,6 +444,7 @@ object KotlinBackend : Backend {
         is ViewText -> "${x.view}.text.toString()"
         is ViewChecked -> "${x.view}.isChecked"
         is RawExpr -> "(${x.code}).toString()"
+        is StorageGet -> "(${x.store}.getString(${c(x.key)}, \"\") ?: \"\")"
     }
 
     private fun Out.helpers(h: Set<Helper>) {

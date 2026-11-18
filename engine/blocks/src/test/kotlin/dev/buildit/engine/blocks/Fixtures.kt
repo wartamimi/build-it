@@ -17,7 +17,7 @@ fun txt(id: String, v: String) = b(id, "text_literal", mapOf("text" to v))
 fun get(id: String, v: String) = b(id, "var_get", mapOf("var" to v))
 
 val views = listOf(ViewInfo("greeting", "TextView"), ViewInfo("button1", "Button"), ViewInfo("agree", "CheckBox"), ViewInfo("photo", "ImageView"))
-val ctx = BlockContext(views, activities = listOf("MainActivity", "SettingsActivity"))
+val ctx = BlockContext(views, activities = listOf("MainActivity", "SettingsActivity"), sounds = listOf("ding"))
 
 fun manifest(language: SourceLanguage) = ProjectManifest(
     id = "p1",
@@ -73,5 +73,26 @@ fun sampleDocument(): BlockDocument = BlockDocument(
             b("s21", "var_set", mapOf("var" to "count"), mapOf("value" to b("tl", "text_length", inputs = mapOf("text" to get("g8", "name"))))),
         ))))),
         BlockStack(0f, 1200f, listOf(b("e5", "event_pause", statements = mapOf("do" to listOf(b("s22", "app_finish")))))),
+        // Components
+        BlockStack(0f, 1500f, listOf(b("e6", "event_resume", statements = mapOf("do" to listOf(
+            b("s23", "timer_start", mapOf("timer" to "ticker", "mode" to "repeating"), mapOf("ms" to num("n8", 1000.0))),
+            b("s24", "dialog_show", mapOf("dialog" to "confirm"), mapOf("title" to txt("t3", "Hi"), "message" to b("sg", "storage_get", mapOf("store" to "prefs"), mapOf("key" to txt("t4", "last"))))),
+        ))))),
+        BlockStack(0f, 1800f, listOf(b("e7", "event_timer", mapOf("timer" to "ticker"), statements = mapOf("do" to listOf(
+            b("s25", "timer_stop", mapOf("timer" to "ticker")),
+            b("s26", "storage_set", mapOf("store" to "prefs"), mapOf("value" to get("g9", "count"), "key" to txt("t5", "last"))),
+            b("s27", "storage_remove", mapOf("store" to "prefs"), mapOf("key" to txt("t6", "old"))),
+        ))))),
+        BlockStack(0f, 2100f, listOf(b("e8", "event_dialog_ok", mapOf("dialog" to "confirm"), statements = mapOf("do" to listOf(
+            b("s28", "sound_play", mapOf("sound" to "player", "file" to "ding")),
+        ))))),
+        BlockStack(0f, 2400f, listOf(b("e9", "event_sound_done", mapOf("sound" to "player"), statements = mapOf("do" to listOf(
+            b("s29", "sound_stop", mapOf("sound" to "player")),
+            b("s30", "app_open_link", inputs = mapOf("url" to txt("t7", "https://example.com"))),
+        ))))),
+    ),
+    components = listOf(
+        Component("ticker", ComponentType.Timer), Component("prefs", ComponentType.Storage),
+        Component("confirm", ComponentType.Dialog), Component("player", ComponentType.Sound),
     ),
 )

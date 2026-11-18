@@ -96,4 +96,8 @@
     <string name="ds_preview_runtime_content">Isi %1$s hanya muncul saat aplikasi berjalan</string>
     <string name="ds_preview_menu_not_previewed">Menu %1$s tidak dipratinjau</string>
     <string name="ds_preview_attribute_not_previewed">%1$s tetap ada di XML tetapi tidak tampil di pratinjau</string>
+    <string name="ds_bar_hint">Ketuk view di layar untuk mengeditnya, atau widget di kiri untuk menambahkannya.</string>
+    <string name="ds_all_properties">Semua properti</string>
+    <string name="ds_width">Lebar</string>
+    <string name="ds_height">Tinggi</string>
 </resources>

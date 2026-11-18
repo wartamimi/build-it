@@ -14,6 +14,8 @@ data class BlockDiagnostic(
 data class BlockContext(
     val views: List<ViewInfo>,
     val activities: List<String>,
+    /** Sound files in res/raw, by resource name. */
+    val sounds: List<String> = emptyList(),
 )
 
 /**
@@ -35,6 +37,12 @@ object BlockValidator {
             if (!seenVars.add(v.name)) err(null, "duplicate_variable", v.name)
             if (v.name in viewIds) err(null, "variable_clashes_view", v.name)
         }
+        val seenComponents = mutableSetOf<String>()
+        doc.components.forEach { c ->
+            if (!Names.isIdentifier(c.name)) err(null, "invalid_component", c.name)
+            if (!seenComponents.add(c.name) || c.name in seenVars) err(null, "duplicate_component", c.name)
+            if (c.name in viewIds) err(null, "component_clashes_view", c.name)
+        }
         val procedures = doc.stacks.mapNotNull { s -> s.blocks.firstOrNull()?.takeIf { it.type == "proc_define" } }
         val procNames = procedures.map { it.field("name") }.toSet()
 
@@ -49,6 +57,9 @@ object BlockValidator {
                 if (stack.blocks.size > 1) err(stack.blocks[1].id, "after_event")
                 val key = when (first.type) {
                     "event_click", "event_checked" -> first.type + ":" + first.field("view")
+                    "event_timer" -> first.type + ":" + first.field("timer")
+                    "event_dialog_ok" -> first.type + ":" + first.field("dialog")
+                    "event_sound_done" -> first.type + ":" + first.field("sound")
                     "proc_define" -> "proc:" + first.field("name")
                     else -> first.type
                 }
@@ -113,6 +124,14 @@ object BlockValidator {
                     }
                     FieldKind.Activity -> if (value !in ctx.activities) err(b.id, "unknown_activity", value)
                     FieldKind.Code -> if (value.isBlank()) warn(b.id, "empty_code")
+                    is FieldKind.ComponentRef -> when {
+                        value.isEmpty() -> err(b.id, "missing_component", k.type.name)
+                        doc.components.none { it.name == value && it.type == k.type } -> err(b.id, "unknown_component", value)
+                    }
+                    FieldKind.RawResource -> when {
+                        value.isEmpty() -> err(b.id, "missing_sound")
+                        value !in ctx.sounds -> err(b.id, "unknown_sound", value)
+                    }
                     is FieldKind.Text -> if (b.type == "view_set_text_color" && !colorPattern.matches(value)) err(b.id, "invalid_color", value)
                 }
             }

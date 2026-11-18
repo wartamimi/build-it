@@ -53,6 +53,18 @@ internal fun blockMessageRes(type: String): Int? = when (type) {
     "app_finish" -> R.string.blk_app_finish
     "code_stmt" -> R.string.blk_code_stmt
     "code_expr" -> R.string.blk_code_expr
+    "event_timer" -> R.string.blk_event_timer
+    "event_dialog_ok" -> R.string.blk_event_dialog_ok
+    "event_sound_done" -> R.string.blk_event_sound_done
+    "timer_start" -> R.string.blk_timer_start
+    "timer_stop" -> R.string.blk_timer_stop
+    "storage_set" -> R.string.blk_storage_set
+    "storage_get" -> R.string.blk_storage_get
+    "storage_remove" -> R.string.blk_storage_remove
+    "dialog_show" -> R.string.blk_dialog_show
+    "sound_play" -> R.string.blk_sound_play
+    "sound_stop" -> R.string.blk_sound_stop
+    "app_open_link" -> R.string.blk_app_open_link
     else -> null
 }
 
@@ -74,6 +86,7 @@ internal fun categoryRes(c: BlockCategory): Int = when (c) {
     BlockCategory.Variables -> R.string.bk_cat_Variables
     BlockCategory.Lists -> R.string.bk_cat_Lists
     BlockCategory.Components -> R.string.bk_cat_Components
+    BlockCategory.Parts -> R.string.bk_cat_Parts
     BlockCategory.App -> R.string.bk_cat_App
     BlockCategory.Code -> R.string.bk_cat_Code
 }
@@ -105,5 +118,12 @@ internal fun diagnosticRes(code: String): Int? = when (code) {
     "invalid_variable" -> R.string.bk_diag_invalid_variable
     "duplicate_variable" -> R.string.bk_diag_duplicate_variable
     "variable_clashes_view" -> R.string.bk_diag_variable_clashes_view
+    "invalid_component" -> R.string.bk_diag_invalid_component
+    "duplicate_component" -> R.string.bk_diag_duplicate_component
+    "component_clashes_view" -> R.string.bk_diag_component_clashes_view
+    "missing_component" -> R.string.bk_diag_missing_component
+    "unknown_component" -> R.string.bk_diag_unknown_component
+    "missing_sound" -> R.string.bk_diag_missing_sound
+    "unknown_sound" -> R.string.bk_diag_unknown_sound
     else -> null
 }

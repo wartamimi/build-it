@@ -3,4 +3,13 @@
     <string name="nav_home">Beranda</string>
     <string name="nav_projects">Proyek</string>
     <string name="nav_settings">Pengaturan</string>
+    <string name="ws_run">Jalankan</string>
+    <string name="ws_building">Membangun %1$d/%2$d…</string>
+    <string name="ws_build_failed">Build gagal</string>
+    <string name="ws_build_details">Detail build</string>
+    <string name="ws_share_apk">Bagikan APK</string>
+    <string name="ws_install_apk">Pasang APK terakhir</string>
+    <string name="ws_screen">Layar</string>
+    <string name="ws_run_options">Opsi jalankan</string>
+    <string name="ws_cancel_build">Batalkan build</string>
 </resources>

@@ -35,6 +35,7 @@ data class ListSize(val list: String) : Expr { override val type = ValueType.Num
 data class ViewText(val view: String) : Expr { override val type = ValueType.Text }
 data class ViewChecked(val view: String) : Expr { override val type = ValueType.Boolean }
 data class RawExpr(val code: String) : Expr { override val type = ValueType.Text }
+data class StorageGet(val store: String, val key: Expr) : Expr { override val type = ValueType.Text }
 
 sealed interface Stmt
 data class If(val cond: Expr, val then: List<Stmt>, val otherwise: List<Stmt>?) : Stmt
@@ -56,6 +57,14 @@ data class StartActivity(val activity: String) : Stmt
 data object Finish : Stmt
 data class CallProcedure(val name: String) : Stmt
 data class RawStmt(val code: String) : Stmt
+data class TimerStart(val timer: String, val delayMs: Expr, val repeating: Boolean) : Stmt
+data class TimerStop(val timer: String) : Stmt
+data class StorageSet(val store: String, val key: Expr, val value: Expr) : Stmt
+data class StorageRemove(val store: String, val key: Expr) : Stmt
+data class DialogShow(val dialog: String, val title: Expr, val message: Expr) : Stmt
+data class SoundPlay(val sound: String, val file: String) : Stmt
+data class SoundStop(val sound: String) : Stmt
+data class OpenLink(val url: Expr) : Stmt
 
 enum class Lifecycle(val method: String) { Resume("onResume"), Pause("onPause"), Destroy("onDestroy") }
 enum class Helper { FormatNumber, RandomInt, ParseNumber }
@@ -76,6 +85,9 @@ data class Program(
     val checkedChanges: List<Handler>,
     val procedures: List<Procedure>,
     val helpers: Set<Helper>,
+    val components: List<Component> = emptyList(),
+    /** Component events: timer ticks, dialog OK, sound finished (the handler's view is the component name). */
+    val componentEvents: Map<String, List<Stmt>> = emptyMap(),
 )
 
 data class ActivityTarget(val packageName: String, val className: String, val layout: String)
@@ -87,6 +99,9 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
     private var counter = 0
 
     companion object {
+        /** Component event hats and the field naming their component. */
+        val COMPONENT_EVENTS = mapOf("event_timer" to "timer", "event_dialog_ok" to "dialog", "event_sound_done" to "sound")
+
         fun lower(doc: BlockDocument, ctx: BlockContext, target: ActivityTarget): Program {
             require(!BlockValidator.hasErrors(BlockValidator.validate(doc, ctx))) { "Document has errors; validate before lowering" }
             return Lowering(doc, ctx).program(target)
@@ -105,6 +120,9 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
         val clicks = hats.filter { it.type == "event_click" }.map { Handler(view(it.field("view")), body(it)) }.sortedBy { it.view }
         val checks = hats.filter { it.type == "event_checked" }.map { Handler(view(it.field("view")), body(it)) }.sortedBy { it.view }
         val procs = hats.filter { it.type == "proc_define" }.map { Procedure(it.field("name"), body(it)) }.sortedBy { it.name }
+        val componentEvents = hats.filter { it.type in COMPONENT_EVENTS }.associate { h ->
+            h.field(COMPONENT_EVENTS.getValue(h.type)) to body(h)
+        }
         val tags = ctx.views.associate { it.id to it.tag }
         return Program(
             packageName = target.packageName,
@@ -118,6 +136,8 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
             checkedChanges = checks,
             procedures = procs,
             helpers = helpers,
+            components = doc.components,
+            componentEvents = componentEvents,
         )
     }
 
@@ -149,6 +169,14 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
         "app_start" -> StartActivity(b.field("activity"))
         "app_finish" -> Finish
         "code_stmt" -> RawStmt(b.field("code"))
+        "timer_start" -> TimerStart(b.field("timer"), expr(b, "ms"), b.field("mode") == "repeating")
+        "timer_stop" -> TimerStop(b.field("timer"))
+        "storage_set" -> StorageSet(b.field("store"), text(b, "key"), text(b, "value"))
+        "storage_remove" -> StorageRemove(b.field("store"), text(b, "key"))
+        "dialog_show" -> DialogShow(b.field("dialog"), text(b, "title"), text(b, "message"))
+        "sound_play" -> SoundPlay(b.field("sound"), b.field("file"))
+        "sound_stop" -> SoundStop(b.field("sound"))
+        "app_open_link" -> OpenLink(text(b, "url"))
         else -> error("Not a statement block: ${b.type}")
     }
 
@@ -189,6 +217,7 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
         "view_get_text" -> ViewText(view(b.field("view")))
         "view_is_checked" -> ViewChecked(view(b.field("view")))
         "code_expr" -> RawExpr(b.field("code"))
+        "storage_get" -> StorageGet(b.field("store"), text(b, "key"))
         else -> error("Not a value block: ${b.type}")
     }
 }

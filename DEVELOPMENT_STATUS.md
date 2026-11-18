@@ -288,6 +288,38 @@ Not done / limits
 - Play services and Firebase are resolved and merged by the same rules but have not had their own
   device test yet.
 
+## Phase 10 — Workflow redesign inspired by Sketchware Pro (owner request)
+
+The workflow follows Sketchware Pro's; the look (name, icons, colours, block shapes) stays Build
+It's own.
+
+Done
+- Workspace: three main tabs, Design | Events | Components, and a bottom bar with the screen
+  picker (switches the designer and the blocks together) and Run (saves everything, builds a debug
+  APK, opens the installer; a failed build links to the Build details). Everything else (Code,
+  Libraries, Images, Sounds, Fonts, Build, Console, AI, Project, Files) is in the Project tools
+  drawer.
+- Design (phones): widget palette beside the canvas; property bar under it for the selected view
+  (width/height toggles, duplicate, delete, All properties / Tree / Problems in a bottom sheet).
+- Events: events of the screen grouped as Screen / Views / Components / More blocks; + adds an
+  event (or opens the existing one); tapping one opens the block editor full screen on it, with
+  the blocks in a slide-up drawer (block list left, categories right).
+- Components (new, real): Timer, Storage (SharedPreferences), Dialog (AlertDialog with OK event),
+  Sound player (MediaPlayer, res/raw). Stored in the screen's block file; blocks and events in the
+  block editor; Java and Kotlin generation; timers stopped and players released in onDestroy. The
+  generated Java is compiled against android.jar in CodegenTest. New App block: open web page.
+- Images / Sounds / Fonts managers: import with the system picker into res/drawable, res/raw,
+  res/font under a valid resource name; never replaces an existing resource; rename, delete,
+  previews (thumbnail, play, font sample).
+
+Not done / limits
+- Components not yet available: Intent, file picker, camera, sensors, text-to-speech, speech
+  input, network requests, vibrator (needs a manifest permission).
+- Renaming an image/sound/font does not update references to it.
+- Generated Kotlin with components is checked by tests as text, not compiled (Kotlin projects
+  still stop at the Check step on the device).
+- The UI test on the emulator covers the new tabs and tools; Run → install was not automated.
+
 ## Build status
 
 - `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:deps:test :engine:ai:test` —
@@ -329,7 +361,8 @@ Not done / limits
 | feature:console ConsoleTest (Robolectric provider: unverified callers rejected, logcat parsing; stack-frame links; filters, capacity) | 3 | pass |
 | core:database ProjectDaoTest | 3 | pass |
 | core:data ProjectRepositoryTest | 4 | pass |
-| app AppFlowTest (Robolectric, end-to-end create → designer → saved XML → blocks → saved block file → settings → files → code tab → build tab → console tab → AI setup) | 1 | pass |
+| engine:project ProjectAssetsTest (import, never replace, names, rename/delete) | 3 | pass |
+| app AppFlowTest (Robolectric, end-to-end create → design → saved XML → events → block editor → saved block file → components → settings/images/files tools → code → build → console → AI setup) | 1 | pass |
 
 ## Known issues
 

@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -80,7 +81,14 @@ import dev.buildit.engine.blocks.ViewFamilies
  * activity's source file (never over hand edits without asking).
  */
 @Composable
-fun BlocksScreen(viewModel: BlocksViewModel, onExit: () -> Unit) {
+fun BlocksScreen(
+    viewModel: BlocksViewModel,
+    onExit: () -> Unit,
+    /** Set when the editor was opened from the event list: back returns there. */
+    onBack: (() -> Unit)? = null,
+    /** Block to scroll to and select when the editor opens (e.g. the event that was tapped). */
+    focus: String? = null,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val autoSave by viewModel.autoSaveEnabled.collectAsStateWithLifecycle(initialValue = null)
     val snackbar = remember { SnackbarHostState() }
@@ -114,6 +122,15 @@ fun BlocksScreen(viewModel: BlocksViewModel, onExit: () -> Unit) {
     BackHandler(enabled = state.dirty) {
         if (autoSave?.autoSave == true) viewModel.saveThen(onExit) else confirmLeave = true
     }
+    // Registered last, so it wins: back from the editor returns to the event list (saving continues in the background).
+    BackHandler(enabled = onBack != null) { viewModel.flush(); onBack?.invoke() }
+    var paletteOpen by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(focus, canvas.size, state.document != null) {
+        val doc = state.document ?: return@LaunchedEffect
+        if (focus == null || canvas.size.width == 0) return@LaunchedEffect
+        BlockLocator.position(doc, focus)?.let { (x, y) -> canvas.pan = androidx.compose.ui.geometry.Offset(32f - x * canvas.zoom, 32f - y * canvas.zoom) }
+        viewModel.select(focus)
+    }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -122,12 +139,12 @@ fun BlocksScreen(viewModel: BlocksViewModel, onExit: () -> Unit) {
                 state.error != null -> BiErrorState(stringResource(R.string.bk_open_failed), state.error!!, retryLabel = stringResource(R.string.bk_retry), onRetry = { viewModel.load(state.activity) })
                 state.document == null -> BiEmptyState(BiIcons.Widgets, stringResource(R.string.bk_no_activities_title), stringResource(R.string.bk_no_activities_body))
                 else -> {
-                    Toolbar(state, viewModel, canvas, onCode = { showCode = true }, onProblems = { showProblems = true })
+                    Toolbar(state, viewModel, canvas, onCode = { showCode = true }, onProblems = { showProblems = true }, onBack = onBack?.let { b -> { viewModel.flush(); b() } })
                     StatusLine(state)
                     HorizontalDivider()
                     val errorIds = remember(state.diagnostics) { state.diagnostics.filter { it.severity == BlockDiagnostic.Severity.Error }.mapNotNull { it.blockId }.toSet() }
                     BoxWithConstraints(Modifier.fillMaxSize()) {
-                        val panelHeight = maxHeight * 0.4f
+                        val panelHeight = maxHeight * 0.45f
                         val canvasView: @Composable (Modifier) -> Unit = { m ->
                             Box(m) {
                                 BlockCanvas(
@@ -155,10 +172,21 @@ fun BlocksScreen(viewModel: BlocksViewModel, onExit: () -> Unit) {
                                 canvasView(Modifier.weight(1f).fillMaxHeight())
                             }
                         } else {
+                            // Phone: the canvas gets the whole screen; blocks slide up in a drawer.
                             Column(Modifier.fillMaxSize()) {
-                                canvasView(Modifier.weight(1f).fillMaxWidth())
-                                HorizontalDivider()
-                                Surface(tonalElevation = 2.dp) { palette(Modifier.fillMaxWidth().height(panelHeight)) }
+                                Box(Modifier.weight(1f).fillMaxWidth()) {
+                                    canvasView(Modifier.fillMaxSize())
+                                    ExtendedFloatingActionButton(
+                                        onClick = { paletteOpen = !paletteOpen },
+                                        icon = { Icon(if (paletteOpen) BiIcons.Close else BiIcons.Blocks, null) },
+                                        text = { Text(stringResource(if (paletteOpen) R.string.bk_hide_palette else R.string.bk_show_palette)) },
+                                        modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.md),
+                                    )
+                                }
+                                if (paletteOpen) {
+                                    HorizontalDivider()
+                                    Surface(tonalElevation = 2.dp) { palette(Modifier.fillMaxWidth().height(panelHeight)) }
+                                }
                             }
                         }
                     }
@@ -206,11 +234,12 @@ fun BlocksScreen(viewModel: BlocksViewModel, onExit: () -> Unit) {
 }
 
 @Composable
-private fun Toolbar(state: BlocksUiState, vm: BlocksViewModel, canvas: BlockCanvasState, onCode: () -> Unit, onProblems: () -> Unit) {
+private fun Toolbar(state: BlocksUiState, vm: BlocksViewModel, canvas: BlockCanvasState, onCode: () -> Unit, onProblems: () -> Unit, onBack: (() -> Unit)?) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (onBack != null) BiIconButton(BiIcons.Back, stringResource(R.string.bk_back_to_events), onBack)
         Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
             var menu by remember { mutableStateOf(false) }
-            Box {
+            if (onBack == null) Box {
                 TextButton(onClick = { menu = true }) { Text((state.activity ?: stringResource(R.string.bk_screen)) + " ▾") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     state.activities.forEach { a -> DropdownMenuItem(text = { Text(a) }, onClick = { menu = false; vm.load(a) }) }
@@ -282,14 +311,8 @@ private fun Palette(
 ) {
     var category by rememberSaveable { mutableStateOf(BlockCategory.Events) }
     val res = LocalContext.current.resources
-    Column(modifier) {
-        Row(Modifier.horizontalScroll(rememberScrollState()).padding(Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            BlockCategory.entries.forEach { c ->
-                FilterChip(selected = c == category, onClick = { category = c }, label = { Text(stringResource(categoryRes(c))) },
-                    leadingIcon = { Box(Modifier.width(10.dp).height(10.dp).background(categoryColor(c), RoundedCornerShape(5.dp))) })
-            }
-        }
-        LazyColumn(Modifier.fillMaxSize().padding(horizontal = Spacing.sm).testTag(PALETTE_TAG)) {
+    Row(modifier) {
+        LazyColumn(Modifier.weight(1f).fillMaxHeight().padding(horizontal = Spacing.sm).testTag(PALETTE_TAG)) {
             item { Text(stringResource(R.string.bk_palette_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Spacing.xs)) }
             if (category == BlockCategory.Variables || category == BlockCategory.Lists) {
                 item { TextButton(onClick = onNewVariable) { Icon(BiIcons.Add, null); Text(stringResource(R.string.bk_new_variable)) } }
@@ -303,6 +326,27 @@ private fun Palette(
             }
             items(BlockRegistry.all.filter { it.category == category }, key = { it.type }) { def ->
                 PaletteBlock(def, paletteText(def, res), onClick = { onAdd(def.type) })
+            }
+        }
+        VerticalDivider()
+        // Category rail on the right, within reach of the thumb.
+        Column(Modifier.width(104.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(vertical = Spacing.xs)) {
+            BlockCategory.entries.forEach { c ->
+                val selected = c == category
+                Row(
+                    Modifier.fillMaxWidth()
+                        .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable { category = c }
+                        .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.width(4.dp).height(18.dp).background(categoryColor(c), RoundedCornerShape(2.dp)))
+                    Text(
+                        stringResource(categoryRes(c)), style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.padding(start = Spacing.sm),
+                    )
+                }
             }
         }
     }
@@ -360,6 +404,8 @@ private fun FieldEditor(block: Block, field: String, state: BlocksUiState, onDis
         is FieldKind.VariableRef -> doc.variables.filter { kind.type == null || it.type == kind.type }.map { it.name to it.name }
         is FieldKind.Procedure -> if (kind.defines) null else doc.stacks.mapNotNull { s -> s.blocks.firstOrNull()?.takeIf { it.type == "proc_define" }?.field("name") }.map { it to it }
         FieldKind.Activity -> state.activities.map { it to it }
+        is FieldKind.ComponentRef -> doc.components.filter { it.type == kind.type }.map { it.name to it.name }
+        FieldKind.RawResource -> state.sounds.map { it to it }
         else -> null
     }
     if (choices != null) {
@@ -368,7 +414,12 @@ private fun FieldEditor(block: Block, field: String, state: BlocksUiState, onDis
             title = { Text(stringResource(R.string.bk_choose)) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    if (choices.isEmpty()) Text(stringResource(if (kind is FieldKind.View) R.string.bk_no_views else R.string.bk_none_available))
+                    if (choices.isEmpty()) Text(stringResource(when (kind) {
+                        is FieldKind.View -> R.string.bk_no_views
+                        is FieldKind.ComponentRef -> R.string.bk_no_components_of_type
+                        FieldKind.RawResource -> R.string.bk_no_sounds
+                        else -> R.string.bk_none_available
+                    }))
                     choices.forEach { (value, label) ->
                         Text(label, fontWeight = if (value == current) FontWeight.Bold else FontWeight.Normal,
                             modifier = Modifier.fillMaxWidth().clickable { onSet(value) }.padding(vertical = Spacing.md))

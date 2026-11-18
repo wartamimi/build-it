@@ -17,6 +17,7 @@ are updated (§19). Status details are in [DEVELOPMENT_STATUS.md](DEVELOPMENT_ST
 | 7 | AI providers and assistant (reviewed proposals), debug console, runtime log bridge | Done: Claude (official SDK) and OpenAI-compatible providers, reviewed per-file diffs, console bridge in debug builds; not yet run on a device (Phase 8) |
 | 8 | Integration, performance and memory work, compatibility testing, security review, release (APK built and published here) | Done for release: signed GitHub releases from CI, emulator tests of the on-device build, console and UI; performance/memory work and a security review remain |
 | 9 | Libraries (owner request): AndroidX, Material, Google Play services, Firebase and Maven libraries in the on-device build, Library Manager | Done: resolver, resource/manifest merge, dex cache, Library Manager tab; verified on the emulator (AppCompat + Material + ConstraintLayout app built, installed and run on the device) |
+| 10 | Workflow inspired by Sketchware Pro (owner request): Design/Events/Components tabs, Run bar, project tools drawer, non-visual components, image/sound/font managers | Done for Timer, Storage, Dialog, Sound player; more component kinds later |
 
 ## Phase 1 implementation plan (as executed)
 

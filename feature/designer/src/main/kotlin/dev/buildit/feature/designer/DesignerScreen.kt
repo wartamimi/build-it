@@ -61,6 +61,12 @@ import dev.buildit.core.designsystem.theme.Spacing
 import dev.buildit.engine.layout.DropResolver
 import dev.buildit.engine.layout.LayoutCommand
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.Arrangement
+import dev.buildit.core.designsystem.theme.CodeTypography
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 
 private enum class Panel(val label: Int) { Library(R.string.ds_panel_library), Tree(R.string.ds_panel_tree), Properties(R.string.ds_panel_properties), Problems(R.string.ds_panel_problems) }
 
@@ -69,6 +75,7 @@ private enum class Panel(val label: Int) { Library(R.string.ds_panel_library), T
  * component tree, properties inspector and problems list. Edits go through [DesignerViewModel],
  * which writes the layout XML (the source of truth) back to the project.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -81,6 +88,7 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
     var confirmLeave by remember { mutableStateOf(false) }
     var newLayout by remember { mutableStateOf(false) }
     var newActivity by remember { mutableStateOf(false) }
+    var sheet by remember { mutableStateOf<Panel?>(null) }
 
     val messages = rememberMessages()
     LaunchedEffect(viewModel) {
@@ -163,31 +171,17 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
                             }
                         }
                     } else {
-                        var panel by rememberSaveable { mutableIntStateOf(Panel.Library.ordinal) }
-                        // Selecting a view on the canvas jumps to its properties.
-                        LaunchedEffect(state.selectedUid) {
-                            if (state.selectedUid != null && panel == Panel.Library.ordinal) panel = Panel.Properties.ordinal
-                        }
+                        // Phone layout: widget palette beside the canvas, a property bar for the
+                        // selected view underneath, and the full panels in a bottom sheet.
                         Column(Modifier.fillMaxSize()) {
-                            Box(Modifier.weight(1f).fillMaxWidth()) { canvas(Modifier) }
-                            Surface(tonalElevation = 2.dp) {
-                                Column(Modifier.fillMaxWidth().height(panelHeight)) {
-                                    PrimaryTabRow(selectedTabIndex = panel) {
-                                        Panel.entries.forEach { p ->
-                                            val count = if (p == Panel.Problems) state.diagnostics.size + previewIssues.size else 0
-                                            Tab(selected = panel == p.ordinal, onClick = { panel = p.ordinal }, text = {
-                                                Text(stringResource(p.label) + if (count > 0) " ($count)" else "", maxLines = 1)
-                                            })
-                                        }
-                                    }
-                                    when (Panel.entries[panel]) {
-                                        Panel.Library -> library(Modifier.fillMaxSize())
-                                        Panel.Tree -> ComponentTree(state, viewModel)
-                                        Panel.Properties -> PropertiesInspector(state, viewModel)
-                                        Panel.Problems -> ProblemsList(state, previewIssues, viewModel::select)
-                                    }
+                            Row(Modifier.weight(1f).fillMaxWidth()) {
+                                Surface(tonalElevation = 1.dp) {
+                                    ComponentLibrary(viewModel::addComponent, drag, onDragMove, onDrop, Modifier.width(140.dp).fillMaxHeight(), compact = true)
                                 }
+                                VerticalDivider()
+                                Box(Modifier.weight(1f).fillMaxHeight()) { canvas(Modifier) }
                             }
+                            PropertyBar(state, state.diagnostics.size + previewIssues.size, viewModel, onPanel = { sheet = it })
                         }
                     }
                 }
@@ -221,8 +215,65 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
             },
         )
     }
+    sheet?.let { p ->
+        ModalBottomSheet(onDismissRequest = { sheet = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+            Text(stringResource(p.label), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = Spacing.lg))
+            Box(Modifier.fillMaxWidth().fillMaxHeight(0.75f)) {
+                when (p) {
+                    Panel.Library -> ComponentLibrary({ viewModel.addComponent(it); sheet = null }, drag, onDragMove, onDrop, Modifier.fillMaxSize())
+                    Panel.Tree -> ComponentTree(state, viewModel)
+                    Panel.Properties -> PropertiesInspector(state, viewModel)
+                    Panel.Problems -> ProblemsList(state, previewIssues, { viewModel.select(it); sheet = Panel.Properties })
+                }
+            }
+        }
+    }
     if (newLayout) NewLayoutDialog(onDismiss = { newLayout = false }, onCreate = { n, r -> newLayout = false; viewModel.createLayout(n, r) })
     if (newActivity) NewActivityDialog(onDismiss = { newActivity = false }, onCreate = { a, l -> newActivity = false; viewModel.addActivity(a, l) })
+}
+
+/** Bottom bar of the phone layout: what is selected and quick actions for it. */
+@Composable
+private fun PropertyBar(state: DesignerUiState, problems: Int, vm: DesignerViewModel, onPanel: (Panel) -> Unit) {
+    val el = state.selectedUid?.let { state.root?.find(it) }
+    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(start = Spacing.xs)) {
+                    if (el == null) {
+                        Text(stringResource(R.string.ds_bar_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        Text(el.label(), style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                        Text(el.name.substringAfterLast('.'), style = CodeTypography.small, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    }
+                }
+                if (el != null) {
+                    BiIconButton(BiIcons.Duplicate, stringResource(R.string.ds_duplicate), { vm.apply(LayoutCommand.Duplicate(el.uid)) })
+                    BiIconButton(BiIcons.Delete, stringResource(R.string.ds_delete), { vm.apply(LayoutCommand.Remove(el.uid)) }, enabled = el.uid != state.root?.uid)
+                }
+            }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                if (el != null) {
+                    AssistChip(onClick = { onPanel(Panel.Properties) }, label = { Text(stringResource(R.string.ds_all_properties)) }, leadingIcon = { Icon(BiIcons.Tune, null) })
+                    SizeChip(stringResource(R.string.ds_width), el["android:layout_width"]) { vm.apply(LayoutCommand.SetAttribute(el.uid, "android:layout_width", it)) }
+                    SizeChip(stringResource(R.string.ds_height), el["android:layout_height"]) { vm.apply(LayoutCommand.SetAttribute(el.uid, "android:layout_height", it)) }
+                }
+                AssistChip(onClick = { onPanel(Panel.Tree) }, label = { Text(stringResource(R.string.ds_panel_tree)) }, leadingIcon = { Icon(BiIcons.Layers, null) })
+                AssistChip(
+                    onClick = { onPanel(Panel.Problems) },
+                    label = { Text(stringResource(R.string.ds_panel_problems) + if (problems > 0) " ($problems)" else "") },
+                    leadingIcon = { Icon(BiIcons.Warning, null, tint = if (problems > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) },
+                )
+            }
+        }
+    }
+}
+
+/** Cycles a layout size between wrap_content and match_parent (other values are kept until tapped). */
+@Composable
+private fun SizeChip(label: String, value: String?, onSet: (String) -> Unit) {
+    val short = when (value) { "match_parent", "fill_parent" -> "match"; "wrap_content" -> "wrap"; null -> "—"; else -> value }
+    AssistChip(onClick = { onSet(if (value == "wrap_content") "match_parent" else "wrap_content") }, label = { Text("$label: $short") })
 }
 
 @Composable
