@@ -17,3 +17,6 @@
 -dontwarn com.android.tools.r8.**
 -dontwarn com.android.apksig.**
 -dontwarn com.google.auto.value.AutoValue
+
+# Stand-in for javax.lang.model on Android (see app/src/main/java/javax/lang/model).
+-keep class javax.lang.model.SourceVersion { *; }
