@@ -253,6 +253,24 @@ a Kotlin re-implementation of the parts ECJ uses. The original jar is unchanged 
 *Consequences:* upgrading ECJ needs the emulator job to confirm no new Java-only API is used.
 Verified on ART by the on-device build test.
 
+### D18. Libraries: Maven resolution and a non-namespaced merge in the on-device builder
+*Decision:* Projects list their libraries in `buildit.json` (`app.dependencies`); the Library
+Manager edits that list and Build It writes it to `app/build.gradle.kts`. The build resolves them
+like Gradle for an Android app (`engine:deps`): Gradle module metadata first (Android variant,
+Kotlin Multiplatform redirects, dependency constraints), POM otherwise (parents, properties, BOM
+imports), highest version wins. Files come from Google Maven and Maven Central into one cache
+shared by all projects. Resources of all libraries and the app are compiled together into the
+app package (library first, app overrides), as AGP does without namespacing. The app's R holds
+every id; each library package gets an R whose nested classes extend the app's, so library code
+(compiled against non-final R fields) finds the ids by field resolution through the superclass.
+Library manifests are merged by element key with `tools:node="remove"` and `${applicationId}`.
+Each library JAR is dexed once and cached; the app's classes are dexed on every build.
+`google-services.json` is turned into string resources as the Google Services plugin does.
+*Consequences:* not supported: annotation processors, Kotlin-only/Compose APIs (projects are
+Java), Gradle plugins other than google-services, manifest placeholders other than
+`${applicationId}`, and R8 shrinking of the user's APK. Library resources are recompiled on every
+build (seconds on a phone for Material). Verified on ART by the emulator test.
+
 ---
 
 ## Part C — Risks and mitigations (§20 item 11)

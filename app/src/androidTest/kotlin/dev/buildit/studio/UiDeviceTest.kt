@@ -48,7 +48,7 @@ class UiDeviceTest {
         val dir = File(compose.activity.filesDir, "workspace").listFiles().orEmpty().first { File(it, "buildit.json").readText().contains(name) }
         compose.waitUntil(10_000) { File(dir, ".buildit/blocks/MainActivity.json").let { it.isFile && it.readText().contains("app_finish") } }
 
-        for (tab in listOf("Code", "Build", "Console", "AI", "Project", "Files", "Design")) {
+        for (tab in listOf("Code", "Libraries", "Build", "Console", "AI", "Project", "Files", "Design")) {
             compose.onAllNodes(hasText(tab) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).onFirst().performScrollTo().performClick()
             compose.waitForIdle()
         }

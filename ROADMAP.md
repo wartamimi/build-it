@@ -12,10 +12,11 @@ are updated (§19). Status details are in [DEVELOPMENT_STATUS.md](DEVELOPMENT_ST
 | 3 | UI designer: layout model, XML parse/serialize, component catalog, drag-and-drop canvas, tree, inspector, live preview | Done (see known gaps) |
 | 4 | Block engine: model, definitions, validation, AST/IR, Java/Kotlin codegen, Canvas renderer, undo/redo | Done (see known gaps) |
 | 5 | Code editor: editor abstraction, Java/Kotlin/XML/JSON/Gradle highlighting, find/replace, tabs, diagnostics | Done (see known gaps) |
-| 6 | Local build engine: Toolchain Manager, Kotlin-on-ART spike, dependency resolver, AAPT2/ECJ/D8/R8, APK/AAB, signing, verification | Partly done: Java projects build to signed, verified APKs on the device; see known gaps (dependencies, Kotlin, AAB) |
+| 6 | Local build engine: Toolchain Manager, Kotlin-on-ART spike, dependency resolver, AAPT2/ECJ/D8/R8, APK/AAB, signing, verification | Partly done: Java projects, with Maven libraries (Phase 9), build to signed, verified APKs on the device; see known gaps (Kotlin, AAB) |
 | 6b | Gradle compatibility mode (experimental, non-Play builds) | Not started |
 | 7 | AI providers and assistant (reviewed proposals), debug console, runtime log bridge | Done: Claude (official SDK) and OpenAI-compatible providers, reviewed per-file diffs, console bridge in debug builds; not yet run on a device (Phase 8) |
-| 8 | Integration, performance and memory work, compatibility testing, security review, release (APK built and published here) | Partly done: signed APK 0.8.0 built, tag-triggered GitHub release ready once secrets are set, emulator CI added; on-device Java compile fails on ART (ECJ needs Java 9+ APIs) and is the top open item |
+| 8 | Integration, performance and memory work, compatibility testing, security review, release (APK built and published here) | Done for release: signed GitHub releases from CI, emulator tests of the on-device build, console and UI; performance/memory work and a security review remain |
+| 9 | Libraries (owner request): AndroidX, Material, Google Play services, Firebase and Maven libraries in the on-device build, Library Manager | Done: resolver, resource/manifest merge, dex cache, Library Manager tab; verified on the emulator (AppCompat + Material + ConstraintLayout app built, installed and run on the device) |
 
 ## Phase 1 implementation plan (as executed)
 

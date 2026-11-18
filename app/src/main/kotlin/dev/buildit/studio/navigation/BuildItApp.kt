@@ -1,5 +1,8 @@
 package dev.buildit.studio.navigation
 
+import dev.buildit.feature.libraries.LibrariesScreen
+import dev.buildit.feature.libraries.LibrariesViewModel
+import dev.buildit.feature.libraries.R as LibrariesR
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
@@ -169,6 +172,9 @@ fun BuildItApp(container: AppContainer) {
                     val build: BuildViewModel = viewModel(key = "bd-$id", factory = viewModelFactory {
                         initializer { BuildViewModel(id, container.projectRepository, container.toolchain, container.debugKeystore, container.dispatchers, console = container.consoleHost, maven = container.maven) }
                     })
+                    val libraries: LibrariesViewModel = viewModel(key = "lb-$id", factory = viewModelFactory {
+                        initializer { LibrariesViewModel(id, container.projectRepository, container.maven, container.dispatchers) }
+                    })
                     val console: ConsoleViewModel = viewModel(key = "cn-$id", factory = viewModelFactory {
                         initializer { ConsoleViewModel(id, container.projectRepository, ConsoleLog.shared, container.dispatchers) }
                     })
@@ -182,7 +188,7 @@ fun BuildItApp(container: AppContainer) {
                         }
                     })
                     val context = LocalContext.current
-                    val tabs = remember(designer, blocks, code, build, console, ai) {
+                    val tabs = remember(designer, blocks, code, build, console, ai, libraries) {
                         listOf(
                             WorkspaceExtraTab(title = { stringResource(DesignerR.string.ds_tab) }, content = { scope -> DesignerScreen(designer, onExit = scope.leave) }),
                             WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_tab) }, content = { scope -> BlocksScreen(blocks, onExit = scope.leave) }),
@@ -191,6 +197,7 @@ fun BuildItApp(container: AppContainer) {
                                 content = { scope -> CodeScreen(code, onExit = scope.leave) },
                                 opens = { path -> CodeViewModel.canOpen(path).also { if (it) code.open(path) } },
                             ),
+                            WorkspaceExtraTab(title = { stringResource(LibrariesR.string.lb_tab) }, content = { LibrariesScreen(libraries) }),
                             WorkspaceExtraTab(
                                 title = { stringResource(BuildR.string.bd_tab) },
                                 content = { scope ->

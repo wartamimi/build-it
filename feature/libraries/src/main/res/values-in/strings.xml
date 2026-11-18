@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lb_tab">Library</string>
+    <string name="lb_project_title">Di proyek ini</string>
+    <string name="lb_project_empty">Belum ada library. Cari di bawah atau pilih yang umum; library beserta semua kebutuhannya diunduh dan diperiksa sebelum proyek diubah.</string>
+    <string name="lb_enabled">Pakai saat build</string>
+    <string name="lb_remove">Hapus</string>
+    <string name="lb_change_version">Ganti versi</string>
+    <string name="lb_included_title">Ikut di build (%1$d, %2$s MB)</string>
+    <string name="lb_included_by">dibutuhkan oleh %1$s</string>
+    <string name="lb_included_direct">ditambahkan oleh Anda</string>
+    <string name="lb_refresh">Periksa dan unduh</string>
+    <string name="lb_search_label">Cari di Google Maven dan Maven Central</string>
+    <string name="lb_search">Cari</string>
+    <string name="lb_popular">Library umum</string>
+    <string name="lb_results">Hasil</string>
+    <string name="lb_no_results">Tidak ditemukan. Anda juga bisa mengetik koordinat lengkap, mis. com.squareup.okhttp3:okhttp:4.12.0.</string>
+    <string name="lb_add">Tambah</string>
+    <string name="lb_added_badge">Sudah ada</string>
+    <string name="lb_working">Mengunduh %1$s</string>
+    <string name="lb_cancel">Batal</string>
+    <string name="lb_choose_version">%1$s: pilih versi</string>
+    <string name="lb_loading_versions">Memuat versi…</string>
+    <string name="lb_versions_failed">Gagal memuat versi: %1$s</string>
+    <string name="lb_prerelease">pra-rilis</string>
+    <string name="lb_problems">Proyek tidak diubah:</string>
+    <string name="lb_msg_added">%1$s ditambahkan. Build sekarang memakai %2$d library (%3$s MB).</string>
+    <string name="lb_msg_removed">%1$s dihapus.</string>
+    <string name="lb_msg_gradle_kept">%1$s sudah Anda ubah manual, jadi Build It tidak menimpanya. Daftar library di sini yang dipakai build di perangkat.</string>
+    <string name="lb_msg_failed">Gagal mengubah library: %1$s</string>
+    <string name="lb_ok">OK</string>
+    <string name="lb_limits_title">Yang didukung</string>
+    <string name="lb_limits_body">AndroidX, Material Components, Google Play services, Firebase, dan library Java/Android biasa dari Google Maven dan Maven Central: kode, resource, manifest, dan native library-nya ikut di-build ke APK Anda. Firebase butuh google-services.json di folder app (Build It membacanya seperti plugin Gradle Google Services). Belum didukung di perangkat: annotation processor (mis. Room, Glide compiler), API khusus Kotlin dan Jetpack Compose (proyek memakai Java), dan plugin Gradle lain seperti Crashlytics.</string>
+</resources>

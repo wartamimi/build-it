@@ -17,6 +17,9 @@ directory as a Build It project and stores its configuration.
   "app": {
     "packageName": "com.example.myapp",   // applicationId
     "namespace": "com.example.myapp",     // source package of R; optional, defaults to packageName
+    "dependencies": [                     // optional (added in 0.9, no format change): Maven libraries
+      { "coordinate": "androidx.appcompat:appcompat:1.7.1", "enabled": true }
+    ],
     "versionCode": 1,
     "versionName": "1.0",
     "minSdk": 24,

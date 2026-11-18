@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lb_tab">Libraries</string>
+    <string name="lb_project_title">In this project</string>
+    <string name="lb_project_empty">No libraries yet. Search below or pick a common one; the library and everything it needs are downloaded and checked before the project changes.</string>
+    <string name="lb_enabled">Use in builds</string>
+    <string name="lb_remove">Remove</string>
+    <string name="lb_change_version">Change version</string>
+    <string name="lb_included_title">Included in the build (%1$d, %2$s MB)</string>
+    <string name="lb_included_by">needed by %1$s</string>
+    <string name="lb_included_direct">added by you</string>
+    <string name="lb_refresh">Check and download</string>
+    <string name="lb_search_label">Search Google Maven and Maven Central</string>
+    <string name="lb_search">Search</string>
+    <string name="lb_popular">Common libraries</string>
+    <string name="lb_results">Results</string>
+    <string name="lb_no_results">Nothing found. You can also type a full coordinate, e.g. com.squareup.okhttp3:okhttp:4.12.0.</string>
+    <string name="lb_add">Add</string>
+    <string name="lb_added_badge">Added</string>
+    <string name="lb_working">Downloading %1$s</string>
+    <string name="lb_cancel">Cancel</string>
+    <string name="lb_choose_version">%1$s: choose a version</string>
+    <string name="lb_loading_versions">Loading versions…</string>
+    <string name="lb_versions_failed">Could not load versions: %1$s</string>
+    <string name="lb_prerelease">pre-release</string>
+    <string name="lb_problems">The project was not changed:</string>
+    <string name="lb_msg_added">Added %1$s. The build now includes %2$d libraries (%3$s MB).</string>
+    <string name="lb_msg_removed">Removed %1$s.</string>
+    <string name="lb_msg_gradle_kept">%1$s was edited by hand, so Build It did not rewrite it. The library list here is what the on-device build uses.</string>
+    <string name="lb_msg_failed">Could not change the libraries: %1$s</string>
+    <string name="lb_ok">OK</string>
+    <string name="lb_limits_title">What works</string>
+    <string name="lb_limits_body">AndroidX, Material Components, Google Play services, Firebase and plain Java/Android libraries from Google Maven and Maven Central: their code, resources, manifests and native libraries are built into your APK. Firebase needs google-services.json in the app folder (Build It reads it like the Google Services Gradle plugin). Not supported on the device: annotation processors (e.g. Room, Glide compiler), Kotlin-only and Jetpack Compose APIs (projects are Java), and other Gradle plugins such as Crashlytics.</string>
+</resources>

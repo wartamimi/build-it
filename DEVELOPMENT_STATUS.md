@@ -263,9 +263,34 @@ Not done in this phase
 - Kotlin-on-ART spike, separate build process, memory checks before builds, a formal security
   review. Library dependencies are Phase 9 (in progress).
 
+## Phase 9 — Libraries and Library Manager (owner request)
+
+Done
+- `engine:deps`: resolver for Google Maven and Maven Central (module metadata, POM inheritance,
+  BOMs, version ranges, dependency constraints, highest version wins), offline cache, search of
+  Google's group index and Maven Central.
+- On-device builder with libraries: AAR resources merged under the app's (attr,
+  declare-styleable, macro, inline aapt:attr, res-auto attributes, nine-patch images, all
+  qualifiers incl. BCP-47), R for app and library packages, merged manifests, library JARs on the
+  compile classpath, per-JAR dex cache, Java resources, assets and native libraries packaged,
+  `google-services.json` for Firebase.
+- Library Manager tab: search, choose a version, add (everything is downloaded and checked
+  before the project changes), turn on/off, change version, remove, list of every library the
+  build includes and who needs it. EN/ID.
+- Verified: JVM test builds an AppCompat + Material 3 + ConstraintLayout app and checks it with
+  aapt2, dexdump and apksigner; the emulator test builds the same app on the device, installs and
+  runs it with no crash.
+
+Not done / limits
+- Annotation processors (Room, Glide compiler), Kotlin-only and Compose APIs, Gradle plugins other
+  than google-services (e.g. Crashlytics), manifest placeholders other than `${applicationId}`.
+- Library resources are recompiled on every build; a large set (Material) costs seconds on a phone.
+- Play services and Firebase are resolved and merged by the same rules but have not had their own
+  device test yet.
+
 ## Build status
 
-- `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:ai:test` —
+- `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:deps:test :engine:ai:test` —
   passing locally (130 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
 - APK: CI publishes a signed GitHub release for each push to main. Emulator job: on-device build, install and console pass.

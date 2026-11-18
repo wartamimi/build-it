@@ -1,14 +1,15 @@
 Build It for Android 8.0 and newer.
 
-Works: project management, UI designer, block editor, code editor, AI assistant (your own Claude
-or OpenAI-compatible key; every change is shown as a diff you apply yourself), console tab, and
-building a signed debug APK of a Java project on the phone itself (Eclipse compiler + D8 +
-apksig, no server). Verified on an Android 14 emulator: build, install, launch, and the app's log
-and crash appear in the Console tab.
+New in 0.9.0: libraries. A new Libraries tab searches Google Maven and Maven Central, adds a
+library at the version you choose (with everything it needs, downloaded and checked first), turns
+libraries on and off, and shows every library in your build. The on-device builder now builds
+apps that use AndroidX, Material Components, Google Play services, Firebase (with
+google-services.json) and other Maven libraries. Verified on an Android 14 emulator: an
+AppCompat + Material 3 + ConstraintLayout app built on the device, installed and ran.
 
-Fixed in 0.8.1: the Blocks tab crashed when opened on Android; the on-device Java compiler
-needed Java APIs that Android lacks.
+Also works: project management, UI designer, block editor, code editor, AI assistant (your own
+Claude or OpenAI-compatible key; every change is shown as a diff you apply yourself), console tab,
+and signed debug APKs of Java projects built on the phone.
 
-Not yet: projects that use libraries (AndroidX, Material, Google Play services) and Kotlin
-sources cannot be built on the phone yet; library support is the next update.
-See DEVELOPMENT_STATUS.md.
+Not yet: Kotlin sources, annotation processors (e.g. Room), Compose, and Gradle plugins other than
+google-services. See DEVELOPMENT_STATUS.md.
