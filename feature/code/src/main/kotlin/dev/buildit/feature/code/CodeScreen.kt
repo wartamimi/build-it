@@ -141,6 +141,14 @@ fun CodeScreen(viewModel: CodeViewModel, onExit: () -> Unit) {
                     )
                 }
             }
+            val reveal = state.reveal
+            LaunchedEffect(reveal, editor, file.path, file.revision) {
+                val e = editor
+                if (reveal != null && reveal.path == file.path && e != null && e.contentDescription == file.path) {
+                    e.goTo(TextPositions.lineStart(e.text ?: "", reveal.line))
+                    viewModel.revealDone()
+                }
+            }
             if (showProblems) Problems(file.diagnostics) { d ->
                 editor?.let { e -> e.goTo(TextPositions.lineStart(e.text ?: "", d.line) + d.column - 1) }
             }

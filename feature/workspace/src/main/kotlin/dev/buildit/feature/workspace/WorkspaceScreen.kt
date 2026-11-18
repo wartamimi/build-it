@@ -106,14 +106,15 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit, extraTabs
                             Tab(selected = current == i, onClick = { selected = i }, text = { Text(t) })
                         }
                     }
+                    val openInTab = { path: String ->
+                        val i = extraTabs.indexOfFirst { it.opens?.invoke(path) == true }
+                        if (i >= 0) selected = i
+                        i >= 0
+                    }
                     when (val extra = current) {
-                        in extraTabs.indices -> extraTabs[extra].content(leave)
+                        in extraTabs.indices -> extraTabs[extra].content(WorkspaceTabScope(leave, openInTab))
                         extraTabs.size -> ProjectSettingsTab(state, viewModel)
-                        else -> FilesTab(state.files, viewModel, openInTab = { path ->
-                            val i = extraTabs.indexOfFirst { it.opens?.invoke(path) == true }
-                            if (i >= 0) selected = i
-                            i >= 0
-                        })
+                        else -> FilesTab(state.files, viewModel, openInTab = openInTab)
                     }
                 }
             }
@@ -145,12 +146,15 @@ fun WorkspaceScreen(viewModel: WorkspaceViewModel, onBack: () -> Unit, extraTabs
 }
 
 /**
- * A tab contributed by another feature (e.g. the designer). Extra tabs come first. [content]
- * receives the workspace's leave action so it can finish its own work before leaving.
+ * What a contributed tab can ask of the workspace: [leave] it (after finishing its own work), or
+ * [openFile] in whichever tab opens that file (returns false if none can).
  */
+class WorkspaceTabScope(val leave: () -> Unit, val openFile: (path: String) -> Boolean)
+
+/** A tab contributed by another feature (e.g. the designer). Extra tabs come first. */
 class WorkspaceExtraTab(
     val title: @Composable () -> String,
-    val content: @Composable (leave: () -> Unit) -> Unit,
+    val content: @Composable (WorkspaceTabScope) -> Unit,
     /** Opens a project file in this tab; returns false if the tab can't handle it. */
     val opens: ((path: String) -> Boolean)? = null,
 )

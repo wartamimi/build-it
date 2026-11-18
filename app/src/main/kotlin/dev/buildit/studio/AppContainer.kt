@@ -12,6 +12,7 @@ import dev.buildit.core.data.SettingsRepository
 import dev.buildit.core.data.WorkspaceInfo
 import dev.buildit.core.database.BuildItDatabase
 import dev.buildit.engine.project.ProjectStore
+import dev.buildit.engine.build.Toolchain
 import java.io.File
 
 private val Context.settingsStore by preferencesDataStore(name = "settings")
@@ -24,6 +25,10 @@ class AppContainer(context: Context) {
     private val appContext = context.applicationContext
     val dispatchers: DispatcherProvider = DefaultDispatchers
     val workspaceDir: File = File(appContext.filesDir, "workspace")
+    /** Downloaded platforms, accepted licenses, compiler stubs and the debug signing key. */
+    val toolchainDir: File = File(appContext.filesDir, "toolchain")
+    val toolchain: Toolchain by lazy { Toolchain(toolchainDir) }
+    val debugKeystore: File get() = File(toolchainDir, "keys/debug.p12")
 
     private val database: BuildItDatabase by lazy { BuildItDatabase.create(appContext) }
     private val projectStore: ProjectStore by lazy { ProjectStore(workspaceDir) }

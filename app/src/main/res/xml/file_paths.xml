@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Built APKs live under <project>/build/outputs/ in the workspace; only those are shared. -->
+<paths>
+    <files-path name="workspace" path="workspace/" />
+</paths>

@@ -39,11 +39,15 @@ data class OpenFile(
     val revision: Int = 0,
 )
 
+data class Reveal(val path: String, val line: Int)
+
 data class CodeUiState(
     val files: List<OpenFile> = emptyList(),
     val current: String? = null,
     val saving: Boolean = false,
     val fontSizeSp: Int = 14,
+    /** A line to scroll to once [Reveal.path] is shown (e.g. from a build error). */
+    val reveal: Reveal? = null,
 ) {
     val currentFile get() = files.firstOrNull { it.path == current }
 }
@@ -109,6 +113,14 @@ class CodeViewModel(
     }
 
     fun select(path: String) = _state.update { it.copy(current = path) }
+
+    /** Opens [path] and asks the screen to move the cursor to 1-based [line]. */
+    fun reveal(path: String, line: Int) {
+        _state.update { it.copy(reveal = Reveal(path, line)) }
+        open(path)
+    }
+
+    fun revealDone() = _state.update { it.copy(reveal = null) }
 
     /** Called by the editor on every change. */
     fun onEdited(path: String, text: String) {

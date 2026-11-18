@@ -49,14 +49,15 @@ Flow throughout; blocking I/O runs on the injected `io` dispatcher.
 | `feature:blocks` | Android + Compose | Block editor: Canvas renderer and layout, gestures/snapping, palette, variables, problems, code preview; contributed as the Blocks tab. |
 | `engine:editor` | JVM | Code editor logic: lexers for highlighting, search/replace, syntax checks, edit history and auto-indent. |
 | `feature:code` | Android + Compose | Code editor: file tabs, `EditText`-based editor with gutter and highlighting, find/replace, go to line, problems, conflict handling; contributed as the Code tab and opened from Files. |
+| `engine:build` | JVM | On-device build: resource compiler (binary XML, resources.arsc, R.java), ECJ Java compiler, D8, APK packaging, apksig signing/verification, build pipeline with steps and diagnostics, toolchain manager (official platform download, license, SHA-1). |
+| `feature:build` | Android + Compose | Build tab: platform install with license, build with live steps, problems that open the file at the line, install/share the APK. |
 | `feature:home` | Android + Compose | Dashboard: quick actions, recent projects, storage. |
 | `feature:projects` | Android + Compose | Project list, search/sort, create sheet, rename/duplicate/delete, ZIP import/export (SAF), backups. |
 | `feature:workspace` | Android + Compose | Open project: project settings (app ID, versions, SDK levels) and file explorer. Editor tabs are added per phase. |
 | `feature:settings` | Android + Compose | Theme, dynamic color, language, editor font size, auto-save, rescan workspace, about. |
 | `build-logic` | Gradle | Convention plugins shared by all modules. |
 
-Planned modules: `engine:build`, `toolchain:*`,
-`feature:build` (Phase 6); `engine:ai`, `feature:ai`, `feature:console` (Phase 7);
+Planned modules: `engine:ai`, `feature:ai`, `feature:console` (Phase 7);
 `feature:resources` (later).
 
 ## 3. Storage

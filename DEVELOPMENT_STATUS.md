@@ -4,10 +4,12 @@ Last updated: 2026-11-18
 
 ## Summary
 
-Phases 0–5 are implemented. The app shell, design system, project management, the project
-workspace (settings + file explorer), the visual layout designer, the block editor (with Java
-and Kotlin code generation) and the code editor work end to end and are covered by tests. The
-build engine and AI assistant are **not implemented yet** and do not appear in the app. Per the owner's instruction, no APK is built or published until the final
+Phases 0–5 are implemented and Phase 6 is partly done. The app shell, design system, project
+management, the project workspace (settings + file explorer), the visual layout designer, the
+block editor (with Java and Kotlin code generation), the code editor and the on-device build of
+**Java** projects into signed, verified debug APKs work end to end and are covered by tests. Not
+yet: library dependencies, Kotlin compilation, AAB and release signing UI in the build engine,
+and the AI assistant (Phase 7). Per the owner's instruction, no APK is built or published until the final
 phase; CI compiles the app and runs the tests.
 
 ## Phase 1 — Foundation: complete
@@ -161,10 +163,51 @@ Known gaps (planned)
 - "Replace all" is undone one replacement at a time.
 - No split view, minimap or code folding.
 
+## Phase 6 — Local build engine: partly done
+
+Completed features
+- Build tab in the workspace: shows whether the project's Android platform is installed; if not,
+  downloads it from Google's official SDK repository after the user accepts the Android SDK
+  License shown in the app, with progress and cancel, and installs it only if the SHA-1 matches
+  the official index (TECHNICAL_DECISIONS D14).
+- "Build debug APK" runs seven real steps with live status and timings: check project → compile
+  resources and manifest → compile Java → convert to DEX → package → sign → verify signature.
+- Resource compiler written in Kotlin (D13): values (strings with Android escaping rules, colors,
+  dimensions, booleans, integers, fractions, ids, styles with parents, string/integer/typed arrays,
+  plurals), XML files compiled to binary XML with attribute ids, enums and flags from the
+  platform, references to app and public framework resources, common qualifiers (language/region,
+  night, orientation, density, sw/w/h dp, version), manifest with package, version, uses-sdk,
+  qualified class names and `debuggable` for debug builds; R.java and BuildConfig.java.
+- Java 17 source compiled in process by ECJ against android.jar; D8 converts to DEX with Java 8+
+  language desugaring; resources.arsc stored uncompressed and aligned; signed with apksig (v1 when
+  minSdk < 24, v2, v3) using a per-device debug key, then verified like the platform does.
+- Errors from every step carry the project file and line; tapping one opens the file at that line
+  in the Code tab. Unsupported inputs (Kotlin sources, library dependencies, AndroidX/Material
+  widgets, `app:` attributes, nine-patch images, `declare-styleable`) stop the build with a plain
+  explanation instead of being skipped.
+- The signed APK can be installed (system installer, through a FileProvider) or shared.
+- Verified in tests with the SDK's own tools: `aapt2 dump badging/xmltree/resources`, `dexdump`
+  and `apksigner verify` accept the APKs Build It produces.
+
+Known gaps (planned)
+- **Not yet run on a real device.** This environment has no Android runtime (no emulator/KVM);
+  all build tests run on the JVM. ECJ, D8 and apksig are pure Java and used by other on-device
+  IDEs, but the first on-device confirmation comes with the emulator CI job in Phase 8.
+- Library dependencies (Maven/AAR resolution, AndroidX, Material) are not supported yet; neither
+  are the AndroidX/Material components in the designer's palette when building on the device.
+- Kotlin sources: not compiled on the device yet (Kotlin-on-ART spike still open, D14/risks).
+- No AAB output; no release signing UI (the engine can sign with a PKCS#12 key); no R8
+  shrinking; no incremental builds (every build is a full build, a few seconds for small apps).
+- Java library APIs newer than minSdk (e.g. `List.of` below API 30) are not desugared; only
+  language features are.
+- Builds run in the app process; leaving the project cancels at the next step. A separate build
+  process and foreground service come with Phase 8.
+- Native libraries (`jniLibs`) are not packaged.
+
 ## Build status
 
-- `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test` —
-  passing locally (96 tests) and on CI (GitHub Actions, JDK 21).
+- `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test` —
+  passing locally (110 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
 - APK: intentionally not built yet (owner's instruction: only after the final phase).
 
@@ -188,9 +231,14 @@ Known gaps (planned)
 | engine:editor EditorEngineTest (lexers, search/replace, checks, history, indent) | 7 | pass |
 | feature:code CodeViewModelTest (autosave to disk, conflict instead of overwrite, save/discard, problems) | 5 | pass |
 | feature:code CodeEditTextTest (Robolectric, real view: auto-indent, undo/redo) | 2 | pass |
+| engine:build FrameworkResourcesTest (ids/enums/flags vs android.jar's R classes) | 1 | pass |
+| engine:build ResourceCompilerTest (checked with the SDK's aapt2; values, qualifiers, errors with lines) | 3 | pass |
+| engine:build BuildPipelineTest (signed APK accepted by aapt2, dexdump, apksigner; Java errors; unsupported inputs; cancel) | 4 | pass |
+| engine:build ToolchainTest (official index format, SHA-1 check, cancel) | 3 | pass |
+| feature:build BuildViewModelTest (license before download, real build, failed step) | 3 | pass |
 | core:database ProjectDaoTest | 3 | pass |
 | core:data ProjectRepositoryTest | 4 | pass |
-| app AppFlowTest (Robolectric, end-to-end create → designer → saved XML → blocks → saved block file → settings → files → code tab) | 1 | pass |
+| app AppFlowTest (Robolectric, end-to-end create → designer → saved XML → blocks → saved block file → settings → files → code tab → build tab) | 1 | pass |
 
 ## Known issues
 
@@ -200,5 +248,6 @@ Known gaps (planned)
 
 ## Next
 
-Phase 6: local build engine. First a time-boxed spike on running the Kotlin compiler on ART, then
-the toolchain manager, dependency resolver, AAPT2/ECJ/D8 pipeline, APK signing and verification.
+Phase 7: AI assistant (providers, reviewed proposals that never overwrite code silently) and the
+debug console. The remaining Phase 6 items (dependencies, Kotlin, AAB, release signing UI) are
+tracked above; on-device verification of the build engine runs in Phase 8.

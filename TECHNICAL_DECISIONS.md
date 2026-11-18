@@ -46,9 +46,9 @@ running the desktop Gradle + AGP stack as-is inside a normal app**. Component by
 | **Kotlin compiler (K2)** | **Uncertain — needs a spike.** | `kotlin-compiler-embeddable` relies on IntelliJ core and some JDK APIs that ART lacks or implements differently. Older (K1) compilers have been run on ART with patches. Phase 6 starts with a time-boxed spike; fallback below. |
 | **D8** (dexer) | **Yes**, in-process. | Pure Java library (from the R8 artifact). |
 | **R8** (shrinker/optimizer) | **Yes, with memory limits.** | Pure Java but needs 1–3 GB heap for an app with AndroidX. Runs in a separate `:build` process with `largeHeap`; on low-RAM devices Build It reports this and offers a non-minified release build instead of crashing. |
-| **AAPT2** | **Only as a native binary built for Android.** | The Maven `aapt2` artifact contains Linux/macOS/Windows x86 binaries only. Build It must ship `aapt2` compiled for `arm64-v8a` and `x86_64` Android (AOSP sources, Apache 2.0) packaged as `libaapt2.so` in `jniLibs` so it lands in the executable `nativeLibraryDir`. |
+| **AAPT2** | **Only as a native binary built for Android.** | The Maven `aapt2` artifact contains Linux/macOS/Windows x86 binaries only. *Superseded by D13: Build It compiles resources itself in Kotlin and does not ship aapt2.* |
 | **apksig** (APK signing v1–v4) | **Yes**, in-process. | Pure Java (Apache 2.0). |
-| **bundletool** (AAB) | **Yes**, in-process. | Pure Java. Needs AAPT2 `--proto-format` output; same pipeline otherwise. |
+| **bundletool** (AAB) | **Yes**, in-process. | Pure Java. Needs resources in protobuf format (aapt2 `--proto-format`); with D13 that means a protobuf writer in the resource compiler (not done yet). |
 | **Android SDK platform (`android.jar`)** | **Yes**, as a downloaded file. | Needed as the compile classpath. Downloaded from Google after the user accepts the Android SDK License in-app; never bundled. |
 | **Maven dependency resolution** | **Yes**, own implementation. | POM parsing, parent/BOM import, scopes, AAR extraction, "highest version wins" conflict policy, offline cache. Gradle Module Metadata variants (e.g. Kotlin Multiplatform-only libraries) are reported as unsupported in the first version. |
 | **Gradle + AGP** | **Possible, but heavy and fragile; optional mode only.** | Needs an Android build of OpenJDK 17+ (no official one; community builds exist), executed from `nativeLibraryDir` because Android 10+ forbids executing files from app-writable storage (W^X). ~1 GB+ of toolchain and caches, 2 GB+ RAM for the daemon, first build needs network. Distribution through Google Play is a policy risk ("downloading executable code"). |
@@ -178,14 +178,46 @@ text view (piece table, incremental layout) later without touching the view mode
 example, the designer or blocks regenerated it), the editor reports a conflict and lets the user
 overwrite or reload instead of silently overwriting either side.
 
+
+### D13. Resources compiled in Kotlin instead of a native aapt2
+*Context:* the plan (Part A) was to ship aapt2 built from AOSP for Android ABIs. Building aapt2 for
+Android needs the AOSP tree and a native toolchain in CI, and shipping third-party prebuilt
+binaries means trusting their provenance. Native executables are also the part most exposed to
+W^X and Play policy changes.
+*Decision:* `engine:build` contains its own resource compiler written in Kotlin
+(`engine/build/.../res`): it reads the platform's attributes from android.jar's resources.arsc,
+compiles `res/` and the manifest into Android binary XML and resources.arsc (UTF-8 string pools,
+dense type chunks, 64-byte configurations), assigns ids and writes R.java. It covers what Build It
+projects use (values of all common kinds, styles, arrays, plurals, XML files, bitmaps copied as
+they are, common qualifiers) and reports everything else as an error with file and line.
+*Verification:* tests run the SDK's own `aapt2 dump badging|xmltree|resources` on the output and
+check attribute ids, typed values, launchable activity and labels; CI installs the SDK so these
+tests cannot be skipped there.
+*Consequences:* no native code to build or ship; identical behaviour on the JVM (tests) and on
+ART. Not covered yet: `declare-styleable`/`attr`/`public` (needed for libraries), styled strings,
+nine-patch processing, PNG crunching, resource shrinking, and the protobuf format needed for AAB.
+
+### D14. In-process ECJ, D8 and apksig; platforms downloaded from Google
+*Decision:* Java is compiled by ECJ 3.46 in-process. ECJ normally looks for a JDK module image
+(which ART does not have) for Java 9+; Build It overrides that lookup so android.jar is the system
+library, which allows Java 17 source. Lambda/string-concat bootstrap classes missing from
+android.jar are provided by signature-only stubs compiled from source on first use (the role of
+AGP's core-lambda-stubs.jar); they are never packaged. D8 (R8 9.5) converts to DEX with Java 8+
+language desugaring; apksig signs (v1 when minSdk < 24, v2, v3) and verifies the APK like the
+platform. android.jar is downloaded from `dl.google.com/android/repository` using the official
+index, only after the user accepts the Android SDK License shown in the app, and only installed if
+its SHA-1 matches. The debug key is a per-device PKCS#12 keystore created on first build.
+*Consequences:* the app's APK grows noticeably (the R8 jar alone is 21 MB before dexing; to be measured when the APK is first built in Phase 8). Builds run in the app process for now
+(`largeHeap`); a separate build process is planned with Phase 8 performance work.
+
 ---
 
 ## Part C — Risks and mitigations (§20 item 11)
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Kotlin compiler does not run on ART | Medium | High for Kotlin projects | Time-boxed spike first in Phase 6; Java-first block codegen; Gradle mode fallback. |
-| AAPT2 Android binaries (build + license + updates) | Medium | High | Build from AOSP in CI for arm64-v8a/x86_64, pin to Build Tools 36, verify with golden-file tests; document provenance. |
+| Kotlin compiler does not run on ART | Medium | High for Kotlin projects | Spike still open (no ART runtime available in the development environment; planned with the emulator CI job in Phase 8). Until then Kotlin projects stop at the Check step with a clear message; block codegen defaults to Java. |
+| Resource compiler fidelity (D13 replaces aapt2) | Medium | High | Output checked by the SDK's own aapt2 (`dump badging/xmltree/resources`), dexdump and apksigner in tests on every CI run; unsupported inputs fail with a clear message instead of being skipped. |
 | R8/D8 memory on low-end devices | High | Medium | Separate build process, `largeHeap`, memory-class check before build, D8-only fallback, clear messaging. |
 | Google Play policy on downloading toolchains | Medium | High for distribution | Direct-mode tools ship inside the APK (no downloaded executable code); Gradle mode only in non-Play builds. |
 | Scope: the full vision is many months of work | Certain | High | Strict phases with acceptance criteria; nothing marked complete without tests; DEVELOPMENT_STATUS.md kept honest. |

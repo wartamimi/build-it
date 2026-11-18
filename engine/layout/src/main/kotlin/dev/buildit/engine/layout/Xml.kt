@@ -60,13 +60,27 @@ class XmlParseException(message: String, val line: Int, val column: Int) : Excep
  * CDATA, the XML declaration and standard entities. DTDs and processing instructions other than the
  * declaration are rejected. Pure Kotlin so it behaves identically on the JVM and on ART.
  */
-class XmlParser private constructor(private val src: String, private val ids: () -> Long) {
+class XmlParser private constructor(
+    private val src: String,
+    private val ids: () -> Long,
+    /** Records the line of each element's start tag, keyed by uid. */
+    private val lines: MutableMap<Long, Int>? = null,
+    /** Keeps text nodes exactly as written (resource values need their whitespace). */
+    private val rawText: Boolean = false,
+) {
     private var pos = 0
     private var line = 1
     private var col = 1
 
     companion object {
         fun parse(text: String, ids: () -> Long = UidSource()::next): XmlElement = XmlParser(text, ids).document()
+
+        /** Parses keeping raw text nodes and returns each element's line, for compilers and diagnostics. */
+        fun parseDetailed(text: String): DetailedXml {
+            val lines = HashMap<Long, Int>()
+            val root = XmlParser(text, UidSource()::next, lines, rawText = true).document()
+            return DetailedXml(root, lines)
+        }
     }
 
     private fun document(): XmlElement {
@@ -99,13 +113,15 @@ class XmlParser private constructor(private val src: String, private val ids: ()
     }
 
     private fun element(): XmlElement {
+        val startLine = line
+        fun made(e: XmlElement) = e.also { lines?.put(it.uid, startLine) }
         expect('<')
         val name = name()
         val attrs = LinkedHashMap<String, String>()
         while (true) {
             val hadWs = skipWs()
             when {
-                startsWith("/>") -> { advance(2); return XmlElement(ids(), name, attrs) }
+                startsWith("/>") -> { advance(2); return made(XmlElement(ids(), name, attrs)) }
                 startsWith(">") -> { advance(1); break }
                 else -> {
                     if (!hadWs) fail("Expected whitespace before attribute")
@@ -133,7 +149,7 @@ class XmlParser private constructor(private val src: String, private val ids: ()
                     val close = name()
                     if (close != name) fail("Expected </$name> but found </$close>")
                     skipWs(); expect('>')
-                    return XmlElement(ids(), name, attrs, children)
+                    return made(XmlElement(ids(), name, attrs, children))
                 }
                 startsWith("<!--") -> children += comment()
                 startsWith("<![CDATA[") -> {
@@ -148,7 +164,8 @@ class XmlParser private constructor(private val src: String, private val ids: ()
                     val end = src.indexOf('<', pos).let { if (it < 0) src.length else it }
                     val text = src.substring(pos, end)
                     advanceTo(end)
-                    if (text.isNotBlank()) children += XmlText(decode(text.trim()))
+                    if (rawText) children += XmlText(decode(text))
+                    else if (text.isNotBlank()) children += XmlText(decode(text.trim()))
                 }
             }
         }
@@ -206,6 +223,11 @@ class XmlParser private constructor(private val src: String, private val ids: ()
         }
     }
     private fun fail(msg: String): Nothing = throw XmlParseException(msg, line, col)
+}
+
+/** A parsed document with the line of each element (by uid). */
+class DetailedXml(val root: XmlElement, private val lines: Map<Long, Int>) {
+    fun line(e: XmlElement): Int = lines[e.uid] ?: 0
 }
 
 /** Monotonic uid source for one editing session. */

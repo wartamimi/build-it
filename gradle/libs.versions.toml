@@ -1,4 +1,7 @@
 [versions]
+ecj = "3.46.100"
+r8 = "9.5.33"
+apksig = "9.5.1"
 agp = "9.5.1"
 kotlin = "2.4.21"
 ksp = "2.3.14"
@@ -23,6 +26,9 @@ cardview = "1.0.0"
 drawerlayout = "1.2.0"
 
 [libraries]
+ecj = { module = "org.eclipse.jdt:ecj", version.ref = "ecj" }
+r8 = { module = "com.android.tools:r8", version.ref = "r8" }
+apksig = { module = "com.android.tools.build:apksig", version.ref = "apksig" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }

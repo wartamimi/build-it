@@ -1,5 +1,6 @@
 package dev.buildit.studio
 
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -72,5 +73,10 @@ class AppFlowTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Close settings.gradle.kts").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Kotlin").assertExists()
         compose.onNodeWithText("Go to line").assertExists()
+
+        // Build tab: no platform is installed in a fresh app, so it offers the official download.
+        compose.onNodeWithText("Build").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Download platform").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Build debug APK").assertIsNotEnabled()
     }
 }

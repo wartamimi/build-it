@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -45,6 +46,10 @@ import dev.buildit.feature.blocks.R as BlocksR
 import dev.buildit.feature.code.CodeScreen
 import dev.buildit.feature.code.CodeViewModel
 import dev.buildit.feature.code.R as CodeR
+import dev.buildit.feature.build.BuildScreen
+import dev.buildit.feature.build.BuildViewModel
+import dev.buildit.feature.build.R as BuildR
+import dev.buildit.studio.ApkActions
 import dev.buildit.feature.designer.DesignerScreen
 import dev.buildit.feature.designer.DesignerViewModel
 import dev.buildit.feature.designer.R as DesignerR
@@ -152,14 +157,29 @@ fun BuildItApp(container: AppContainer) {
                     val code: CodeViewModel = viewModel(key = "cd-$id", factory = viewModelFactory {
                         initializer { CodeViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers) }
                     })
-                    val tabs = remember(designer, blocks, code) {
+                    val build: BuildViewModel = viewModel(key = "bd-$id", factory = viewModelFactory {
+                        initializer { BuildViewModel(id, container.projectRepository, container.toolchain, container.debugKeystore, container.dispatchers) }
+                    })
+                    val context = LocalContext.current
+                    val tabs = remember(designer, blocks, code, build) {
                         listOf(
-                            WorkspaceExtraTab(title = { stringResource(DesignerR.string.ds_tab) }, content = { leave -> DesignerScreen(designer, onExit = leave) }),
-                            WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_tab) }, content = { leave -> BlocksScreen(blocks, onExit = leave) }),
+                            WorkspaceExtraTab(title = { stringResource(DesignerR.string.ds_tab) }, content = { scope -> DesignerScreen(designer, onExit = scope.leave) }),
+                            WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_tab) }, content = { scope -> BlocksScreen(blocks, onExit = scope.leave) }),
                             WorkspaceExtraTab(
                                 title = { stringResource(CodeR.string.cd_tab) },
-                                content = { leave -> CodeScreen(code, onExit = leave) },
+                                content = { scope -> CodeScreen(code, onExit = scope.leave) },
                                 opens = { path -> CodeViewModel.canOpen(path).also { if (it) code.open(path) } },
+                            ),
+                            WorkspaceExtraTab(
+                                title = { stringResource(BuildR.string.bd_tab) },
+                                content = { scope ->
+                                    BuildScreen(
+                                        build,
+                                        onOpenFile = { path, line -> if (CodeViewModel.canOpen(path)) { code.reveal(path, line); scope.openFile(path) } },
+                                        onInstall = { apk -> ApkActions.install(context, apk) { m -> context.getString(BuildR.string.bd_install_failed, m) } },
+                                        onShare = { apk -> ApkActions.share(context, apk) },
+                                    )
+                                },
                             ),
                         )
                     }
