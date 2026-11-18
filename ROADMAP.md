@@ -12,7 +12,7 @@ are updated (§19). Status details are in [DEVELOPMENT_STATUS.md](DEVELOPMENT_ST
 | 3 | UI designer: layout model, XML parse/serialize, component catalog, drag-and-drop canvas, tree, inspector, live preview | Done (see known gaps) |
 | 4 | Block engine: model, definitions, validation, AST/IR, Java/Kotlin codegen, Canvas renderer, undo/redo | Done (see known gaps) |
 | 5 | Code editor: editor abstraction, Java/Kotlin/XML/JSON/Gradle highlighting, find/replace, tabs, diagnostics | Done (see known gaps) |
-| 6 | Local build engine: Toolchain Manager, Kotlin-on-ART spike, dependency resolver, AAPT2/ECJ/D8/R8, APK/AAB, signing, verification | Partly done: Java projects, with Maven libraries (Phase 9), build to signed, verified APKs on the device; see known gaps (Kotlin, AAB) |
+| 6 | Local build engine: Toolchain Manager, Kotlin-on-ART spike, dependency resolver, AAPT2/ECJ/D8/R8, APK/AAB, signing, verification | Done except AAB: Java and Kotlin projects, with Maven libraries, build to signed, verified APKs on the device (Kotlin since Phase 15); release signing with the user's key; no AAB (D22) |
 | 6b | Gradle compatibility mode (experimental, non-Play builds) | Not started |
 | 7 | AI providers and assistant (reviewed proposals), debug console, runtime log bridge | Done: Claude (official SDK) and OpenAI-compatible providers, reviewed per-file diffs, console bridge in debug builds; not yet run on a device (Phase 8) |
 | 8 | Integration, performance and memory work, compatibility testing, security review, release (APK built and published here) | Done for release: signed GitHub releases from CI, emulator tests of the on-device build, console and UI; performance/memory work and a security review remain |
@@ -22,8 +22,8 @@ are updated (§19). Status details are in [DEVELOPMENT_STATUS.md](DEVELOPMENT_ST
 | 12 | Sketchware parity: components (Intent, FilePicker, Calendar, Vibrator, ObjectAnimator, SoundPool, sensors, TextToSpeech, SpeechToText, RequestNetwork, Notification, date/time pickers, Firebase via libraries) | Done (no built-in Firebase components) |
 | 13 | Sketchware parity: widgets (Spinner, SeekBar, RatingBar, ListView, GridView, VideoView, CalendarView, ...), their events and blocks, and per-screen options (orientation, keyboard, title bar, fullscreen). Custom list item layouts, RecyclerView, drawer and FAB are not built yet | Done |
 | 14 | Sketchware parity: per-attribute property popups, Basic/Recent properties, Collection (reusable blocks, widgets, images, sounds), AppCompat/AndroidX on/off switch in the Library Manager | Done |
-| 15 | On-device Kotlin builder (compile Kotlin sources in the app); Sketchware parity: project managers (custom Java/Kotlin files, AndroidManifest editor, assets, permissions), release signing and AAB | Planned |
-| 16 | Simple app templates for new projects; integration: emulator tests per phase, performance pass, docs, final signed APK | Planned |
+| 15 | On-device Kotlin builder (compile Kotlin sources in the app); Sketchware parity: project managers (custom Java/Kotlin files, AndroidManifest editor, assets, permissions), release signing and AAB | Done: Kotlin and mixed Kotlin/Java projects build on the device (verified on the API 34 emulator), permissions manager, release keys; AAB not built (D22) |
+| 16 | Simple app templates for new projects; integration: emulator tests per phase, performance pass, docs, final signed APK | Done: six app templates in Java and Kotlin (each built in tests, the Java ones run on the emulator), baseline profile, release 0.16.0 |
 
 ## Phase 1 implementation plan (as executed)
 

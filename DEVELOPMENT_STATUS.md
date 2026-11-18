@@ -196,7 +196,7 @@ Known gaps (planned)
   IDEs, but the first on-device confirmation comes with the emulator CI job in Phase 8.
 - Library dependencies (Maven/AAR resolution, AndroidX, Material) are not supported yet; neither
   are the AndroidX/Material components in the designer's palette when building on the device.
-- Kotlin sources: not compiled on the device yet (Kotlin-on-ART spike still open, D14/risks).
+- Kotlin sources: compiled on the device since Phase 15 (D22).
 - No AAB output; no release signing UI (the engine can sign with a PKCS#12 key); no R8
   shrinking; no incremental builds (every build is a full build, a few seconds for small apps).
 - Java library APIs newer than minSdk (e.g. `List.of` below API 30) are not desugared; only
@@ -437,10 +437,51 @@ Not done / limits
 - Collected widgets keep their attributes as they are: a widget that uses a string, colour or image
   resource of another project needs that resource in the new project too.
 
+## Phase 15 — Kotlin on the device, permissions, release keys (owner request)
+
+Done
+- Kotlin builder: projects with Kotlin sources (and mixed Kotlin/Java) build on the device. The
+  Kotlin compiler 2.4.21 is downloaded from Maven Central on the first Kotlin build (about 60 MB),
+  converted to DEX once and cached; JDK APIs Android lacks are redirected to small stand-ins (D22).
+  Kotlin errors open in the editor at the line. Verified on the API 34 emulator: a Kotlin project
+  (data class, ranges, lambdas) built on the device, installed and ran.
+- Permissions manager in Project settings: common permissions as switches, any other by name.
+  Saving project settings no longer drops libraries, permissions or the AppCompat switch (bug fix).
+- Release APK: create a signing key in the app or import a PKCS#12 keystore, choose it per
+  project, build a release APK signed with it, export the keystore as a backup, remove it.
+  Keystores stay in app storage (never in a project); passwords only in the Keystore-encrypted
+  store.
+- Maven downloads retry when the server answers "busy" (429/503).
+- Custom Java/Kotlin files, AndroidManifest.xml and assets: edited in the Files tool; the build
+  compiles every source file and packs `assets/`. A hand-edited manifest is kept and reported, not
+  regenerated.
+
+Not done / limits
+- No AAB (App Bundle): it needs aapt2's protobuf resource format (D22).
+- The first Kotlin build prepares the compiler and takes several minutes; later builds reuse it.
+- JKS keystores must be converted to PKCS#12 first (Android cannot read JKS).
+
+## Phase 16 — App templates, emulator tests, smoothness (owner request)
+
+Done
+- New project: choose Java or Kotlin and start from an empty screen or one of six small apps:
+  Counter, Calculator, To-do list (saved), Notes (saved), Stopwatch (timer) and Dice. Each is a
+  normal layout plus blocks, so it opens in the designer and the block editor.
+- Tests: every template builds into an APK in Java and in Kotlin through the real pipeline; on the
+  emulator every Java template builds on the device, installs and starts without a crash; the
+  Kotlin device build is covered as above.
+- Fix found by the templates: generated Kotlin set the text of an EditText with `.text =`, which
+  does not compile; it now uses setText.
+- Baseline profile for all of Build It's code, so installs from GitHub get it compiled ahead of
+  time (smoother first launches of the editors and the block canvas).
+
+Not done / limits
+- No benchmark numbers yet; smoothness was not measured on a physical device.
+
 ## Build status
 
 - `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:deps:test :engine:ai:test` —
-  passing locally (162 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
+  passing locally (169 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
 - APK: CI publishes a signed GitHub release for each push to main. Emulator job: on-device build, install and console pass.
 
@@ -472,6 +513,11 @@ Not done / limits
 | engine:build ResourceCompilerTest (checked with the SDK's aapt2; values, qualifiers, errors with lines) | 3 | pass |
 | engine:build BuildPipelineTest (signed APK accepted by aapt2, dexdump, apksigner; console bridge only in debug builds; Java errors; unsupported inputs; cancel) | 5 | pass |
 | engine:build ToolchainTest (official index format, SHA-1 check, cancel) | 3 | pass |
+| engine:build KotlinBuildTest (mixed Kotlin/Java project with the real compiler; Kotlin error lines) | 2 | pass |
+| engine:build ReleaseKeyringTest (create, import with password/alias checks, JKS refused, release APK signed with the chosen key, no passwords in files) | 3 | pass |
+| engine:build AppTemplatesBuildTest (all six app templates build in Java and in Kotlin) | 2 | pass |
+| feature:build RelocationTest (same-length renames, stand-ins present) | 1 | pass |
+| feature:workspace SettingsDraftTest (settings keep libraries and AppCompat; permissions) | 2 | pass |
 | feature:build BuildViewModelTest (license before download, real build, failed step) | 3 | pass |
 | engine:ai AnthropicAiClientTest (official SDK against a local server: streaming, request body, auth error, cancel) | 3 | pass |
 | engine:ai OpenAiCompatibleClientTest (streaming, usage, no-key requests, provider errors) | 2 | pass |
@@ -493,7 +539,6 @@ Not done / limits
 
 ## Next
 
-Phase 8: integration and an emulator CI job that runs the on-device build, the console bridge and
-the Keystore store on ART (including the Kotlin-on-ART spike), performance and memory work, a
-security review, then building and publishing the APK. The remaining Phase 6 items
-(dependencies, Kotlin, AAB, release signing UI) are tracked above.
+The owner's Sketchware-parity plan (Phases 11–16) is complete. Open items: AAB output, custom list
+item layouts and RecyclerView, measured performance work on a physical device, and a formal
+security review.

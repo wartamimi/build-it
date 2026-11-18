@@ -9,4 +9,5 @@ android {
 dependencies {
     api(project(":engine:build"))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.r8)
 }

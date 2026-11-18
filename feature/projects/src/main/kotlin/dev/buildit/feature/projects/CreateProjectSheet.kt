@@ -2,13 +2,12 @@ package dev.buildit.feature.projects
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,12 +17,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import dev.buildit.core.designsystem.component.BiBottomSheet
 import dev.buildit.core.designsystem.component.BiButton
 import dev.buildit.core.designsystem.component.BiButtonStyle
 import dev.buildit.core.designsystem.component.BiTextField
 import dev.buildit.core.designsystem.theme.Spacing
+import dev.buildit.engine.blocks.AppTemplates
 import dev.buildit.engine.project.ProjectTemplate
 import dev.buildit.engine.project.ProjectTemplates
 import dev.buildit.engine.project.ProjectValidation
@@ -39,7 +38,9 @@ fun CreateProjectSheet(
     var name by remember { mutableStateOf("") }
     var pkg by remember { mutableStateOf("") }
     var pkgEdited by remember { mutableStateOf(false) }
-    var template by remember { mutableStateOf(ProjectTemplates.EmptyActivity) }
+    var language by remember { mutableStateOf(SourceLanguage.Java) }
+    var kind by remember { mutableStateOf<AppTemplates.Kind?>(null) }
+    val template = kind?.let { AppTemplates.of(it, language) } ?: if (language == SourceLanguage.Java) ProjectTemplates.EmptyActivity else ProjectTemplates.EmptyActivityKotlin
     var attempted by remember { mutableStateOf(false) }
 
     val effectivePkg = if (pkgEdited) pkg else "com.example." + ProjectValidation.suggestPackageSegment(name)
@@ -60,25 +61,21 @@ fun CreateProjectSheet(
                 monospace = true,
             )
             Text(stringResource(R.string.projects_field_language), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
-            Column(Modifier.selectableGroup()) {
-                ProjectTemplates.all.forEach { t ->
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .selectable(selected = t == template, role = Role.RadioButton, onClick = { template = t })
-                            .padding(vertical = Spacing.sm),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = t == template, onClick = null)
-                        Column(Modifier.padding(start = Spacing.md)) {
-                            Text(
-                                stringResource(if (t.language == SourceLanguage.Java) R.string.projects_template_java else R.string.projects_template_kotlin),
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                            Text(stringResource(R.string.projects_template_empty_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SourceLanguage.entries.forEach { l ->
+                    FilterChip(selected = l == language, onClick = { language = l }, label = { Text(if (l == SourceLanguage.Java) "Java" else "Kotlin") })
                 }
             }
+            if (language == SourceLanguage.Kotlin) {
+                Text(stringResource(R.string.projects_kotlin_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(stringResource(R.string.projects_field_template), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                (listOf<AppTemplates.Kind?>(null) + AppTemplates.Kind.entries).forEach { k ->
+                    FilterChip(selected = k == kind, onClick = { kind = k }, label = { Text(stringResource(templateTitle(k))) })
+                }
+            }
+            Text(stringResource(templateDescription(kind)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Row(Modifier.fillMaxWidth().padding(top = Spacing.lg), horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End)) {
             BiButton(stringResource(R.string.projects_cancel), onDismiss, style = BiButtonStyle.Text)
@@ -88,4 +85,24 @@ fun CreateProjectSheet(
             })
         }
     }
+}
+
+private fun templateTitle(k: AppTemplates.Kind?) = when (k) {
+    null -> R.string.projects_template_empty
+    AppTemplates.Kind.Counter -> R.string.projects_template_counter
+    AppTemplates.Kind.Calculator -> R.string.projects_template_calculator
+    AppTemplates.Kind.Todo -> R.string.projects_template_todo
+    AppTemplates.Kind.Notes -> R.string.projects_template_notes
+    AppTemplates.Kind.Stopwatch -> R.string.projects_template_stopwatch
+    AppTemplates.Kind.Dice -> R.string.projects_template_dice
+}
+
+private fun templateDescription(k: AppTemplates.Kind?) = when (k) {
+    null -> R.string.projects_template_empty_desc
+    AppTemplates.Kind.Counter -> R.string.projects_template_counter_desc
+    AppTemplates.Kind.Calculator -> R.string.projects_template_calculator_desc
+    AppTemplates.Kind.Todo -> R.string.projects_template_todo_desc
+    AppTemplates.Kind.Notes -> R.string.projects_template_notes_desc
+    AppTemplates.Kind.Stopwatch -> R.string.projects_template_stopwatch_desc
+    AppTemplates.Kind.Dice -> R.string.projects_template_dice_desc
 }

@@ -37,7 +37,7 @@ class UiDeviceTest {
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("App name") and hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
         val name = "Ui Check ${System.currentTimeMillis() % 100000}"
         compose.onAllNodes(hasText("App name") and hasSetTextAction()).onFirst().performTextInput(name)
-        compose.onNodeWithText("Create").performClick()
+        compose.onNodeWithText("Create").performScrollTo().performClick()
         compose.waitUntil(30_000) { compose.onAllNodesWithText("activity_main.xml ▾").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onAllNodes(hasText("Events") and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).onFirst().performClick()

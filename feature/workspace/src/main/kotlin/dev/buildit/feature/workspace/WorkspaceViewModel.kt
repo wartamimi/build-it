@@ -30,17 +30,20 @@ data class SettingsDraft(
     val minSdk: String,
     val targetSdk: String,
     val compileSdk: String,
+    /** Manifest permissions, full names. */
+    val permissions: List<String> = emptyList(),
 ) {
+    /** The manifest with these settings; everything the form does not show (libraries, AppCompat, screens) is kept. */
     fun toManifest(base: ProjectManifest): ProjectManifest? {
-        val app = AppConfig(
+        val app = base.app.copy(
             packageName = packageName.trim(),
             versionCode = versionCode.toIntOrNull() ?: return null,
             versionName = versionName.trim(),
             minSdk = minSdk.toIntOrNull() ?: return null,
             targetSdk = targetSdk.toIntOrNull() ?: return null,
             compileSdk = compileSdk.toIntOrNull() ?: return null,
-            language = base.app.language,
             namespace = base.app.effectiveNamespace,
+            permissions = permissions.distinct().sorted(),
         )
         return base.copy(name = name.trim(), app = app)
     }
@@ -49,7 +52,22 @@ data class SettingsDraft(
         fun from(m: ProjectManifest) = SettingsDraft(
             m.name, m.app.packageName, m.app.versionCode.toString(), m.app.versionName,
             m.app.minSdk.toString(), m.app.targetSdk.toString(), m.app.compileSdk.toString(),
+            m.app.permissions,
         )
+
+        /** Permissions offered as switches; others can be typed in. */
+        val commonPermissions = listOf(
+            "android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE", "android.permission.CAMERA",
+            "android.permission.RECORD_AUDIO", "android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION",
+            "android.permission.READ_MEDIA_IMAGES", "android.permission.READ_MEDIA_AUDIO", "android.permission.READ_MEDIA_VIDEO",
+            "android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE", "android.permission.VIBRATE",
+            "android.permission.POST_NOTIFICATIONS", "android.permission.WAKE_LOCK", "android.permission.RECEIVE_BOOT_COMPLETED",
+            "android.permission.FOREGROUND_SERVICE", "android.permission.CALL_PHONE", "android.permission.READ_CONTACTS",
+            "android.permission.SEND_SMS", "android.permission.BLUETOOTH_CONNECT",
+        )
+
+        private val permissionName = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+")
+        fun isPermissionName(s: String) = permissionName.matches(s)
     }
 }
 

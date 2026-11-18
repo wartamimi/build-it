@@ -60,7 +60,7 @@ class AppFlowTest {
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("App name") and hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodes(hasText("App name") and hasSetTextAction()).onFirst().performTextInput("Hello World")
         compose.onNodeWithText("com.example.helloworld").assertIsDisplayed()
-        compose.onNodeWithText("Create").performClick()
+        compose.onNodeWithText("Create").performScrollTo().performClick()
         // The workspace opens on the Design tab with the launcher activity's layout.
         compose.waitUntil(15_000) { compose.onAllNodesWithText("activity_main.xml ▾").fetchSemanticsNodes().isNotEmpty() }
 

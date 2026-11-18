@@ -90,4 +90,8 @@
     <string name="as_save_to_collection">Simpan ke koleksi</string>
     <string name="as_saved_to_collection">%1$s disimpan ke koleksi</string>
     <string name="as_error_collection_exists">Koleksi sudah punya file dengan nama ini</string>
+    <string name="ws_section_permissions">Izin</string>
+    <string name="ws_permissions_hint">Ditulis ke AndroidManifest.xml. Komponen menambahkan izin yang diperlukan saat bloknya disimpan.</string>
+    <string name="ws_permission_other">Izin lain</string>
+    <string name="ws_permission_add">Tambah</string>
 </resources>

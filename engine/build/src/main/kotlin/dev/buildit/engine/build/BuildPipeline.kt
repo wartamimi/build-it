@@ -29,8 +29,10 @@ data class BuildRequest(
     val toolCache: File? = null,
     /** Debug builds connect to this console host (see [DebugBridge]); null leaves the bridge out. */
     val console: DebugBridge.Host? = null,
-    /** Where libraries are downloaded and kept; needed when the project has libraries. */
+    /** Where libraries are downloaded and kept; needed when the project has libraries or Kotlin sources. */
     val maven: MavenCache? = null,
+    /** Loads the Kotlin compiler; needed when the project has Kotlin sources. */
+    val kotlin: KotlinCompilerHost? = null,
 )
 
 sealed interface BuildEvent {
@@ -51,7 +53,8 @@ class BuildCancelledException : Exception("Build cancelled")
 
 /**
  * The on-device build: check sources -> compile resources (Kotlin, no aapt2) -> generate R and
- * BuildConfig -> compile Java (ECJ) -> dex (D8) -> package -> sign (apksig) -> verify. Every step
+ * BuildConfig -> compile Kotlin (kotlinc, when there are .kt files) and Java (ECJ) -> dex (D8) ->
+ * package -> sign (apksig) -> verify. Every step
  * is real; any failure stops the build with diagnostics pointing at project files.
  *
  * Outputs go to `<project>/build/buildit/`; the APK is `build/outputs/<name>-<type>.apk`.
@@ -80,11 +83,13 @@ class BuildPipeline(private val frameworkCache: (File) -> FrameworkResources = :
 
         return try {
             // 1. Check what the on-device builder supports before doing any work.
+            var kotlinSources = emptyList<File>()
             val sources = step(BuildStep.Check) {
                 val javaDirs = listOf(File(main, "java"), File(main, "kotlin")).filter { it.isDirectory }
                 val all = javaDirs.flatMap { dir -> dir.walkTopDown().filter { it.isFile }.toList() }
-                all.filter { it.name.endsWith(".kt") }.forEach {
-                    d.error("Kotlin sources are not supported by the on-device builder yet; use Java for this project or build it with Android Studio", rel(it))
+                kotlinSources = all.filter { it.name.endsWith(".kt") }
+                if (kotlinSources.isNotEmpty() && (request.kotlin == null || request.maven == null)) {
+                    d.error("This build has no Kotlin compiler configured", rel(kotlinSources.first()))
                 }
                 val declared = app.dependencies.filter { it.enabled }.map { it.coordinate }.toSet()
                 dependencies(module).forEach { (dep, line, file) ->
@@ -95,12 +100,14 @@ class BuildPipeline(private val frameworkCache: (File) -> FrameworkResources = :
                 all.filter { it.name.endsWith(".java") }
             }
             if (d.hasErrors) return fail()
-            onEvent(BuildEvent.Log("${sources.size} Java file(s)"))
+            onEvent(BuildEvent.Log("${sources.size} Java file(s)" + if (kotlinSources.isEmpty()) "" else ", ${kotlinSources.size} Kotlin file(s)"))
 
             // 1b. Libraries: resolve (from the local cache, downloading what is missing) and unpack.
             val toolCache = request.toolCache ?: File(project, "build/buildit/tools")
             val libraries = step(BuildStep.Libraries) {
-                val roots = app.dependencies.filter { it.enabled }.mapNotNull { Coordinate.parse(it.coordinate) }
+                val declaredRoots = app.dependencies.filter { it.enabled }.mapNotNull { Coordinate.parse(it.coordinate) }
+                // Kotlin code needs the Kotlin standard library at run time
+                val roots = if (kotlinSources.isNotEmpty() && declaredRoots.none { it.module == KotlinCompiler.stdlib.module }) declaredRoots + KotlinCompiler.stdlib else declaredRoots
                 if (roots.isEmpty()) return@step emptyList()
                 val maven = request.maven ?: run { d.error("This build has no library cache configured"); return@step emptyList() }
                 val resolution = try {
@@ -155,8 +162,20 @@ class BuildPipeline(private val frameworkCache: (File) -> FrameworkResources = :
                     extra += bridge
                 }
                 classes.deleteRecursively()
+                if (kotlinSources.isNotEmpty()) {
+                    val resolution = try {
+                        Resolver(request.maven!!).resolve(listOf(KotlinCompiler.compiler) + request.kotlin!!.extraLibraries, progress = { onEvent(BuildEvent.Log(it)) }, isCancelled = isCancelled)
+                    } catch (_: ResolveCancelledException) { throw BuildCancelledException() }
+                    resolution.problems.forEach { d.error("Kotlin compiler: $it") }
+                    if (d.hasErrors) return@step false
+                    onEvent(BuildEvent.Log("Kotlin ${KotlinCompiler.VERSION}: preparing the compiler"))
+                    val loader = request.kotlin!!.classLoader(resolution.artifacts.map { it.file }, { onEvent(BuildEvent.Log(it)) }, isCancelled)
+                    if (isCancelled()) throw BuildCancelledException()
+                    onEvent(BuildEvent.Log("Compiling ${kotlinSources.size} Kotlin file(s)"))
+                    if (!KotlinCompiler.compile(loader, kotlinSources, sources + extra, listOf(request.androidJar) + libJars, classes, d, ::rel)) return@step false
+                }
                 val stubs = LambdaStubs.classes(request.androidJar, request.toolCache ?: File(project, "build/buildit/tools"))
-                JavaCompiler.compile(sources + extra, request.androidJar, classes, d, ::rel, stubs, libJars)
+                JavaCompiler.compile(sources + extra, request.androidJar, classes, d, ::rel, stubs, libJars + if (kotlinSources.isNotEmpty()) listOf(classes) else emptyList())
             }.let { ok -> if (!ok || d.hasErrors) return fail() }
 
             // 4. Dex.

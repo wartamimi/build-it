@@ -180,7 +180,7 @@ fun BuildItApp(container: AppContainer) {
                         initializer { CodeViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers) }
                     })
                     val build: BuildViewModel = viewModel(key = "bd-$id", factory = viewModelFactory {
-                        initializer { BuildViewModel(id, container.projectRepository, container.toolchain, container.debugKeystore, container.dispatchers, console = container.consoleHost, maven = container.maven) }
+                        initializer { BuildViewModel(id, container.projectRepository, container.toolchain, container.debugKeystore, container.dispatchers, console = container.consoleHost, maven = container.maven, kotlin = container.kotlinCompiler, keyring = container.releaseKeys) }
                     })
                     val libraries: LibrariesViewModel = viewModel(key = "lb-$id", factory = viewModelFactory {
                         initializer { LibrariesViewModel(id, container.projectRepository, container.maven, container.dispatchers) }

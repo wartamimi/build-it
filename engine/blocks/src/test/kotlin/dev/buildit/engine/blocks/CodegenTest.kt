@@ -65,7 +65,7 @@ class CodegenTest {
             "button1.setOnClickListener { onButton1Click() }",
             "for (i1 in 0 until 3.0.toInt()) {",
             "name = \"Ada \\\"\\$\\\" \\\\ \\n\"",
-            "greeting.text = \"Count: \" + formatNumber(count)",
+            "greeting.setText(\"Count: \" + formatNumber(count))",
             "startActivity(Intent(this, SettingsActivity::class.java))",
             "photo.visibility = View.GONE",
             "count += 1.0",

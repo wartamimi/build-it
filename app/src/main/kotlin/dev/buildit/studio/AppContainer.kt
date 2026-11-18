@@ -37,8 +37,26 @@ class AppContainer(context: Context) {
     /** Blocks, widgets, images and sounds saved once and reused in every project. */
     val collection: dev.buildit.engine.project.CollectionStore by lazy { dev.buildit.engine.project.CollectionStore(File(appContext.filesDir, "collection")) }
 
+    /** Runs the Kotlin compiler (downloaded from Maven Central, converted to DEX once) for Kotlin projects. */
+    val kotlinCompiler: dev.buildit.engine.build.KotlinCompilerHost by lazy {
+        dev.buildit.feature.build.AndroidKotlinCompilerHost(File(toolchainDir, "kotlin"), androidJar = { toolchain.installedApis().lastOrNull()?.let(toolchain::androidJar) })
+    }
+
     /** AI provider settings; the API key itself is kept encrypted by the Android Keystore. */
     val aiSettings: AiSettingsStore by lazy { AiSettingsStore(File(appContext.filesDir, "ai/config.json"), KeystoreSecretStore(appContext)) }
+
+    /**
+     * Release signing keys: keystores in app-private storage (never in a project), passwords
+     * encrypted by the Android Keystore in the same store as AI keys.
+     */
+    val releaseKeys: dev.buildit.engine.build.ReleaseKeyring by lazy {
+        val secrets = KeystoreSecretStore(appContext)
+        dev.buildit.engine.build.ReleaseKeyring(File(appContext.filesDir, "release-keys"), object : dev.buildit.engine.build.PasswordStore {
+            override fun read(name: String) = secrets.read(name)
+            override fun write(name: String, value: String) = secrets.write(name, value)
+            override fun delete(name: String) = secrets.delete(name)
+        })
+    }
 
     /** Debug builds send their logs here (see the console provider in feature:console). */
     val consoleHost = DebugBridge.Host(appContext.packageName, appContext.packageName + ".console")

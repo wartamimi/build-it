@@ -31,8 +31,6 @@
     <string name="projects_field_package">Nama paket</string>
     <string name="projects_field_package_hint">ID unik aplikasi, mis. com.namaanda.app</string>
     <string name="projects_field_language">Template</string>
-    <string name="projects_template_java">Activity Kosong (Java)</string>
-    <string name="projects_template_kotlin">Activity Kosong (Kotlin)</string>
     <string name="projects_template_empty_desc">Satu layar dengan sebuah label teks</string>
     <string name="projects_msg_created">“%1$s” dibuat</string>
     <string name="projects_msg_imported">“%1$s” diimpor</string>
@@ -54,4 +52,19 @@
     <string name="projects_restore_confirm_title">Pulihkan cadangan ini?</string>
     <string name="projects_restore_confirm_body">Proyek akan kembali ke cadangan ini. Kondisi saat ini disimpan dulu sebagai cadangan baru, jadi bisa dibatalkan.</string>
     <string name="projects_msg_restored">Cadangan dipulihkan</string>
+    <string name="projects_field_template">Mulai dari</string>
+    <string name="projects_kotlin_hint">Proyek Kotlin mengunduh compiler Kotlin (sekitar 60 MB) saat pertama kali di-build.</string>
+    <string name="projects_template_empty">Layar kosong</string>
+    <string name="projects_template_counter">Penghitung</string>
+    <string name="projects_template_counter_desc">Tombol tambah, kurang dan reset dengan sebuah variabel</string>
+    <string name="projects_template_calculator">Kalkulator</string>
+    <string name="projects_template_calculator_desc">Dua angka dan empat operasi, dengan pemeriksaan input</string>
+    <string name="projects_template_todo">Daftar tugas</string>
+    <string name="projects_template_todo_desc">Daftar yang tersimpan; ketuk tugas untuk menghapusnya</string>
+    <string name="projects_template_notes">Catatan</string>
+    <string name="projects_template_notes_desc">Satu catatan yang tetap tersimpan saat aplikasi dibuka lagi</string>
+    <string name="projects_template_stopwatch">Stopwatch</string>
+    <string name="projects_template_stopwatch_desc">Mulai, berhenti dan reset dengan komponen timer</string>
+    <string name="projects_template_dice">Dadu</string>
+    <string name="projects_template_dice_desc">Angka acak dan jumlah lemparan</string>
 </resources>

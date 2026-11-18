@@ -17,40 +17,42 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.rememberDrawerState
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.graphics.vector.ImageVector
-import kotlinx.coroutines.launch
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -69,6 +71,7 @@ import dev.buildit.core.designsystem.theme.CodeTypography
 import dev.buildit.core.designsystem.theme.Spacing
 import dev.buildit.engine.project.ProjectEntry
 import dev.buildit.engine.project.ValidationIssue
+import kotlinx.coroutines.launch
 
 @Composable
 fun WorkspaceScreen(
@@ -262,6 +265,7 @@ private fun ProjectSettingsTab(state: WorkspaceUiState, vm: WorkspaceViewModel) 
                     Modifier.weight(1f), keyboardType = KeyboardType.Number)
             }
             issue("number")?.let { Text(it.text(), color = MaterialTheme.colorScheme.error) }
+            PermissionsSection(d.permissions) { list -> vm.editDraft { it.copy(permissions = list) } }
             Row(Modifier.fillMaxWidth().padding(top = Spacing.lg), horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End)) {
                 BiButton(stringResource(R.string.ws_discard_changes), vm::discardDraft, style = BiButtonStyle.Text, enabled = state.dirty)
                 BiButton(stringResource(R.string.ws_save), { vm.save() }, enabled = state.dirty && state.issues.isEmpty(), loading = state.saving)
@@ -271,6 +275,32 @@ private fun ProjectSettingsTab(state: WorkspaceUiState, vm: WorkspaceViewModel) 
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = Spacing.sm),
             )
+        }
+    }
+}
+
+/** Manifest permissions: common ones as switches, any other by name. */
+@Composable
+private fun PermissionsSection(selected: List<String>, onChange: (List<String>) -> Unit) {
+    BiSectionHeader(stringResource(R.string.ws_section_permissions))
+    Text(stringResource(R.string.ws_permissions_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val all = (SettingsDraft.commonPermissions + selected).distinct()
+    all.forEach { p ->
+        val on = p in selected
+        Row(
+            Modifier.fillMaxWidth().toggleable(on, role = Role.Switch) { onChange(if (on) selected - p else selected + p) }.padding(vertical = Spacing.xxs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(p.removePrefix("android.permission."), style = CodeTypography.small, modifier = Modifier.weight(1f))
+            Switch(checked = on, onCheckedChange = null)
+        }
+    }
+    var custom by remember { mutableStateOf("") }
+    val name = custom.trim().let { if ('.' in it) it else "android.permission.$it" }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        BiTextField(custom, { custom = it }, stringResource(R.string.ws_permission_other), Modifier.weight(1f), monospace = true)
+        TextButton(enabled = custom.isNotBlank() && SettingsDraft.isPermissionName(name) && name !in selected, onClick = { onChange(selected + name); custom = "" }) {
+            Text(stringResource(R.string.ws_permission_add))
         }
     }
 }

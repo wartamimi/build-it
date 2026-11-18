@@ -73,6 +73,7 @@ fun BuildScreen(
                 }
                 Text(stringResource(R.string.bd_saved_files_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.xs))
             }
+            if (viewModel.releaseAvailable) item { ReleaseCard(s, viewModel) }
             if (s.steps.isNotEmpty()) item { Steps(s.steps) }
             if (!s.running && s.steps.isNotEmpty()) item { ResultCard(s, onInstall, onShare) }
             val errors = s.diagnostics

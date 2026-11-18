@@ -2,6 +2,7 @@ package dev.buildit.core.designsystem.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -142,7 +143,7 @@ fun BiConfirmDialog(
 @Composable
 fun BiBottomSheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.xl).padding(bottom = Spacing.xl), content = content)
+        Column(Modifier.fillMaxWidth().then(Modifier).verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(horizontal = Spacing.xl).padding(bottom = Spacing.xl), content = content)
     }
 }
 
