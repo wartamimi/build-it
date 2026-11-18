@@ -207,6 +207,63 @@ class DeviceTests {
         }
     }
 
+    /** Kotlin sources: the compiler is downloaded, converted to DEX and run on ART. */
+    @Test fun kotlinProjectBuildsAndRunsOnTheDevice() = runBlocking {
+        val pkg = "com.example.ktcheck"
+        val repo = container.projectRepository
+        val toolchain = container.toolchain
+        val summary = repo.create("Kt Check", pkg, dev.buildit.engine.project.ProjectTemplates.EmptyActivityKotlin)
+        try {
+            val project = repo.open(summary.id)
+            val api = project.manifest.app.compileSdk
+            if (toolchain.androidJar(api) == null) {
+                val index = toolchain.fetchIndex()
+                val platform = index.platform(api) ?: error("API $api not in Google's index")
+                platform.licenseId?.let { id -> toolchain.acceptLicense(id, index.licenses.getValue(id)) }
+                toolchain.install(platform)
+            }
+            File(project.directory, "app/src/main/kotlin/com/example/ktcheck/MainActivity.kt").writeText(
+                """
+                package com.example.ktcheck
+
+                import android.app.Activity
+                import android.os.Bundle
+                import android.util.Log
+
+                data class Check(val name: String, val n: Int)
+
+                class MainActivity : Activity() {
+                    override fun onCreate(savedInstanceState: Bundle?) {
+                        super.onCreate(savedInstanceState)
+                        setContentView(R.layout.activity_main)
+                        val c = Check("kotlin", 3)
+                        Log.i("KtCheck", (1..c.n).joinToString(",") { "${'$'}{c.name}${'$'}it" })
+                    }
+                }
+                """.trimIndent() + "\n",
+            )
+            val log = mutableListOf<String>()
+            val start = System.nanoTime()
+            val result = BuildPipeline().run(
+                BuildRequest(project.directory, project.manifest.app, toolchain.androidJar(api)!!, BuildType.Debug,
+                    key = { Keys.debugKey(container.debugKeystore) }, toolCache = toolchain.cacheDir, console = container.consoleHost,
+                    maven = container.maven, kotlin = container.kotlinCompiler),
+                { e -> if (e is dev.buildit.engine.build.BuildEvent.Log) { log += e.text; Log.i("DeviceTests", e.text) } },
+            )
+            Log.i("DeviceTests", "On-device Kotlin build took ${(System.nanoTime() - start) / 1_000_000} ms")
+            assertTrue(result.diagnostics.filter { it.severity == dev.buildit.engine.build.BuildDiagnostic.Severity.Error }.take(20).joinToString("\n") + "\n" + log.takeLast(5), result.success)
+            val out = install(result.apk!!)
+            assertTrue(out, out.contains("Success"))
+            shell("am start -W -n $pkg/.MainActivity")
+            waitFor("the app's log line", 60_000) { entries(pkg).any { it.tag == "KtCheck" && it.text == "kotlin1,kotlin2,kotlin3" } }
+            val crash = entries(pkg).firstOrNull { it.level == ConsoleLevel.Crash }
+            assertNull(crash?.text, crash)
+        } finally {
+            shell("pm uninstall $pkg")
+            repo.delete(summary.id)
+        }
+    }
+
     @Test fun apiKeysAreEncryptedWithTheKeystore() {
         val store = KeystoreSecretStore(instrumentation.targetContext)
         store.write("test-key", "sk-ant-secret-value")
