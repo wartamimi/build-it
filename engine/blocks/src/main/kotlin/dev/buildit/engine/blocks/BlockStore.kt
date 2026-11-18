@@ -61,7 +61,7 @@ object BlockSync {
         if (BlockValidator.hasErrors(diagnostics)) return Result.Invalid(diagnostics)
         val activity = manifest.modules.flatMap { it.activities }.firstOrNull { it.name == doc.activity }
             ?: return Result.Invalid(listOf(BlockDiagnostic(null, BlockDiagnostic.Severity.Error, "unknown_activity", doc.activity)))
-        val program = Lowering.lower(doc, ctx, ActivityTarget(manifest.app.effectiveNamespace, activity.name, activity.layout))
+        val program = Lowering.lower(doc, ctx, ActivityTarget(manifest.app.effectiveNamespace, activity.name, activity.layout, manifest.app.appCompat))
         val code = Backend.of(manifest.app.language).generate(program)
         return Result.Generated(sourcePath(manifest, doc.activity), code, written = false)
     }

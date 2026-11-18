@@ -7,6 +7,8 @@ sealed interface LayoutCommand {
     data class Remove(val uid: Long) : LayoutCommand
     data class SetAttribute(val uid: Long, val name: String, val value: String?) : LayoutCommand
     data class Duplicate(val uid: Long) : LayoutCommand
+    /** Inserts a copy of [element] and its children (e.g. a widget from the collection), with fresh ids. */
+    data class InsertTree(val parentUid: Long, val index: Int, val element: XmlElement) : LayoutCommand
 }
 
 class LayoutEditException(val code: String, message: String) : Exception(message)
@@ -106,6 +108,7 @@ class LayoutEditor(initial: XmlElement, private val uids: UidSource = UidSource(
             val updated = root.replace(c.uid) { it.withAttribute(c.name, value) }!!
             ensureNamespaces(updated, updated.find(c.uid)!!)
         }
+        is LayoutCommand.InsertTree -> insertTree(root, c)
         is LayoutCommand.Duplicate -> {
             if (c.uid == root.uid) throw LayoutEditException("duplicate_root", "The root element can't be duplicated")
             val el = root.find(c.uid) ?: throw LayoutEditException("not_found", "Element not found")
@@ -116,6 +119,18 @@ class LayoutEditor(initial: XmlElement, private val uids: UidSource = UidSource(
             lastCreatedUid = copy.uid
             insertChild(root, parent.uid, parent.elements.indexOfFirst { it.uid == c.uid } + 1, copy)
         }
+    }
+
+    private fun insertTree(root: XmlElement, c: LayoutCommand.InsertTree): XmlElement {
+        val parent = root.find(c.parentUid) ?: throw LayoutEditException("no_parent", "Parent not found")
+        checkCanAccept(parent, extra = 1)
+        fun strip(e: XmlElement): XmlElement = e.copy(
+            attributes = LinkedHashMap(e.attributes.filterKeys { !it.startsWith("xmlns") }),
+            children = e.children.map { if (it is XmlElement) strip(it) else it },
+        )
+        val copy = deepCopy(strip(c.element), allIds(root).toMutableSet())
+        lastCreatedUid = copy.uid
+        return ensureNamespaces(insertChild(root, c.parentUid, c.index.coerceIn(0, parent.elements.size), copy), copy)
     }
 
     private fun checkCanAccept(parent: XmlElement, extra: Int) {
@@ -181,11 +196,23 @@ class LayoutEditor(initial: XmlElement, private val uids: UidSource = UidSource(
         }
 
         /** Adds xmlns:app on the root when an app: attribute is used anywhere. */
+        /** [element] and its children as a standalone XML document (for the collection). */
+        fun subtreeXml(element: XmlElement): String {
+            val attrs = LinkedHashMap<String, String>()
+            attrs["xmlns:android"] = Attr.NS_ANDROID
+            if (element.walk().any { e -> e.attributes.keys.any { it.startsWith("app:") } }) attrs["xmlns:app"] = Attr.NS_APP
+            if (element.walk().any { e -> e.attributes.keys.any { it.startsWith("tools:") } }) attrs["xmlns:tools"] = Attr.NS_TOOLS
+            element.attributes.filterKeys { !it.startsWith("xmlns") }.forEach { (k, v) -> attrs[k] = v }
+            return XmlWriter.write(element.copy(attributes = attrs))
+        }
+
         fun ensureNamespaces(root: XmlElement, changed: XmlElement): XmlElement {
             var r = root
             if (r["xmlns:android"] == null) r = r.withAttribute("xmlns:android", Attr.NS_ANDROID)
             val usesApp = changed.walk().any { e -> e.attributes.keys.any { it.startsWith("app:") } }
             if (usesApp && r["xmlns:app"] == null) r = r.withAttribute("xmlns:app", Attr.NS_APP)
+            val usesTools = changed.walk().any { e -> e.attributes.keys.any { it.startsWith("tools:") } }
+            if (usesTools && r["xmlns:tools"] == null) r = r.withAttribute("xmlns:tools", Attr.NS_TOOLS)
             return r
         }
 

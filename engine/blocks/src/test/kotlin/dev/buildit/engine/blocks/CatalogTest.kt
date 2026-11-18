@@ -112,6 +112,37 @@ class CatalogTest {
         assertTrue(kotlin, kotlin.contains("private fun runDoSomething(n: Double, t: String, flag: Boolean, words: ArrayList<String>) {"))
     }
 
+    @Test fun appCompatSwitchChangesTheBaseClass() {
+        listOf(SourceLanguage.Java, SourceLanguage.Kotlin).forEach { lang ->
+            val m = manifest(lang).let { it.copy(app = it.app.copy(appCompat = true)) }
+            val code = (BlockSync.generateCode(m, everyBlockDocument(), catalogCtx) as BlockSync.Result.Generated).code
+            assertTrue(code, code.contains("import androidx.appcompat.app.AppCompatActivity"))
+            assertTrue(code, code.contains(if (lang == SourceLanguage.Java) "extends AppCompatActivity {" else ": AppCompatActivity() {"))
+            assertTrue(code, !code.contains("import android.app.Activity"))
+        }
+    }
+
+    @Test fun collectedBlocksBringTheirVariables() {
+        val ids = Ids()
+        val doc = BlockDocument(
+            activity = "MainActivity",
+            variables = listOf(Variable("count", ValueType.Number), Variable("other", ValueType.Text)),
+            stacks = listOf(BlockStack(0f, 0f, listOf(b("e", "event_create", statements = mapOf("do" to listOf(
+                b("s", "var_set", mapOf("var" to "count"), mapOf("value" to num("n", 3.0))),
+            )))))),
+        )
+        val collected = BlockCollection.decode(BlockCollection.encode(BlockCollection.collect(doc, "s")))
+        assertEquals(listOf(Variable("count", ValueType.Number)), collected.variables)
+        val target = BlockDocument(activity = "SettingsActivity")
+        val placed = BlockCollection.place(target, collected, ids::next, 10f, 20f)
+        assertEquals(listOf("count"), placed.variables.map { it.name })
+        val block = placed.stacks.single().blocks.single()
+        assertEquals("var_set", block.type)
+        assertTrue(block.id != "s" && block.inputs.getValue("value").id != "n")
+        // Placing twice does not add the variable twice
+        assertEquals(1, BlockCollection.place(placed, collected, ids::next, 0f, 0f).variables.size)
+    }
+
     @Test fun removedParametersKeepTheirBlocks() {
         val ids = Ids()
         val doc = BlockDocument(

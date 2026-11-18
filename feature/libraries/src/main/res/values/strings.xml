@@ -31,4 +31,12 @@
     <string name="lb_ok">OK</string>
     <string name="lb_limits_title">What works</string>
     <string name="lb_limits_body">AndroidX, Material Components, Google Play services, Firebase and plain Java/Android libraries from Google Maven and Maven Central: their code, resources, manifests and native libraries are built into your APK. Firebase needs google-services.json in the app folder (Build It reads it like the Google Services Gradle plugin). Not supported on the device: annotation processors (e.g. Room, Glide compiler), Kotlin-only and Jetpack Compose APIs (projects are Java), and other Gradle plugins such as Crashlytics.</string>
+    <string name="lb_appcompat_title">AppCompat and Material (AndroidX)</string>
+    <string name="lb_appcompat_body">Adds androidx.appcompat and Material Components. Screens extend AppCompatActivity and the app theme comes from Material Components, so Material widgets work.</string>
+    <string name="lb_appcompat_on_done">AppCompat and Material are on. The theme was updated.</string>
+    <string name="lb_appcompat_off_done">AppCompat and Material are off. The libraries stay in the list, turned off.</string>
+    <string name="lb_appcompat_updated">Updated: %1$s.</string>
+    <string name="lb_appcompat_change_to_compat">These screens have your own code and still extend Activity: %1$s. Change them to AppCompatActivity (screens made with blocks change when you save their blocks).</string>
+    <string name="lb_appcompat_change_to_plain">These screens have your own code and still use AppCompatActivity: %1$s. Change them to Activity, or the build fails (screens made with blocks change when you save their blocks).</string>
+    <string name="lb_appcompat_kept">Edited by hand, so not rewritten: %1$s.</string>
 </resources>

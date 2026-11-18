@@ -305,6 +305,25 @@ system; value templates must be single atomic expressions.
 
 ---
 
+## D21 — AppCompat switch, generated themes.xml and the collection
+
+*Decision:* the Library Manager's AppCompat switch is a project setting (`app.appCompat`). Turning
+it on adds androidx.appcompat and Material Components (downloaded and checked before anything
+changes), generated screens extend AppCompatActivity, and the app theme comes from Material
+Components. To make that possible, `res/values/themes.xml` is now a generated file like the
+manifest: it holds `AppTheme` plus the `AppTheme.NoActionBar` / `AppTheme.Fullscreen` styles used by
+the per-screen window option. The themes.xml of older projects is adopted only if it is still the
+original default; a hand-edited one is left alone, reported, and the manifest falls back to
+framework themes. Screens whose source is still exactly Build It's template switch base class;
+any other screen is only reported, never rewritten.
+
+The collection (blocks, widgets, images, sounds) lives in the app's own storage, outside every
+project, as plain files: blocks as JSON (the block plus the variables it uses), widgets as a
+standalone layout XML fragment. Placing them always assigns fresh block ids and view ids.
+
+*Why:* AppCompatActivity crashes without an AppCompat theme, so the switch has to own the theme;
+keeping the user's edits safe follows the same rule as every other generated file (D5).
+
 ## Part C — Risks and mitigations (§20 item 11)
 
 | Risk | Likelihood | Impact | Mitigation |

@@ -67,6 +67,7 @@ fun LibrariesScreen(viewModel: LibrariesViewModel) {
             contentPadding = PaddingValues(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
+            item { AppCompatCard(s.appCompat, enabled = s.progress == null && !s.loading, onChange = viewModel::setAppCompat) }
             item { Text(stringResource(R.string.lb_project_title), style = MaterialTheme.typography.titleMedium) }
             if (s.loading) item { CircularProgressIndicator(Modifier.size(24.dp)) }
             else if (s.dependencies.isEmpty()) item {
@@ -155,12 +156,34 @@ fun LibrariesScreen(viewModel: LibrariesViewModel) {
             is LibrariesMessage.Removed -> stringResource(R.string.lb_msg_removed, m.module)
             is LibrariesMessage.GradleFileKept -> stringResource(R.string.lb_msg_gradle_kept, m.path)
             is LibrariesMessage.Failed -> stringResource(R.string.lb_msg_failed, m.text)
+            is LibrariesMessage.AppCompatChanged -> listOfNotNull(
+                stringResource(if (m.on) R.string.lb_appcompat_on_done else R.string.lb_appcompat_off_done),
+                m.updated.takeIf { it.isNotEmpty() }?.let { stringResource(R.string.lb_appcompat_updated, it.joinToString()) },
+                m.needsChange.takeIf { it.isNotEmpty() }?.let {
+                    stringResource(if (m.on) R.string.lb_appcompat_change_to_compat else R.string.lb_appcompat_change_to_plain, it.joinToString())
+                },
+                m.keptFiles.takeIf { it.isNotEmpty() }?.let { stringResource(R.string.lb_appcompat_kept, it.joinToString()) },
+            ).joinToString("\n\n")
         }
         AlertDialog(
             onDismissRequest = viewModel::dismissMessage,
             text = { Text(text) },
             confirmButton = { TextButton(onClick = viewModel::dismissMessage) { Text(stringResource(R.string.lb_ok)) } },
         )
+    }
+}
+
+/** The AppCompat and Material switch, like Sketchware's "AppCompat and Design" in its Library Manager. */
+@Composable
+private fun AppCompatCard(on: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(Spacing.md), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text(stringResource(R.string.lb_appcompat_title), style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.lb_appcompat_body), style = MaterialTheme.typography.bodySmall)
+            }
+            Switch(checked = on, onCheckedChange = onChange, enabled = enabled, modifier = Modifier.padding(start = Spacing.sm))
+        }
     }
 }
 

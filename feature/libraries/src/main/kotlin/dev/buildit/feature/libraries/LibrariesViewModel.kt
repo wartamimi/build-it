@@ -11,6 +11,9 @@ import dev.buildit.engine.deps.MavenCache
 import dev.buildit.engine.deps.ResolveCancelledException
 import dev.buildit.engine.deps.Resolver
 import dev.buildit.engine.deps.Versions
+import dev.buildit.engine.project.AppCompat
+import dev.buildit.engine.project.AppCompatSources
+import dev.buildit.engine.project.AppConfig
 import dev.buildit.engine.project.LibraryDependency
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,11 +37,15 @@ sealed interface LibrariesMessage {
     data class Removed(val module: String) : LibrariesMessage
     data class GradleFileKept(val path: String) : LibrariesMessage
     data class Failed(val text: String) : LibrariesMessage
+    /** AppCompat switched; [updated] screens were rewritten, [needsChange] screens have the user's code. */
+    data class AppCompatChanged(val on: Boolean, val updated: List<String>, val needsChange: List<String>, val keptFiles: List<String>) : LibrariesMessage
 }
 
 data class LibrariesUiState(
     val loading: Boolean = true,
     val dependencies: List<LibraryDependency> = emptyList(),
+    /** The AppCompat and Material switch ([AppCompat]). */
+    val appCompat: Boolean = false,
     /** Every library the build will use (direct and transitive), once resolved. */
     val included: List<IncludedLibrary> = emptyList(),
     val resolved: Boolean = false,
@@ -74,10 +81,11 @@ class LibrariesViewModel(
 
     fun load() {
         viewModelScope.launch {
-            val deps = try { repository.open(projectId).manifest.app.dependencies } catch (e: Exception) {
+            val app = try { repository.open(projectId).manifest.app } catch (e: Exception) {
                 _state.update { it.copy(loading = false, message = LibrariesMessage.Failed(e.message ?: e.javaClass.simpleName)) }; return@launch
             }
-            _state.update { it.copy(loading = false, dependencies = deps) }
+            val deps = app.dependencies
+            _state.update { it.copy(loading = false, dependencies = deps, appCompat = app.appCompat) }
             if (deps.any { it.enabled }) resolve(deps, save = false)
         }
     }
@@ -143,6 +151,18 @@ class LibrariesViewModel(
         if (enabled) resolve(deps, save = true) else viewModelScope.launch { if (save(deps)) resolve(deps, save = false) }
     }
 
+    /**
+     * Turns AppCompat and Material on or off. On: the libraries are downloaded and checked first,
+     * and nothing changes if that fails. Screens still as Build It created them switch base class.
+     */
+    fun setAppCompat(on: Boolean) {
+        val s = _state.value
+        if (s.progress != null || on == s.appCompat) return
+        val deps = AppCompat.set(AppConfig("x", dependencies = s.dependencies), on).dependencies
+        if (on) resolve(deps, save = true, appCompat = true)
+        else viewModelScope.launch { if (save(deps, appCompat = false)) resolve(deps, save = false) }
+    }
+
     /** Downloads anything missing (e.g. after the cache was cleared) and refreshes the list. */
     fun refresh() = resolve(_state.value.dependencies, save = false)
 
@@ -150,13 +170,13 @@ class LibrariesViewModel(
 
     override fun onCleared() = cancel.set(true)
 
-    private fun resolve(deps: List<LibraryDependency>, save: Boolean, added: String? = null) {
+    private fun resolve(deps: List<LibraryDependency>, save: Boolean, added: String? = null, appCompat: Boolean? = null) {
         if (_state.value.progress != null) return
         cancel.set(false)
         val roots = deps.filter { it.enabled }.mapNotNull { Coordinate.parse(it.coordinate) }
         if (roots.isEmpty()) {
             viewModelScope.launch {
-                if (!save || save(deps)) _state.update { it.copy(included = emptyList(), resolved = true, problems = emptyList()) }
+                if (!save || save(deps, appCompat)) _state.update { it.copy(included = emptyList(), resolved = true, problems = emptyList()) }
             }
             return
         }
@@ -180,7 +200,7 @@ class LibrariesViewModel(
             val included = resolution.artifacts.map { a ->
                 IncludedLibrary(a.coordinate.toString(), a.requestedBy.filter { it != "project" }.sorted(), a.file.length(), a.coordinate.module in direct)
             }
-            if (save && !save(deps)) { _state.update { it.copy(progress = null) }; return@launch }
+            if (save && !save(deps, appCompat)) { _state.update { it.copy(progress = null) }; return@launch }
             _state.update {
                 it.copy(
                     progress = null, included = included, resolved = true,
@@ -190,14 +210,18 @@ class LibrariesViewModel(
         }
     }
 
-    /** Writes the list to the project (buildit.json and app/build.gradle.kts). */
-    private suspend fun save(deps: List<LibraryDependency>): Boolean = try {
+    /** Writes the list (and the AppCompat switch, when given) to the project: buildit.json, app/build.gradle.kts, themes and manifest. */
+    private suspend fun save(deps: List<LibraryDependency>, appCompat: Boolean? = null): Boolean = try {
         val project = repository.open(projectId)
-        val result = repository.saveSettings(projectId, project.manifest.copy(app = project.manifest.app.copy(dependencies = deps)))
+        val app = project.manifest.app.copy(dependencies = deps, appCompat = appCompat ?: project.manifest.app.appCompat)
+        val result = repository.saveSettings(projectId, project.manifest.copy(app = app))
+        val sources = if (appCompat != null) withContext(dispatchers.io) { AppCompatSources.sync(project.directory, result.manifest) } else null
         _state.update { s ->
             s.copy(
                 dependencies = result.manifest.app.dependencies,
-                message = result.conflicts.firstOrNull { it.endsWith("build.gradle.kts") }?.let { LibrariesMessage.GradleFileKept(it) } ?: s.message,
+                appCompat = result.manifest.app.appCompat,
+                message = sources?.let { LibrariesMessage.AppCompatChanged(app.appCompat, it.updated, it.needsChange, result.conflicts) }
+                    ?: result.conflicts.firstOrNull { it.endsWith("build.gradle.kts") }?.let { LibrariesMessage.GradleFileKept(it) } ?: s.message,
             )
         }
         true

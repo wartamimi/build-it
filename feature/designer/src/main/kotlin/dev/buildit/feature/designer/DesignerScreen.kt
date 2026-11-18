@@ -70,6 +70,8 @@ import dev.buildit.core.designsystem.component.BiTextField
 import dev.buildit.core.designsystem.icon.BiIcons
 import dev.buildit.core.designsystem.theme.CodeTypography
 import dev.buildit.core.designsystem.theme.Spacing
+import dev.buildit.engine.layout.PropertyDef
+import dev.buildit.engine.layout.ComponentCatalog
 import dev.buildit.engine.layout.DropResolver
 import dev.buildit.engine.layout.LayoutCommand
 import dev.buildit.engine.project.ActivityConfig
@@ -98,6 +100,8 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
     var newLayout by remember { mutableStateOf(false) }
     var newActivity by remember { mutableStateOf(false) }
     var screenOptions by remember { mutableStateOf(false) }
+    var saveWidget by remember { mutableStateOf<Long?>(null) }
+    val collection = state.collectedWidgets?.let { WidgetCollection(it, viewModel::addFromCollection, viewModel::deleteFromCollection) }
     var sheet by remember { mutableStateOf<Panel?>(null) }
 
     val messages = rememberMessages()
@@ -160,7 +164,7 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
                     val canvas: @Composable (Modifier) -> Unit = { m ->
                         DesignerCanvas(state, handle, onSelect = viewModel::select, onCommand = viewModel::apply, onIssues = { previewIssues = it }, modifier = m)
                     }
-                    val library: @Composable (Modifier) -> Unit = { m -> ComponentLibrary(viewModel::addComponent, drag, onDragMove, onDrop, m) }
+                    val library: @Composable (Modifier) -> Unit = { m -> ComponentLibrary(viewModel::addComponent, drag, onDragMove, onDrop, m, collection = collection) }
                     val panelHeight = maxHeight * 0.45f
                     if (maxWidth >= 840.dp) {
                         Row(Modifier.fillMaxSize()) {
@@ -186,12 +190,12 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
                         Column(Modifier.fillMaxSize()) {
                             Row(Modifier.weight(1f).fillMaxWidth()) {
                                 Surface(tonalElevation = 1.dp) {
-                                    ComponentLibrary(viewModel::addComponent, drag, onDragMove, onDrop, Modifier.width(140.dp).fillMaxHeight(), compact = true)
+                                    ComponentLibrary(viewModel::addComponent, drag, onDragMove, onDrop, Modifier.width(140.dp).fillMaxHeight(), compact = true, collection = collection)
                                 }
                                 VerticalDivider()
                                 Box(Modifier.weight(1f).fillMaxHeight()) { canvas(Modifier) }
                             }
-                            PropertyBar(state, state.diagnostics.size + previewIssues.size, viewModel, onPanel = { sheet = it })
+                            PropertyBar(state, state.diagnostics.size + previewIssues.size, viewModel, onPanel = { sheet = it }, onSaveWidget = { saveWidget = it })
                         }
                     }
                 }
@@ -230,7 +234,7 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
             Text(stringResource(p.label), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = Spacing.lg))
             Box(Modifier.fillMaxWidth().fillMaxHeight(0.75f)) {
                 when (p) {
-                    Panel.Library -> ComponentLibrary({ viewModel.addComponent(it); sheet = null }, drag, onDragMove, onDrop, Modifier.fillMaxSize())
+                    Panel.Library -> ComponentLibrary({ viewModel.addComponent(it); sheet = null }, drag, onDragMove, onDrop, Modifier.fillMaxSize(), collection = collection)
                     Panel.Tree -> ComponentTree(state, viewModel)
                     Panel.Properties -> PropertiesInspector(state, viewModel)
                     Panel.Problems -> ProblemsList(state, previewIssues, { viewModel.select(it); sheet = Panel.Properties })
@@ -241,12 +245,20 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
     if (newLayout) NewLayoutDialog(onDismiss = { newLayout = false }, onCreate = { n, r -> newLayout = false; viewModel.createLayout(n, r) })
     if (newActivity) NewActivityDialog(onDismiss = { newActivity = false }, onCreate = { a, l -> newActivity = false; viewModel.addActivity(a, l) })
     val screen = state.screen
+    saveWidget?.let { uid ->
+        SaveToCollectionDialog(
+            suggested = state.root?.find(uid)?.label().orEmpty().substringBefore(" ·"),
+            existing = state.collectedWidgets.orEmpty(),
+            onDismiss = { saveWidget = null },
+            onSave = { name, replace -> saveWidget = null; viewModel.saveToCollection(uid, name, replace) },
+        )
+    }
     if (screenOptions && screen != null) ScreenOptionsDialog(screen, onDismiss = { screenOptions = false }, onSave = { screenOptions = false; viewModel.setScreenOptions(it) })
 }
 
 /** Bottom bar of the phone layout: what is selected and quick actions for it. */
 @Composable
-private fun PropertyBar(state: DesignerUiState, problems: Int, vm: DesignerViewModel, onPanel: (Panel) -> Unit) {
+private fun PropertyBar(state: DesignerUiState, problems: Int, vm: DesignerViewModel, onPanel: (Panel) -> Unit, onSaveWidget: (Long) -> Unit) {
     val el = state.selectedUid?.let { state.root?.find(it) }
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
@@ -260,32 +272,39 @@ private fun PropertyBar(state: DesignerUiState, problems: Int, vm: DesignerViewM
                     }
                 }
                 if (el != null) {
+                    if (state.collectedWidgets != null) BiIconButton(BiIcons.Library, stringResource(R.string.ds_collection_save), { onSaveWidget(el.uid) })
                     BiIconButton(BiIcons.Duplicate, stringResource(R.string.ds_duplicate), { vm.apply(LayoutCommand.Duplicate(el.uid)) })
                     BiIconButton(BiIcons.Delete, stringResource(R.string.ds_delete), { vm.apply(LayoutCommand.Remove(el.uid)) }, enabled = el.uid != state.root?.uid)
                 }
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                if (el != null) {
-                    AssistChip(onClick = { onPanel(Panel.Properties) }, label = { Text(stringResource(R.string.ds_all_properties)) }, leadingIcon = { Icon(BiIcons.Tune, null) })
-                    SizeChip(stringResource(R.string.ds_width), el["android:layout_width"]) { vm.apply(LayoutCommand.SetAttribute(el.uid, "android:layout_width", it)) }
-                    SizeChip(stringResource(R.string.ds_height), el["android:layout_height"]) { vm.apply(LayoutCommand.SetAttribute(el.uid, "android:layout_height", it)) }
-                }
-                AssistChip(onClick = { onPanel(Panel.Tree) }, label = { Text(stringResource(R.string.ds_panel_tree)) }, leadingIcon = { Icon(BiIcons.Layers, null) })
                 AssistChip(
                     onClick = { onPanel(Panel.Problems) },
                     label = { Text(stringResource(R.string.ds_panel_problems) + if (problems > 0) " ($problems)" else "") },
                     leadingIcon = { Icon(BiIcons.Warning, null, tint = if (problems > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) },
                 )
+                AssistChip(onClick = { onPanel(Panel.Tree) }, label = { Text(stringResource(R.string.ds_panel_tree)) }, leadingIcon = { Icon(BiIcons.Layers, null) })
+                if (el != null) {
+                    AssistChip(onClick = { onPanel(Panel.Properties) }, label = { Text(stringResource(R.string.ds_all_properties)) }, leadingIcon = { Icon(BiIcons.Tune, null) })
+                }
+            }
+            // One card per property, like Sketchware: tap a card to edit it in a popup made for that kind of value
+            if (el != null) {
+                val all = remember(el.name) { ComponentCatalog.propertiesFor(el.name) }
+                var editing by remember(el.uid) { mutableStateOf<PropertyDef?>(null) }
+                var tab by rememberSaveable { mutableStateOf(PropertyTab.Basic) }
+                val defs = propertiesForTab(all, tab, state.recentProperties)
+                Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                    PropertyTabs(tab) { tab = it }
+                    if (defs.isEmpty()) Text(stringResource(R.string.ds_recent_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    defs.forEach { d -> PropertyCard(d, el[d.attr]) { editing = d } }
+                }
+                editing?.let { d ->
+                    PropertyPopup(d, el[d.attr], state.resDir, onSet = { vm.setProperty(el.uid, d.attr, it) }, onDismiss = { editing = null })
+                }
             }
         }
     }
-}
-
-/** Cycles a layout size between wrap_content and match_parent (other values are kept until tapped). */
-@Composable
-private fun SizeChip(label: String, value: String?, onSet: (String) -> Unit) {
-    val short = when (value) { "match_parent", "fill_parent" -> "match"; "wrap_content" -> "wrap"; null -> "—"; else -> value }
-    AssistChip(onClick = { onSet(if (value == "wrap_content") "match_parent" else "wrap_content") }, label = { Text("$label: $short") })
 }
 
 @Composable
@@ -393,6 +412,33 @@ private fun NewActivityDialog(onDismiss: () -> Unit, onCreate: (String, String) 
     )
 }
 
+/** Names a widget (or blocks) saved to the collection; an existing name needs a second tap to replace. */
+@Composable
+private fun SaveToCollectionDialog(suggested: String, existing: List<String>, onDismiss: () -> Unit, onSave: (String, Boolean) -> Unit) {
+    var name by remember { mutableStateOf(suggested) }
+    val clash = name.trim() in existing
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.ds_collection_save)) },
+        text = {
+            Column {
+                BiTextField(name, { name = it }, stringResource(R.string.ds_collection_name))
+                Text(
+                    stringResource(if (clash) R.string.ds_collection_replace_hint else R.string.ds_collection_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (clash) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = name.isNotBlank(), onClick = { onSave(name.trim(), clash) }) {
+                Text(stringResource(if (clash) R.string.ds_collection_replace else R.string.ds_save))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ds_cancel)) } },
+    )
+}
+
 /** Orientation, keyboard and window options of one screen, written to AndroidManifest.xml. */
 @Composable
 private fun ScreenOptionsDialog(screen: ActivityConfig, onDismiss: () -> Unit, onSave: (ActivityConfig) -> Unit) {
@@ -457,11 +503,14 @@ private fun rememberMessages(): (DesignerMessage) -> String {
     val saved = stringResource(R.string.ds_saved)
     val failed = stringResource(R.string.ds_failed)
     val added = stringResource(R.string.ds_activity_added)
+    val savedToCollection = stringResource(R.string.ds_collection_saved)
     val optionsSaved = stringResource(R.string.ds_screen_options_saved)
     val manifestNotWritten = stringResource(R.string.ds_manifest_not_written)
     val generic = stringResource(R.string.ds_rejected_generic)
     val byCode = mapOf(
         "invalid_resource" to stringResource(R.string.ds_rejected_invalid_resource),
+        "collection_exists" to stringResource(R.string.ds_collection_exists),
+        "invalid_name" to stringResource(R.string.ds_collection_invalid_name),
         "exists" to stringResource(R.string.ds_rejected_exists),
         "not_container" to stringResource(R.string.ds_rejected_not_container),
         "duplicate_id" to stringResource(R.string.ds_rejected_duplicate_id),
@@ -479,6 +528,7 @@ private fun rememberMessages(): (DesignerMessage) -> String {
             DesignerMessage.Saved -> saved
             is DesignerMessage.Failed -> failed.format(m.detail)
             is DesignerMessage.ActivityAdded -> added.format(m.name)
+            is DesignerMessage.SavedToCollection -> savedToCollection.format(m.name)
             DesignerMessage.ScreenOptionsSaved -> optionsSaved
             DesignerMessage.ManifestNotWritten -> manifestNotWritten
             is DesignerMessage.EditRejected -> byCode[m.code] ?: generic.format(m.code)

@@ -36,6 +36,8 @@ data class AppConfig(
     val dependencies: List<LibraryDependency> = emptyList(),
     /** Manifest permissions (`android.permission.INTERNET`, ...); components add the ones they need. */
     val permissions: List<String> = emptyList(),
+    /** AndroidX AppCompat and Material Components on (Library Manager switch): see [AppCompat]. */
+    val appCompat: Boolean = false,
 ) {
     val effectiveNamespace: String get() = namespace ?: packageName
 }
@@ -106,12 +108,16 @@ enum class KeyboardMode(val manifestValue: String?) {
     @SerialName("visible") VisibleOnStart("stateVisible|adjustResize"),
 }
 
-/** Window of a screen: the app theme with its action bar, without it, or fullscreen. */
+/**
+ * Window of a screen: the app theme with its action bar, without it, or fullscreen. [style] is
+ * the style Build It writes to themes.xml; [frameworkTheme] is used when themes.xml was edited by
+ * hand and has no such style.
+ */
 @Serializable
-enum class WindowStyle(val theme: String?) {
-    @SerialName("default") Default(null),
-    @SerialName("no_action_bar") NoActionBar("@android:style/Theme.Material.Light.NoActionBar"),
-    @SerialName("fullscreen") Fullscreen("@android:style/Theme.Material.Light.NoActionBar.Fullscreen"),
+enum class WindowStyle(val style: String?, val frameworkTheme: String?) {
+    @SerialName("default") Default(null, null),
+    @SerialName("no_action_bar") NoActionBar("AppTheme.NoActionBar", "@android:style/Theme.Material.Light.NoActionBar"),
+    @SerialName("fullscreen") Fullscreen("AppTheme.Fullscreen", "@android:style/Theme.Material.Light.NoActionBar.Fullscreen"),
 }
 
 object ProjectFormat {

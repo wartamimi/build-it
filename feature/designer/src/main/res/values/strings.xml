@@ -98,8 +98,6 @@
     <string name="ds_preview_attribute_not_previewed">%1$s is kept in the XML but not shown in the preview</string>
     <string name="ds_bar_hint">Tap a view on the screen to edit it, or a widget on the left to add it.</string>
     <string name="ds_all_properties">All properties</string>
-    <string name="ds_width">Width</string>
-    <string name="ds_height">Height</string>
     <string name="ds_screen_options">Screen options · %1$s</string>
     <string name="ds_orientation">Orientation</string>
     <string name="ds_orientation_any">Follow the device</string>
@@ -119,4 +117,24 @@
     <string name="ds_screen_options_note">Saved in buildit.json and written to AndroidManifest.xml.</string>
     <string name="ds_screen_options_saved">Screen options saved</string>
     <string name="ds_manifest_not_written">Options saved, but AndroidManifest.xml was edited by hand and was not changed</string>
+    <string name="ds_popup_value">Value</string>
+    <string name="ds_popup_value_in">Value in %1$s</string>
+    <string name="ds_popup_fixed">Fixed size</string>
+    <string name="ds_popup_color_hint">#RRGGBB, #AARRGGBB or @color/name</string>
+    <string name="ds_popup_apply">Apply</string>
+    <string name="ds_popup_clear">Remove</string>
+    <string name="ds_props_basic">Basic</string>
+    <string name="ds_props_recent">Recent</string>
+    <string name="ds_props_all">All</string>
+    <string name="ds_recent_empty">Properties you edit appear here</string>
+    <string name="ds_collection">Collection</string>
+    <string name="ds_collection_save">Save to collection</string>
+    <string name="ds_collection_name">Name</string>
+    <string name="ds_collection_hint">Saved views can be added to any project from the top of the widget list.</string>
+    <string name="ds_collection_replace_hint">The collection already has an item with this name.</string>
+    <string name="ds_collection_replace">Replace</string>
+    <string name="ds_collection_saved">Saved %1$s to the collection</string>
+    <string name="ds_collection_exists">The collection already has %1$s</string>
+    <string name="ds_collection_invalid_name">Use letters, digits, spaces, _ . or - (up to 60)</string>
+    <string name="ds_collection_remove">Remove from collection</string>
 </resources>

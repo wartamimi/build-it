@@ -171,10 +171,10 @@ fun BuildItApp(container: AppContainer) {
                         initializer { WorkspaceViewModel(id, container.projectRepository, container.dispatchers) }
                     })
                     val designer: DesignerViewModel = viewModel(key = "ds-$id", factory = viewModelFactory {
-                        initializer { DesignerViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers) }
+                        initializer { DesignerViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers, container.collection) }
                     })
                     val blocks: BlocksViewModel = viewModel(key = "bk-$id", factory = viewModelFactory {
-                        initializer { BlocksViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers) }
+                        initializer { BlocksViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers, collection = container.collection) }
                     })
                     val code: CodeViewModel = viewModel(key = "cd-$id", factory = viewModelFactory {
                         initializer { CodeViewModel(id, container.projectRepository, container.settingsRepository, container.dispatchers) }
@@ -198,7 +198,7 @@ fun BuildItApp(container: AppContainer) {
                         }
                     })
                     val assets: AssetsViewModel = viewModel(key = "as-$id", factory = viewModelFactory {
-                        initializer { AssetsViewModel(id, container.projectRepository, container.dispatchers) }
+                        initializer { AssetsViewModel(id, container.projectRepository, container.dispatchers, container.collection) }
                     })
                     val context = LocalContext.current
                     val install = { apk: java.io.File -> ApkActions.install(context, apk) { m -> context.getString(BuildR.string.bd_install_failed, m) } }

@@ -31,4 +31,12 @@
     <string name="lb_ok">OK</string>
     <string name="lb_limits_title">Yang didukung</string>
     <string name="lb_limits_body">AndroidX, Material Components, Google Play services, Firebase, dan library Java/Android biasa dari Google Maven dan Maven Central: kode, resource, manifest, dan native library-nya ikut di-build ke APK Anda. Firebase butuh google-services.json di folder app (Build It membacanya seperti plugin Gradle Google Services). Belum didukung di perangkat: annotation processor (mis. Room, Glide compiler), API khusus Kotlin dan Jetpack Compose (proyek memakai Java), dan plugin Gradle lain seperti Crashlytics.</string>
+    <string name="lb_appcompat_title">AppCompat dan Material (AndroidX)</string>
+    <string name="lb_appcompat_body">Menambahkan androidx.appcompat dan Material Components. Layar memakai AppCompatActivity dan tema aplikasi dari Material Components, sehingga widget Material bisa dipakai.</string>
+    <string name="lb_appcompat_on_done">AppCompat dan Material aktif. Tema sudah diperbarui.</string>
+    <string name="lb_appcompat_off_done">AppCompat dan Material nonaktif. Library tetap ada di daftar dalam keadaan nonaktif.</string>
+    <string name="lb_appcompat_updated">Diperbarui: %1$s.</string>
+    <string name="lb_appcompat_change_to_compat">Layar ini berisi kode Anda dan masih memakai Activity: %1$s. Ubah ke AppCompatActivity (layar dari blok berubah saat bloknya disimpan).</string>
+    <string name="lb_appcompat_change_to_plain">Layar ini berisi kode Anda dan masih memakai AppCompatActivity: %1$s. Ubah ke Activity, atau build akan gagal (layar dari blok berubah saat bloknya disimpan).</string>
+    <string name="lb_appcompat_kept">Sudah diedit manual, jadi tidak ditimpa: %1$s.</string>
 </resources>

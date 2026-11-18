@@ -85,4 +85,9 @@
     <string name="as_error_exists">A resource with this name already exists. Choose another name.</string>
     <string name="as_error_name">Use lowercase letters, digits and _, starting with a letter.</string>
     <string name="as_error_unsupported">This file type can\'t be used here.</string>
+    <string name="as_from_collection">From collection</string>
+    <string name="as_collection_empty">Nothing here yet. Use Save to collection in a file\'s menu to keep it for other projects.</string>
+    <string name="as_save_to_collection">Save to collection</string>
+    <string name="as_saved_to_collection">Saved %1$s to the collection</string>
+    <string name="as_error_collection_exists">The collection already has a file with this name</string>
 </resources>

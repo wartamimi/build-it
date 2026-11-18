@@ -6,6 +6,7 @@ import dev.buildit.core.common.DispatcherProvider
 import dev.buildit.core.data.ProjectRepository
 import dev.buildit.core.data.SettingsRepository
 import dev.buildit.engine.blocks.Block
+import dev.buildit.engine.blocks.BlockCollection
 import dev.buildit.engine.blocks.BlockContext
 import dev.buildit.engine.blocks.BlockDiagnostic
 import dev.buildit.engine.blocks.BlockDocument
@@ -15,21 +16,25 @@ import dev.buildit.engine.blocks.BlockOps
 import dev.buildit.engine.blocks.BlockRegistry
 import dev.buildit.engine.blocks.BlockShape
 import dev.buildit.engine.blocks.BlockStore
+import dev.buildit.engine.blocks.BlockSync
+import dev.buildit.engine.blocks.BlockValidator
 import dev.buildit.engine.blocks.Component
 import dev.buildit.engine.blocks.ComponentType
 import dev.buildit.engine.blocks.Components
-import dev.buildit.engine.blocks.BlockSync
-import dev.buildit.engine.blocks.BlockValidator
 import dev.buildit.engine.blocks.Procedures
 import dev.buildit.engine.blocks.Slot
-import dev.buildit.engine.blocks.defOf
 import dev.buildit.engine.blocks.ValueType
 import dev.buildit.engine.blocks.Variable
 import dev.buildit.engine.blocks.ViewInfo
+import dev.buildit.engine.blocks.defOf
 import dev.buildit.engine.layout.Attr
 import dev.buildit.engine.layout.LayoutEditor
 import dev.buildit.engine.layout.XmlParser
+import dev.buildit.engine.project.CollectionKind
+import dev.buildit.engine.project.CollectionStore
 import dev.buildit.engine.project.ProjectManifest
+import java.io.File
+import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -41,8 +46,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.util.UUID
 
 /** State of the generated source relative to the blocks. */
 sealed interface CodeStatus {
@@ -79,6 +82,8 @@ data class BlocksUiState(
     val sourcePath: String? = null,
     /** The user chose to keep their hand-edited source; don't ask again in this session. */
     val keepHandEdits: Boolean = false,
+    /** Blocks in the collection, by name; null when there is no collection. */
+    val collectedBlocks: List<String>? = null,
 )
 
 sealed interface BlocksMessage {
@@ -86,6 +91,7 @@ sealed interface BlocksMessage {
     data class Failed(val detail: String) : BlocksMessage
     /** Components need these permissions but AndroidManifest.xml was edited by hand, so it was left alone. */
     data class PermissionsNotWritten(val permissions: List<String>) : BlocksMessage
+    data class SavedToCollection(val name: String) : BlocksMessage
 }
 
 class BlocksViewModel(
@@ -94,6 +100,8 @@ class BlocksViewModel(
     private val settings: SettingsRepository,
     private val dispatchers: DispatcherProvider,
     private val ids: () -> String = { UUID.randomUUID().toString().substring(0, 12) },
+    /** Blocks saved once and reused in every project; null hides the collection. */
+    private val collection: CollectionStore? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(BlocksUiState())
     val state: StateFlow<BlocksUiState> = _state.asStateFlow()
@@ -106,7 +114,53 @@ class BlocksViewModel(
     private var editor: BlockEditor? = null
     private var saveJob: Job? = null
 
-    init { load(null) }
+    init {
+        load(null)
+        viewModelScope.launch { refreshCollection() }
+    }
+
+    private suspend fun refreshCollection() {
+        val c = collection ?: return
+        val names = withContext(dispatchers.io) { c.list(CollectionKind.Blocks).map { it.name } }
+        _state.update { it.copy(collectedBlocks = names) }
+    }
+
+    /** Saves block [id] (and everything inside it) to the collection as [name]. */
+    fun saveToCollection(id: String, name: String, replace: Boolean = false) {
+        val c = collection ?: return
+        val doc = _state.value.document ?: return
+        viewModelScope.launch {
+            try {
+                val text = BlockCollection.encode(BlockCollection.collect(doc, id))
+                withContext(dispatchers.io) { c.saveText(CollectionKind.Blocks, name, text, replace) }
+                refreshCollection()
+                _messages.send(BlocksMessage.SavedToCollection(name))
+            } catch (e: Exception) {
+                _messages.send(BlocksMessage.Rejected(if (e.message == "exists") "collection_exists" else e.message ?: "failed"))
+            }
+        }
+    }
+
+    /** Places collected blocks as a new stack at ([x], [y]). */
+    fun addFromCollection(name: String, x: Float, y: Float) {
+        val c = collection ?: return
+        viewModelScope.launch {
+            val collected = try {
+                withContext(dispatchers.io) { c.list(CollectionKind.Blocks).firstOrNull { it.name == name }?.let { BlockCollection.decode(c.readText(it)) } }
+            } catch (e: Exception) {
+                _messages.send(BlocksMessage.Failed(e.message ?: e.javaClass.simpleName)); null
+            } ?: return@launch
+            edit { BlockCollection.place(it, collected, ids, x, y) }
+        }
+    }
+
+    fun deleteFromCollection(name: String) {
+        val c = collection ?: return
+        viewModelScope.launch {
+            withContext(dispatchers.io) { c.list(CollectionKind.Blocks).firstOrNull { it.name == name }?.let(c::delete) }
+            refreshCollection()
+        }
+    }
 
     /** (Re)loads the project, the activity's blocks and the views of its layout. */
     fun load(activity: String?) {

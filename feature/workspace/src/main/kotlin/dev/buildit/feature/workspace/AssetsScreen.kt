@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,6 +82,9 @@ fun AssetsScreen(viewModel: AssetsViewModel, kind: AssetKind) {
     }
     var renaming by remember { mutableStateOf<ProjectAsset?>(null) }
     var deleting by remember { mutableStateOf<ProjectAsset?>(null) }
+    var fromCollection by remember { mutableStateOf(false) }
+    val canCollect = state.collected != null && kind in AssetsViewModel.collectionKinds
+    val save: ((ProjectAsset) -> Unit)? = if (canCollect) viewModel::saveToCollection else null
     val items = state.assets[kind].orEmpty()
 
     Box(Modifier.fillMaxSize()) {
@@ -92,21 +96,28 @@ fun AssetsScreen(viewModel: AssetsViewModel, kind: AssetKind) {
                 contentPadding = PaddingValues(Spacing.md, Spacing.md, Spacing.md, 96.dp),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                items(items, key = { it.file.path }) { a -> ImageTile(a, onRename = { renaming = a }, onDelete = { deleting = a }) }
+                items(items, key = { it.file.path }) { a -> ImageTile(a, onRename = { renaming = a }, onDelete = { deleting = a }, onSave = save) }
             }
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(Spacing.md, Spacing.md, Spacing.md, 96.dp), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 items(items, key = { it.file.path }) { a ->
-                    if (kind == AssetKind.Sound) SoundRow(a, onRename = { renaming = a }, onDelete = { deleting = a })
+                    if (kind == AssetKind.Sound) SoundRow(a, onRename = { renaming = a }, onDelete = { deleting = a }, onSave = save)
                     else FontRow(a, onRename = { renaming = a }, onDelete = { deleting = a })
                 }
             }
         }
-        ExtendedFloatingActionButton(
-            onClick = { picker.launch(mimeTypes(kind)) },
-            icon = { Icon(BiIcons.Import, null) },
-            text = { Text(stringResource(R.string.as_import)) },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.lg),
-        )
+        Row(Modifier.align(Alignment.BottomEnd).padding(Spacing.lg), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            if (canCollect) ExtendedFloatingActionButton(
+                onClick = { fromCollection = true },
+                icon = { Icon(BiIcons.Library, null) },
+                text = { Text(stringResource(R.string.as_from_collection)) },
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            )
+            ExtendedFloatingActionButton(
+                onClick = { picker.launch(mimeTypes(kind)) },
+                icon = { Icon(BiIcons.Import, null) },
+                text = { Text(stringResource(R.string.as_import)) },
+            )
+        }
     }
 
     state.pending?.takeIf { it.kind == kind }?.let { p ->
@@ -140,6 +151,36 @@ fun AssetsScreen(viewModel: AssetsViewModel, kind: AssetKind) {
             dismissButton = { TextButton(onClick = { renaming = null }) { Text(stringResource(R.string.as_cancel)) } },
         )
     }
+    if (fromCollection) {
+        val collected = state.collected?.get(kind).orEmpty()
+        AlertDialog(
+            onDismissRequest = { fromCollection = false },
+            title = { Text(stringResource(R.string.as_from_collection)) },
+            text = {
+                if (collected.isEmpty()) Text(stringResource(R.string.as_collection_empty))
+                else LazyColumn {
+                    items(collected, key = { it.file.path }) { item ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { fromCollection = false; viewModel.importFromCollection(kind, item) }.padding(vertical = Spacing.sm),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(icon(kind), null)
+                            Text(item.name, modifier = Modifier.padding(start = Spacing.md).weight(1f))
+                            Text(size(item.size), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { fromCollection = false }) { Text(stringResource(R.string.as_cancel)) } },
+        )
+    }
+    state.savedToCollection?.let { name ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissError,
+            text = { Text(stringResource(R.string.as_saved_to_collection, name)) },
+            confirmButton = { TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.as_ok)) } },
+        )
+    }
     deleting?.let { a ->
         AlertDialog(
             onDismissRequest = { deleting = null },
@@ -168,23 +209,25 @@ private fun errorText(code: String?): String? = when (code) {
     "exists" -> stringResource(R.string.as_error_exists)
     "invalid_name" -> stringResource(R.string.as_error_name)
     "unsupported" -> stringResource(R.string.as_error_unsupported)
+    "collection_exists" -> stringResource(R.string.as_error_collection_exists)
     else -> code
 }
 
 @Composable
-private fun AssetMenu(onRename: () -> Unit, onDelete: () -> Unit) {
+private fun AssetMenu(onRename: () -> Unit, onDelete: () -> Unit, onSave: (() -> Unit)? = null) {
     var menu by remember { mutableStateOf(false) }
     Box {
         BiIconButton(BiIcons.More, stringResource(R.string.as_more), { menu = true })
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             DropdownMenuItem(text = { Text(stringResource(R.string.as_rename)) }, leadingIcon = { Icon(BiIcons.Edit, null) }, onClick = { menu = false; onRename() })
+            onSave?.let { save -> DropdownMenuItem(text = { Text(stringResource(R.string.as_save_to_collection)) }, leadingIcon = { Icon(BiIcons.Library, null) }, onClick = { menu = false; save() }) }
             DropdownMenuItem(text = { Text(stringResource(R.string.as_delete)) }, leadingIcon = { Icon(BiIcons.Delete, null) }, onClick = { menu = false; onDelete() })
         }
     }
 }
 
 @Composable
-private fun ImageTile(a: ProjectAsset, onRename: () -> Unit, onDelete: () -> Unit) {
+private fun ImageTile(a: ProjectAsset, onRename: () -> Unit, onDelete: () -> Unit, onSave: ((ProjectAsset) -> Unit)? = null) {
     val bitmap = remember(a.file.path, a.file.lastModified()) {
         if (a.extension == "xml") null else runCatching {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -201,13 +244,13 @@ private fun ImageTile(a: ProjectAsset, onRename: () -> Unit, onDelete: () -> Uni
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(a.name, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(start = Spacing.sm))
-            AssetMenu(onRename, onDelete)
+            AssetMenu(onRename, onDelete, onSave?.let { s -> { s(a) } })
         }
     }
 }
 
 @Composable
-private fun SoundRow(a: ProjectAsset, onRename: () -> Unit, onDelete: () -> Unit) {
+private fun SoundRow(a: ProjectAsset, onRename: () -> Unit, onDelete: () -> Unit, onSave: ((ProjectAsset) -> Unit)? = null) {
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
     DisposableEffect(a.file.path) { onDispose { player?.release(); player = null } }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
@@ -227,7 +270,7 @@ private fun SoundRow(a: ProjectAsset, onRename: () -> Unit, onDelete: () -> Unit
                 Text(a.name, style = CodeTypography.body)
                 Text("${a.file.name} · ${size(a.file.length())}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            AssetMenu(onRename, onDelete)
+            AssetMenu(onRename, onDelete, onSave?.let { s -> { s(a) } })
         }
     }
 }

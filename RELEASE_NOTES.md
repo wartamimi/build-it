@@ -1,6 +1,12 @@
 Build It for Android 8.0 and newer.
 
-New in 0.13.0: more widgets, closer to Sketchware: Spinner, SeekBar, RatingBar, ListView,
+New in 0.14.0: tap a property card under the selected view to edit it in a popup (sizes,
+colours from a palette, choices, numbers with presets), with Basic, Recent and All tabs. A
+collection shared by all your projects: save views, blocks, images and sounds once and reuse them.
+Libraries has an AppCompat and Material switch: screens then use AppCompatActivity and a Material
+Components theme.
+
+In 0.13.0: more widgets, closer to Sketchware: Spinner, SeekBar, RatingBar, ListView,
 GridView, VideoView, CalendarView, ToggleButton, RadioGroup, AutoComplete and Space. Their events
 (item selected or clicked, moved, rating changed, text changed, long click, video finished, date
 picked) and blocks (list items, selection, rating, video playback, calendar date). Each screen

@@ -379,4 +379,15 @@
     <string name="blk_calendar_set_date">ubah tanggal {view} menjadi {ms} md</string>
     <string name="blk_calendar_get_date">tanggal {view} dalam md</string>
     <string name="blk_view_set_error">tampilkan galat {text} di {view}</string>
+    <string name="bk_collection">Koleksi</string>
+    <string name="bk_collection_save">Simpan ke koleksi</string>
+    <string name="bk_collection_name">Nama</string>
+    <string name="bk_collection_hint">Blok beserta isinya disimpan bersama variabel yang dipakainya. Tambahkan ke proyek mana pun dari Koleksi di laci blok.</string>
+    <string name="bk_collection_replace_hint">Koleksi sudah punya item dengan nama ini.</string>
+    <string name="bk_collection_replace">Ganti</string>
+    <string name="bk_collection_saved">%1$s disimpan ke koleksi</string>
+    <string name="bk_collection_exists">Koleksi sudah punya item dengan nama ini</string>
+    <string name="bk_collection_invalid_name">Gunakan huruf, angka, spasi, _ . atau - (maks. 60)</string>
+    <string name="bk_collection_remove">Hapus dari koleksi</string>
+    <string name="bk_collection_empty">Pilih blok lalu ketuk tombol koleksi untuk menyimpannya di sini.</string>
 </resources>

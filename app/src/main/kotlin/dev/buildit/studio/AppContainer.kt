@@ -34,6 +34,9 @@ class AppContainer(context: Context) {
     /** Libraries downloaded from Google Maven and Maven Central, shared by all projects. */
     val maven: dev.buildit.engine.deps.MavenCache by lazy { dev.buildit.engine.deps.MavenCache(File(toolchainDir, "maven")) }
 
+    /** Blocks, widgets, images and sounds saved once and reused in every project. */
+    val collection: dev.buildit.engine.project.CollectionStore by lazy { dev.buildit.engine.project.CollectionStore(File(appContext.filesDir, "collection")) }
+
     /** AI provider settings; the API key itself is kept encrypted by the Android Keystore. */
     val aiSettings: AiSettingsStore by lazy { AiSettingsStore(File(appContext.filesDir, "ai/config.json"), KeystoreSecretStore(appContext)) }
 

@@ -98,6 +98,7 @@ data class Program(
     val checkedChanges: List<Handler>,
     val procedures: List<Procedure>,
     val helpers: Set<Helper>,
+    val appCompat: Boolean = false,
     val components: List<Component> = emptyList(),
     /** Bodies of component event hats, by "hat type|component name". */
     val componentEvents: Map<String, List<Stmt>> = emptyMap(),
@@ -111,7 +112,8 @@ data class Program(
 
 data class ViewEventHandler(val spec: ViewEventSpec, val view: String, val body: List<Stmt>)
 
-data class ActivityTarget(val packageName: String, val className: String, val layout: String)
+/** Where the generated activity goes; [appCompat] makes it extend AppCompatActivity (Library Manager switch). */
+data class ActivityTarget(val packageName: String, val className: String, val layout: String, val appCompat: Boolean = false)
 
 /** Turns a validated [BlockDocument] into a [Program]. Disabled blocks and loose stacks are skipped. */
 class Lowering private constructor(private val doc: BlockDocument, private val ctx: BlockContext) {
@@ -150,6 +152,7 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
             packageName = target.packageName,
             className = target.className,
             layout = target.layout,
+            appCompat = target.appCompat,
             variables = doc.variables,
             views = usedViews.map { ViewField(it, ViewFamilies.className(tags.getValue(it))) },
             onCreate = onCreate,

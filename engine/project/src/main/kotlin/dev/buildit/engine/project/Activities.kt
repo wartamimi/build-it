@@ -30,8 +30,9 @@ object Activities {
         if (src.exists()) throw IOException("${src.name} already exists")
         val layoutFile = File(projectDir, "app/src/main/res/layout/$layout.xml")
         srcDir.mkdirs(); layoutFile.parentFile.mkdirs()
-        val code = if (kotlin) AndroidSources.kotlinActivity(ns).replace("MainActivity", name).replace("activity_main", layout)
-        else AndroidSources.javaActivity(ns).replace("MainActivity", name).replace("activity_main", layout)
+        val ac = manifest.app.appCompat
+        val code = if (kotlin) AndroidSources.kotlinActivity(ns, ac).replace("MainActivity", name).replace("activity_main", layout)
+        else AndroidSources.javaActivity(ns, ac).replace("MainActivity", name).replace("activity_main", layout)
         AtomicFiles.writeText(layoutFile, layoutXml)
         AtomicFiles.writeText(src, code)
         val modules = manifest.modules.map { m ->

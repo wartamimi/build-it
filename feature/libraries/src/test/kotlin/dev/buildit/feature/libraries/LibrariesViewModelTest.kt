@@ -9,6 +9,8 @@ import dev.buildit.engine.deps.Http
 import dev.buildit.engine.deps.LibrarySearch
 import dev.buildit.engine.deps.MavenCache
 import dev.buildit.engine.deps.Repository
+import dev.buildit.engine.project.AppCompat
+import dev.buildit.engine.project.AppCompatSources
 import dev.buildit.engine.project.LoadResult
 import dev.buildit.engine.project.ManifestSync
 import dev.buildit.engine.project.ProjectManifest
@@ -77,7 +79,7 @@ class LibrariesViewModelTest {
         override val main = dispatcher
     }
 
-    private fun vm() = LibrariesViewModel("id", Repo(), MavenCache(tmp.newFolder("m2"), listOf(repo), http), dispatchers, LibrarySearch(http))
+    private fun vm() = LibrariesViewModel("id", Repo(), MavenCache(File(tmp.root, "m2").apply { mkdirs() }, listOf(repo), http), dispatchers, LibrarySearch(http))
 
     @Test fun addingALibraryDownloadsItsDependenciesAndUpdatesTheProject() = runTest(dispatcher) {
         val vm = vm()
@@ -113,5 +115,32 @@ class LibrariesViewModelTest {
         advanceUntilIdle()
         assertTrue(manifest.app.dependencies.isEmpty())
         assertTrue(vm.state.value.problems.toString(), vm.state.value.problems.any { it.contains("com.example:c") })
+    }
+
+    @Test fun appCompatSwitch() = runTest(dispatcher) {
+        // On: the libraries cannot be downloaded from this repository, so nothing changes
+        val vm = vm()
+        advanceUntilIdle()
+        vm.setAppCompat(true)
+        advanceUntilIdle()
+        assertEquals(false, manifest.app.appCompat)
+        assertTrue(manifest.app.dependencies.isEmpty())
+        assertTrue(vm.state.value.problems.isNotEmpty())
+
+        // Off from on: libraries turned off, theme and the untouched screen go back
+        manifest = manifest.copy(app = AppCompat.set(manifest.app, true))
+        ManifestSync.apply(project.directory, manifest)
+        AppCompatSources.sync(project.directory, manifest)
+        val vm2 = vm()
+        advanceUntilIdle()
+        assertTrue(vm2.state.value.appCompat)
+        vm2.dismissMessage()
+        vm2.setAppCompat(false)
+        advanceUntilIdle()
+        assertEquals(false, manifest.app.appCompat)
+        assertTrue(manifest.app.dependencies.none { it.enabled })
+        assertEquals(LibrariesMessage.AppCompatChanged(false, listOf("MainActivity"), emptyList(), emptyList()), vm2.state.value.message)
+        assertTrue(File(project.directory, "app/src/main/java/com/example/demo/MainActivity.java").readText().contains("extends Activity {"))
+        assertTrue(File(project.directory, ManifestSync.THEMES).readText().contains("android:Theme.Material.Light.DarkActionBar"))
     }
 }

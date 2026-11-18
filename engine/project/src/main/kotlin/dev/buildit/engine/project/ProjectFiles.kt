@@ -113,14 +113,25 @@ class ProjectFiles(private val root: File) {
 object ManifestSync {
     data class Result(val written: List<String>, val conflicts: List<String>)
 
+    const val THEMES = "app/src/main/res/values/themes.xml"
+
     fun apply(projectDir: File, manifest: ProjectManifest, force: Boolean = false): Result {
         val g = GeneratedFiles(projectDir)
-        val outputs = mapOf(
-            "app/src/main/AndroidManifest.xml" to AndroidSources.manifest(manifest),
-            "app/build.gradle.kts" to GradleFiles.app(manifest.app),
-        )
         val written = mutableListOf<String>()
         val conflicts = mutableListOf<String>()
+        // themes.xml first: the manifest refers to its window styles only when they are there.
+        val themesFile = File(projectDir, THEMES)
+        val legacy = themesFile.isFile && !g.isTracked(THEMES) && themesFile.readText() == AndroidSources.LEGACY_THEMES
+        when (val r = g.write(THEMES, AndroidSources.themes(manifest.app.appCompat), force || legacy)) {
+            GeneratedFiles.WriteResult.Written -> written += THEMES
+            GeneratedFiles.WriteResult.Unchanged -> Unit
+            is GeneratedFiles.WriteResult.UserModified -> conflicts += r.path
+        }
+        val styles = AndroidSources.hasWindowStyles(themesFile.readText())
+        val outputs = mapOf(
+            "app/src/main/AndroidManifest.xml" to AndroidSources.manifest(manifest, styles),
+            "app/build.gradle.kts" to GradleFiles.app(manifest.app),
+        )
         outputs.forEach { (path, content) ->
             when (val r = g.write(path, content, force)) {
                 GeneratedFiles.WriteResult.Written -> written += path

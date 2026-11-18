@@ -98,8 +98,6 @@
     <string name="ds_preview_attribute_not_previewed">%1$s tetap ada di XML tetapi tidak tampil di pratinjau</string>
     <string name="ds_bar_hint">Ketuk view di layar untuk mengeditnya, atau widget di kiri untuk menambahkannya.</string>
     <string name="ds_all_properties">Semua properti</string>
-    <string name="ds_width">Lebar</string>
-    <string name="ds_height">Tinggi</string>
     <string name="ds_screen_options">Opsi layar · %1$s</string>
     <string name="ds_orientation">Orientasi</string>
     <string name="ds_orientation_any">Ikuti perangkat</string>
@@ -119,4 +117,24 @@
     <string name="ds_screen_options_note">Disimpan di buildit.json dan ditulis ke AndroidManifest.xml.</string>
     <string name="ds_screen_options_saved">Opsi layar disimpan</string>
     <string name="ds_manifest_not_written">Opsi disimpan, tetapi AndroidManifest.xml sudah diedit manual sehingga tidak diubah</string>
+    <string name="ds_popup_value">Nilai</string>
+    <string name="ds_popup_value_in">Nilai dalam %1$s</string>
+    <string name="ds_popup_fixed">Ukuran tetap</string>
+    <string name="ds_popup_color_hint">#RRGGBB, #AARRGGBB atau @color/nama</string>
+    <string name="ds_popup_apply">Terapkan</string>
+    <string name="ds_popup_clear">Hapus</string>
+    <string name="ds_props_basic">Dasar</string>
+    <string name="ds_props_recent">Terakhir</string>
+    <string name="ds_props_all">Semua</string>
+    <string name="ds_recent_empty">Properti yang Anda ubah muncul di sini</string>
+    <string name="ds_collection">Koleksi</string>
+    <string name="ds_collection_save">Simpan ke koleksi</string>
+    <string name="ds_collection_name">Nama</string>
+    <string name="ds_collection_hint">Tampilan yang disimpan bisa ditambahkan ke proyek mana pun dari bagian atas daftar widget.</string>
+    <string name="ds_collection_replace_hint">Koleksi sudah punya item dengan nama ini.</string>
+    <string name="ds_collection_replace">Ganti</string>
+    <string name="ds_collection_saved">%1$s disimpan ke koleksi</string>
+    <string name="ds_collection_exists">Koleksi sudah punya %1$s</string>
+    <string name="ds_collection_invalid_name">Gunakan huruf, angka, spasi, _ . atau - (maks. 60)</string>
+    <string name="ds_collection_remove">Hapus dari koleksi</string>
 </resources>

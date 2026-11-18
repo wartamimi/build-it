@@ -17,10 +17,13 @@ import dev.buildit.engine.layout.XmlParser
 import dev.buildit.engine.project.Activities
 import dev.buildit.engine.project.ActivityConfig
 import dev.buildit.engine.project.AtomicFiles
+import dev.buildit.engine.project.CollectionKind
+import dev.buildit.engine.project.CollectionStore
 import dev.buildit.engine.project.GeneratedFiles
 import dev.buildit.engine.project.ModuleType
 import dev.buildit.engine.project.ProjectManifest
 import dev.buildit.engine.project.ProjectValidationException
+import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -32,7 +35,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 
 data class DesignerUiState(
     val loading: Boolean = true,
@@ -55,6 +57,10 @@ data class DesignerUiState(
     val revision: Int = 0,
     /** The screen (activity) that shows the current layout, if any. */
     val screen: ActivityConfig? = null,
+    /** Attributes most recently edited from the property bar, newest first. */
+    val recentProperties: List<String> = emptyList(),
+    /** Widgets in the collection, by name; null when there is no collection. */
+    val collectedWidgets: List<String>? = null,
 )
 
 sealed interface DesignerMessage {
@@ -65,6 +71,7 @@ sealed interface DesignerMessage {
     data object ScreenOptionsSaved : DesignerMessage
     /** The options were saved, but AndroidManifest.xml was edited by hand and was not regenerated. */
     data object ManifestNotWritten : DesignerMessage
+    data class SavedToCollection(val name: String) : DesignerMessage
 }
 
 class DesignerViewModel(
@@ -72,6 +79,8 @@ class DesignerViewModel(
     private val repository: ProjectRepository,
     private val settings: SettingsRepository,
     private val dispatchers: DispatcherProvider,
+    /** Widgets saved once and reused in every project; null hides the collection. */
+    private val collection: CollectionStore? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DesignerUiState())
     val state: StateFlow<DesignerUiState> = _state.asStateFlow()
@@ -94,6 +103,7 @@ class DesignerViewModel(
                 val first = p.manifest.modules.firstOrNull()?.activities?.firstOrNull { it.launcher }?.layout?.takeIf { it in layouts }
                     ?: layouts.firstOrNull()
                 _state.update { it.copy(layouts = layouts, resDir = resDir()) }
+                refreshCollection()
                 if (first != null) open(first) else _state.update { it.copy(loading = false) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false) }
@@ -132,6 +142,12 @@ class DesignerViewModel(
 
     fun select(uid: Long?) = _state.update { it.copy(selectedUid = uid) }
 
+    /** Sets an attribute from a property popup and remembers it under Recent. */
+    fun setProperty(uid: Long, attr: String, value: String?) {
+        apply(LayoutCommand.SetAttribute(uid, attr, value))
+        _state.update { s -> s.copy(recentProperties = (listOf(attr) + s.recentProperties.filter { it != attr }).take(MAX_RECENT)) }
+    }
+
     fun apply(command: LayoutCommand) {
         val ed = editor ?: return
         try {
@@ -141,7 +157,7 @@ class DesignerViewModel(
             return
         }
         val selected = when (command) {
-            is LayoutCommand.Insert, is LayoutCommand.Duplicate -> ed.lastCreatedUid
+            is LayoutCommand.Insert, is LayoutCommand.Duplicate, is LayoutCommand.InsertTree -> ed.lastCreatedUid
             is LayoutCommand.Remove -> null
             else -> _state.value.selectedUid
         }
@@ -153,17 +169,66 @@ class DesignerViewModel(
      * selected view in its parent, otherwise at the end of the root.
      */
     fun addComponent(tag: String) {
-        val root = editor?.root ?: return
+        val (parent, index) = insertionPoint() ?: return
+        apply(LayoutCommand.Insert(parent, index, tag))
+    }
+
+    /** Inside the selected container, after the selected view, or at the end of the root. */
+    private fun insertionPoint(): Pair<Long, Int>? {
+        val root = editor?.root ?: return null
         val sel = _state.value.selectedUid?.let { root.find(it) }
-        val cmd = when {
-            sel != null && ComponentCatalog.isContainer(sel.name) -> LayoutCommand.Insert(sel.uid, sel.elements.size, tag)
+        return when {
+            sel != null && ComponentCatalog.isContainer(sel.name) -> sel.uid to sel.elements.size
             sel != null && sel.uid != root.uid -> {
                 val parent = root.parentOf(sel.uid)!!
-                LayoutCommand.Insert(parent.uid, parent.elements.indexOfFirst { it.uid == sel.uid } + 1, tag)
+                parent.uid to parent.elements.indexOfFirst { it.uid == sel.uid } + 1
             }
-            else -> LayoutCommand.Insert(root.uid, root.elements.size, tag)
+            else -> root.uid to root.elements.size
         }
-        apply(cmd)
+    }
+
+    private suspend fun refreshCollection() {
+        val c = collection ?: return
+        val names = withContext(dispatchers.io) { c.list(CollectionKind.Widgets).map { it.name } }
+        _state.update { it.copy(collectedWidgets = names) }
+    }
+
+    /** Saves the view [uid] and its children to the collection as [name]. */
+    fun saveToCollection(uid: Long, name: String, replace: Boolean = false) {
+        val c = collection ?: return
+        val el = editor?.root?.find(uid) ?: return
+        viewModelScope.launch {
+            try {
+                withContext(dispatchers.io) { c.saveText(CollectionKind.Widgets, name, LayoutEditor.subtreeXml(el), replace) }
+                refreshCollection()
+                _messages.send(DesignerMessage.SavedToCollection(name))
+            } catch (e: Exception) {
+                _messages.send(DesignerMessage.EditRejected(if (e.message == "exists") "collection_exists" else e.message ?: "failed", name))
+            }
+        }
+    }
+
+    /** Adds a collected widget where a new view would go. */
+    fun addFromCollection(name: String) {
+        val c = collection ?: return
+        viewModelScope.launch {
+            try {
+                val item = c.list(CollectionKind.Widgets).firstOrNull { it.name == name } ?: return@launch
+                val element = XmlParser.parse(withContext(dispatchers.io) { c.readText(item) })
+                val (parent, index) = insertionPoint() ?: return@launch
+                apply(LayoutCommand.InsertTree(parent, index, element))
+            } catch (e: Exception) {
+                _messages.send(DesignerMessage.Failed(e.message ?: e.javaClass.simpleName))
+            }
+        }
+    }
+
+    fun deleteFromCollection(name: String) {
+        val c = collection ?: return
+        viewModelScope.launch {
+            withContext(dispatchers.io) { c.list(CollectionKind.Widgets).firstOrNull { it.name == name }?.let(c::delete) }
+            refreshCollection()
+        }
     }
 
     /** Moves the element one position up/down within its parent (component tree reordering). */
@@ -317,5 +382,6 @@ class DesignerViewModel(
 
     companion object {
         const val AUTOSAVE_DELAY_MS = 800L
+        const val MAX_RECENT = 8
     }
 }

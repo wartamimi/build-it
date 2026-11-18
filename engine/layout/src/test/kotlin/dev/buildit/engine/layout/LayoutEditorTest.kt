@@ -131,4 +131,24 @@ class LayoutEditorTest {
             codes,
         )
     }
+
+    @Test fun collectedWidgetsRoundTripWithFreshIds() {
+        val ed = editor()
+        ed.apply(LayoutCommand.Insert(ed.root.uid, 0, "LinearLayout", mapOf("app:layout_constraintTop_toTopOf" to "parent")))
+        val box = ed.root.elements[0]
+        ed.apply(LayoutCommand.Insert(box.uid, 0, "Button"))
+        val saved = LayoutEditor.subtreeXml(ed.root.elements[0])
+        assertTrue(saved, saved.contains("xmlns:android") && saved.contains("xmlns:app"))
+
+        // Inserting it again gets new ids, so the layout stays valid
+        ed.apply(LayoutCommand.InsertTree(ed.root.uid, 1, XmlParser.parse(saved)))
+        val ids = ed.root.walk().mapNotNull { it[Attr.ID] }.toList()
+        assertEquals(ids.size, ids.toSet().size)
+        assertEquals(4, ids.size)
+        assertEquals(ed.root.elements[1].uid, ed.lastCreatedUid)
+        assertTrue(ed.root.elements[1].attributes.keys.none { it.startsWith("xmlns") })
+        assertTrue(LayoutEditor.validate(ed.root).none { it.severity == LayoutDiagnostic.Severity.Error })
+        assertTrue(ed.undo())
+        assertEquals(1, ed.root.elements.size)
+    }
 }

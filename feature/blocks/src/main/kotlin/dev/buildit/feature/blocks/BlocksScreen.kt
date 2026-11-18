@@ -109,16 +109,19 @@ fun BlocksScreen(
     var confirmLeave by remember { mutableStateOf(false) }
     var newVariable by remember { mutableStateOf(false) }
     var renameVariable by remember { mutableStateOf<String?>(null) }
+    var saveBlocks by remember { mutableStateOf<String?>(null) }
 
     val rejected = rejectionTexts()
     val failed = stringResource(R.string.bk_failed)
     val permissionsNotWritten = stringResource(R.string.bk_permissions_not_written)
+    val savedToCollection = stringResource(R.string.bk_collection_saved)
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { m ->
             snackbar.showSnackbar(when (m) {
                 is BlocksMessage.Rejected -> rejected(m.code)
                 is BlocksMessage.Failed -> failed.format(m.detail)
                 is BlocksMessage.PermissionsNotWritten -> permissionsNotWritten.format(m.permissions.joinToString(", ") { it.substringAfterLast('.') })
+                is BlocksMessage.SavedToCollection -> savedToCollection.format(m.name)
             })
         }
     }
@@ -170,11 +173,13 @@ fun BlocksScreen(
                                     description = stringResource(R.string.bk_canvas),
                                     onDropNew = viewModel::drop,
                                 )
-                                state.selectedId?.let { id -> SelectionBar(id, state, viewModel, canvas, Modifier.align(Alignment.TopEnd)) }
+                                state.selectedId?.let { id -> SelectionBar(id, state, viewModel, canvas, Modifier.align(Alignment.TopEnd), onSave = { saveBlocks = id }) }
                             }
                         }
                         val palette: @Composable (Modifier) -> Unit = { m ->
                             Palette(state, onAdd = { type -> canvas.center().let { c -> viewModel.add(type, c.x, c.y) } },
+                                onAddCollected = { name -> canvas.center().let { c -> viewModel.addFromCollection(name, c.x, c.y) } },
+                                onDeleteCollected = viewModel::deleteFromCollection,
                                 onNewVariable = { newVariable = true }, onRenameVariable = { renameVariable = it },
                                 onRemoveVariable = viewModel::removeVariable, modifier = m)
                         }
@@ -222,6 +227,31 @@ fun BlocksScreen(
         viewModel.select(id)
         BlockLocator.position(state.document!!, id)?.let { (x, y) -> canvas.centerOn(x, y) }
     }, onDismiss = { showProblems = false })
+    saveBlocks?.let { id ->
+        val res = LocalContext.current.resources
+        var name by remember { mutableStateOf(state.document?.find(id)?.let { b -> eventTitle(b, res) }.orEmpty().filter { it.isLetterOrDigit() || it in " _.-" }.take(40).trim()) }
+        val clash = name.trim() in state.collectedBlocks.orEmpty()
+        AlertDialog(
+            onDismissRequest = { saveBlocks = null },
+            title = { Text(stringResource(R.string.bk_collection_save)) },
+            text = {
+                Column {
+                    OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.bk_collection_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Text(
+                        stringResource(if (clash) R.string.bk_collection_replace_hint else R.string.bk_collection_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (clash) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = name.isNotBlank(), onClick = { saveBlocks = null; viewModel.saveToCollection(id, name.trim(), clash) }) {
+                    Text(stringResource(if (clash) R.string.bk_collection_replace else R.string.bk_save))
+                }
+            },
+            dismissButton = { TextButton(onClick = { saveBlocks = null }) { Text(stringResource(R.string.bk_cancel)) } },
+        )
+    }
     if (newVariable) VariableDialog(null, onDismiss = { newVariable = false }, onConfirm = { n, t -> newVariable = false; viewModel.addVariable(n, t) })
     renameVariable?.let { old ->
         VariableDialog(old, onDismiss = { renameVariable = null }, onConfirm = { n, _ -> renameVariable = null; viewModel.renameVariable(old, n) })
@@ -294,13 +324,14 @@ private fun StatusLine(state: BlocksUiState) {
 }
 
 @Composable
-private fun SelectionBar(id: String, state: BlocksUiState, vm: BlocksViewModel, canvas: BlockCanvasState, modifier: Modifier) {
+private fun SelectionBar(id: String, state: BlocksUiState, vm: BlocksViewModel, canvas: BlockCanvasState, modifier: Modifier, onSave: () -> Unit) {
     val block = state.document?.find(id) ?: return
     Surface(modifier.padding(Spacing.sm), shape = RoundedCornerShape(12.dp), tonalElevation = 4.dp, shadowElevation = 2.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             BiIconButton(BiIcons.Duplicate, stringResource(R.string.bk_duplicate), {
                 val c = canvas.center(); vm.duplicate(id, c.x, c.y)
             })
+            if (state.collectedBlocks != null) BiIconButton(BiIcons.Library, stringResource(R.string.bk_collection_save), onSave)
             TextButton(onClick = { vm.toggleDisabled(id) }) { Text(stringResource(if (block.disabled) R.string.bk_enable else R.string.bk_disable)) }
             BiIconButton(BiIcons.Delete, stringResource(R.string.bk_delete), { vm.delete(id) })
             BiIconButton(BiIcons.Close, stringResource(R.string.bk_close), { vm.select(null) })
@@ -317,12 +348,15 @@ const val PALETTE_TAG = "blocks-palette"
 private fun Palette(
     state: BlocksUiState,
     onAdd: (String) -> Unit,
+    onAddCollected: (String) -> Unit,
+    onDeleteCollected: (String) -> Unit,
     onNewVariable: () -> Unit,
     onRenameVariable: (String) -> Unit,
     onRemoveVariable: (String) -> Unit,
     modifier: Modifier,
 ) {
-    var category by rememberSaveable { mutableStateOf(BlockCategory.Events) }
+    // null: the collection
+    var category by rememberSaveable { mutableStateOf<BlockCategory?>(BlockCategory.Events) }
     val res = LocalContext.current.resources
     Row(modifier) {
         LazyColumn(Modifier.weight(1f).fillMaxHeight().padding(horizontal = Spacing.sm).testTag(PALETTE_TAG)) {
@@ -337,6 +371,26 @@ private fun Palette(
                     }
                 }
             }
+            if (category == null) {
+                val names = state.collectedBlocks.orEmpty()
+                if (names.isEmpty()) item {
+                    Text(stringResource(R.string.bk_collection_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Spacing.xs))
+                }
+                items(names, key = { "col-$it" }) { name ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            onClick = { onAddCollected(name) }, shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.tertiaryContainer,
+                            modifier = Modifier.weight(1f).padding(vertical = Spacing.xxs),
+                        ) {
+                            Row(Modifier.padding(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(BiIcons.Library, null, Modifier.size(18.dp))
+                                Text(name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = Spacing.sm))
+                            }
+                        }
+                        BiIconButton(BiIcons.Delete, stringResource(R.string.bk_collection_remove), { onDeleteCollected(name) })
+                    }
+                }
+            }
             items(BlockRegistry.all.filter { it.category == category }, key = { it.type }) { def ->
                 PaletteBlock(def, paletteText(def, res), onClick = { onAdd(def.type) })
             }
@@ -344,6 +398,22 @@ private fun Palette(
         VerticalDivider()
         // Category rail on the right, within reach of the thumb.
         Column(Modifier.width(104.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(vertical = Spacing.xs)) {
+            if (state.collectedBlocks != null) {
+                val selected = category == null
+                Row(
+                    Modifier.fillMaxWidth()
+                        .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable { category = null }
+                        .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(BiIcons.Library, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.tertiary)
+                    Text(
+                        stringResource(R.string.bk_collection), style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(start = Spacing.sm),
+                    )
+                }
+            }
             BlockCategory.entries.forEach { c ->
                 val selected = c == category
                 Row(
@@ -625,6 +695,8 @@ private fun rejectionTexts(): (String) -> String {
         "incompatible" to stringResource(R.string.bk_rejected_incompatible),
         "invalid_name" to stringResource(R.string.bk_rejected_invalid_name),
         "duplicate_name" to stringResource(R.string.bk_rejected_duplicate_name),
+        "collection_exists" to stringResource(R.string.bk_collection_exists),
+        "invalid_name" to stringResource(R.string.bk_collection_invalid_name),
         "in_use" to stringResource(R.string.bk_rejected_in_use),
     )
     val generic = stringResource(R.string.bk_rejected_generic)

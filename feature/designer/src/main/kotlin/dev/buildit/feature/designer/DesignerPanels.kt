@@ -1,5 +1,8 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package dev.buildit.feature.designer
 
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -83,7 +86,10 @@ class LibraryDrag {
 const val LIBRARY_TAG = "designer-library"
 
 @Composable
-fun ComponentLibrary(onAdd: (String) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
+fun ComponentLibrary(
+    onAdd: (String) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false,
+    collection: WidgetCollection? = null,
+) {
     var query by remember { mutableStateOf("") }
     val filtered = remember(query) {
         ComponentCatalog.all.filter { query.isBlank() || it.displayName.contains(query, ignoreCase = true) || it.tag.contains(query, ignoreCase = true) }
@@ -105,6 +111,18 @@ fun ComponentLibrary(onAdd: (String) -> Unit, drag: LibraryDrag, onDragMove: () 
             modifier = Modifier.padding(horizontal = Spacing.md),
         )
         LazyColumn(Modifier.fillMaxSize().testTag(LIBRARY_TAG)) {
+            val collected = collection?.names.orEmpty().filter { query.isBlank() || it.contains(query, ignoreCase = true) }
+            if (collected.isNotEmpty()) {
+                item(key = "h-collection") {
+                    Text(
+                        stringResource(R.string.ds_collection),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = if (compact) Spacing.sm else Spacing.md, top = Spacing.md, bottom = Spacing.xs),
+                    )
+                }
+                items(collected, key = { "col-$it" }) { name -> CollectedItem(name, collection!!, compact) }
+            }
             filtered.forEach { (category, defs) ->
                 item(key = "h-$category") {
                     Text(
@@ -116,6 +134,34 @@ fun ComponentLibrary(onAdd: (String) -> Unit, drag: LibraryDrag, onDragMove: () 
                 }
                 items(defs, key = { it.tag }) { def -> LibraryItem(def, onAdd, drag, onDragMove, onDrop, compact) }
             }
+        }
+    }
+}
+
+/** Widgets from the collection shown at the top of the library. */
+class WidgetCollection(val names: List<String>, val onAdd: (String) -> Unit, val onDelete: (String) -> Unit)
+
+@Composable
+private fun CollectedItem(name: String, c: WidgetCollection, compact: Boolean) {
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            Modifier.fillMaxWidth()
+                .combinedClickable(onClick = { c.onAdd(name) }, onLongClick = { menu = true })
+                .padding(horizontal = if (compact) Spacing.sm else Spacing.md, vertical = if (compact) Spacing.xs else Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(if (compact) 24.dp else 28.dp).background(MaterialTheme.colorScheme.tertiaryContainer, RoundedCornerShape(6.dp)),
+                contentAlignment = Alignment.Center,
+            ) { Icon(BiIcons.Library, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer) }
+            Text(
+                name, style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = if (compact) Spacing.sm else Spacing.md).weight(1f),
+            )
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(text = { Text(stringResource(R.string.ds_collection_remove)) }, leadingIcon = { Icon(BiIcons.Delete, null) }, onClick = { menu = false; c.onDelete(name) })
         }
     }
 }

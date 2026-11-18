@@ -68,10 +68,38 @@ class ProjectFilesTest {
         val xml = AndroidSources.manifest(p.manifest.copy(modules = listOf(app.copy(activities = listOf(main, second)))))
         assertTrue(xml, xml.contains("android:screenOrientation=\"portrait\""))
         assertTrue(xml, xml.contains("android:windowSoftInputMode=\"adjustResize\""))
-        assertTrue(xml, xml.contains("android:theme=\"@android:style/Theme.Material.Light.NoActionBar.Fullscreen\""))
-        assertTrue(xml, xml.contains("<activity android:name=\".Second\" android:theme=\"@android:style/Theme.Material.Light.NoActionBar\" android:exported=\"false\" />"))
+        assertTrue(xml, xml.contains("android:theme=\"@style/AppTheme.Fullscreen\""))
+        assertTrue(xml, xml.contains("<activity android:name=\".Second\" android:theme=\"@style/AppTheme.NoActionBar\" android:exported=\"false\" />"))
+        // A hand-edited themes.xml without the styles: framework themes instead
+        val framework = AndroidSources.manifest(p.manifest.copy(modules = listOf(app.copy(activities = listOf(main, second)))), themeStyles = false)
+        assertTrue(framework, framework.contains("@android:style/Theme.Material.Light.NoActionBar.Fullscreen"))
         // Defaults add nothing
         assertFalse(AndroidSources.manifest(p.manifest).contains("screenOrientation"))
+    }
+
+    @Test fun appCompatSwitchChangesLibrariesThemeAndUntouchedScreens() {
+        val p = project()
+        val themes = File(p.directory, ManifestSync.THEMES)
+        // Projects from before 0.14.0 have an untracked themes.xml: it is adopted, not reported
+        themes.writeText(AndroidSources.LEGACY_THEMES)
+        GeneratedFiles(p.directory).release(ManifestSync.THEMES)
+        val on = p.manifest.copy(app = AppCompat.set(p.manifest.app.copy(dependencies = listOf(LibraryDependency("androidx.appcompat:appcompat:1.6.1", enabled = false))), true))
+        assertEquals(listOf("androidx.appcompat:appcompat:1.6.1", AppCompat.MATERIAL), on.app.dependencies.map { it.coordinate })
+        assertTrue(on.app.dependencies.all { it.enabled })
+        val r = ManifestSync.apply(p.directory, on)
+        assertEquals(emptyList<String>(), r.conflicts)
+        assertTrue(themes.readText().contains("Theme.MaterialComponents.Light.DarkActionBar"))
+        assertTrue(themes.readText().contains("<item name=\"windowNoTitle\">true</item>"))
+
+        val main = File(p.directory, "app/src/main/java/com/example/files/MainActivity.java")
+        assertEquals(SourceSync(listOf("MainActivity"), emptyList()), AppCompatSources.sync(p.directory, on))
+        assertTrue(main.readText().contains("extends AppCompatActivity"))
+        // An edited screen is reported, not rewritten
+        main.writeText(main.readText().replace("setContentView", "/* mine */ setContentView"))
+        val off = on.copy(app = AppCompat.set(on.app, false))
+        assertTrue(off.app.dependencies.none { it.enabled })
+        assertEquals(SourceSync(emptyList(), listOf("MainActivity")), AppCompatSources.sync(p.directory, off))
+        assertTrue(main.readText().contains("/* mine */"))
     }
 
     @Test fun manifestSyncUpdatesVersionAndReportsConflicts() {

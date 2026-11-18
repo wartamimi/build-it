@@ -85,4 +85,9 @@
     <string name="as_error_exists">Resource dengan nama ini sudah ada. Pilih nama lain.</string>
     <string name="as_error_name">Gunakan huruf kecil, angka dan _, diawali huruf.</string>
     <string name="as_error_unsupported">Jenis file ini tidak bisa dipakai di sini.</string>
+    <string name="as_from_collection">Dari koleksi</string>
+    <string name="as_collection_empty">Belum ada isi. Pakai Simpan ke koleksi di menu file untuk menyimpannya bagi proyek lain.</string>
+    <string name="as_save_to_collection">Simpan ke koleksi</string>
+    <string name="as_saved_to_collection">%1$s disimpan ke koleksi</string>
+    <string name="as_error_collection_exists">Koleksi sudah punya file dengan nama ini</string>
 </resources>

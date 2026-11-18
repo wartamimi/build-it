@@ -379,4 +379,15 @@
     <string name="blk_calendar_set_date">set date of {view} to {ms} ms</string>
     <string name="blk_calendar_get_date">date of {view} in ms</string>
     <string name="blk_view_set_error">show error {text} on {view}</string>
+    <string name="bk_collection">Collection</string>
+    <string name="bk_collection_save">Save to collection</string>
+    <string name="bk_collection_name">Name</string>
+    <string name="bk_collection_hint">The block and everything inside it are saved with the variables they use. Add them to any project from Collection in the block drawer.</string>
+    <string name="bk_collection_replace_hint">The collection already has an item with this name.</string>
+    <string name="bk_collection_replace">Replace</string>
+    <string name="bk_collection_saved">Saved %1$s to the collection</string>
+    <string name="bk_collection_exists">The collection already has an item with this name</string>
+    <string name="bk_collection_invalid_name">Use letters, digits, spaces, _ . or - (up to 60)</string>
+    <string name="bk_collection_remove">Remove from collection</string>
+    <string name="bk_collection_empty">Select a block and tap the collection button to save it here.</string>
 </resources>

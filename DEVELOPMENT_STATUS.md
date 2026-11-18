@@ -411,10 +411,36 @@ Not done / limits
 - The window options use the framework Material themes; with an AppCompat theme (Phase 14) they
   will need AppCompat equivalents.
 
+## Phase 14 — Sketchware parity: property popups, collection, AppCompat switch (owner request)
+
+Done
+- Property cards in the designer's phone property bar: one card per property with its current
+  value, under Basic, Recent (the last 8 edited) or All. Tapping a card opens a popup made for that
+  kind of value: match/wrap/fixed size, numbers with dp or sp and presets, a colour palette with a
+  hex field, choices, flags, drawables of the project, id with validation, multi-line text.
+- Collection, shared by every project and kept in the app's own storage: save a view and its
+  children from the designer (added again from the top of the widget list with fresh ids), a block
+  and everything inside it from the block editor (with the variables it uses; Collection in the
+  block drawer), and images and sounds from their managers ("From collection" imports them under a
+  resource name you choose).
+- AppCompat and Material switch in Libraries (like Sketchware's "AppCompat and Design"): adds
+  androidx.appcompat 1.7.1 and Material Components 1.12.0 after downloading and checking them;
+  generated screens extend AppCompatActivity and the theme comes from Material Components. Turning
+  it off turns the two libraries off. Screens still as Build It created them switch base class;
+  screens with the user's code are listed for the user to change.
+- themes.xml is now generated (hash-tracked) with the window styles used by the screen options.
+  The default themes.xml of older projects is adopted; a hand-edited one is left alone.
+
+Not done / limits
+- The wide (tablet) designer layout keeps the full inspector; property cards and "save to
+  collection" are in the phone property bar.
+- Collected widgets keep their attributes as they are: a widget that uses a string, colour or image
+  resource of another project needs that resource in the new project too.
+
 ## Build status
 
 - `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:deps:test :engine:ai:test` —
-  passing locally (152 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
+  passing locally (162 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
 - APK: CI publishes a signed GitHub release for each push to main. Emulator job: on-device build, install and console pass.
 
@@ -423,17 +449,20 @@ Not done / limits
 | Suite | Tests | Result |
 |---|---|---|
 | engine:project ProjectStoreTest | 17 | pass |
-| engine:project ProjectFilesTest (incl. screen options in the manifest) | 6 | pass |
+| engine:project ProjectFilesTest (incl. screen options in the manifest, AppCompat switch) | 7 | pass |
 | engine:project ProjectValidationTest | 5 | pass |
 | engine:project ActivitiesTest | 2 | pass |
 | engine:layout XmlTest | 5 | pass |
-| engine:layout LayoutEditorTest | 10 | pass |
+| engine:layout LayoutEditorTest (incl. collected widgets with fresh ids) | 11 | pass |
 | engine:layout DropAndValuesTest | 6 | pass |
 | feature:designer PreviewRendererTest (Robolectric, real views, Phase 13 widgets) | 3 | pass |
+| feature:designer PropertyPopupsTest (dimension parsing, card values, Basic/Recent/All) | 3 | pass |
+| engine:project CollectionStoreTest (save, replace, rename, delete, names that escape) | 2 | pass |
+| feature:libraries LibrariesViewModelTest (add, disable, remove, failed download, AppCompat switch) | 3 | pass |
 | engine:blocks BlockOpsTest | 7 | pass |
 | engine:blocks ValidatorTest | 3 | pass |
 | engine:blocks CodegenTest (incl. javac against android.jar) | 6 | pass |
-| engine:blocks CatalogTest (every block and component: validates, compiles as Java and Kotlin against android.jar; procedures; loop checks) | 7 | pass |
+| engine:blocks CatalogTest (every block and component: validates, compiles as Java and Kotlin against android.jar; procedures; loop checks; AppCompat base class; collected blocks) | 9 | pass |
 | feature:blocks BlockLayoutTest | 3 | pass |
 | feature:blocks BlocksViewModelTest (save → generated Java on disk, hand-edit protection, procedure parameters, palette drop, component permissions in the manifest) | 5 | pass |
 | engine:editor EditorEngineTest (lexers, search/replace, checks, history, indent) | 7 | pass |

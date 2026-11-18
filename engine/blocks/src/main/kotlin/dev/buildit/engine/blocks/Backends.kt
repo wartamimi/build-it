@@ -66,6 +66,7 @@ private fun usesClass(p: Program, predicate: (Stmt) -> Boolean): Boolean {
         p.checkedChanges.any { any(it.body) } || p.procedures.any { any(it.body) } || p.componentEvents.values.any(::any) || p.viewEvents.any { any(it.body) }
 }
 
+private val Program.baseClass get() = if (appCompat) "androidx.appcompat.app.AppCompatActivity" else "android.app.Activity"
 private fun Program.has(t: ComponentType) = components.any { it.type == t }
 private fun Program.eventBody(hat: String, name: String) = componentEvents["$hat|$name"].orEmpty()
 private fun Program.legacyEvent(c: Component) = eventBody(Components.spec(c.type).events.firstOrNull()?.hat.orEmpty(), c.name)
@@ -87,7 +88,7 @@ private fun Program.cleanup(kotlin: Boolean): List<String> =
         specCode(kotlin).mapNotNull { (c, _, code) -> code.cleanup?.let { fillFor(c, it) } }
 
 private fun imports(p: Program): List<String> {
-    val set = sortedSetOf("android.app.Activity", "android.os.Bundle")
+    val set = sortedSetOf(p.baseClass, "android.os.Bundle")
     p.views.forEach { set += it.className }
     if (p.variables.any { it.type == ValueType.TextList || it.type == ValueType.NumberList }) set += "java.util.ArrayList"
     if (p.variables.any { it.type == ValueType.TextMap }) set += "java.util.HashMap"
@@ -114,7 +115,7 @@ object JavaBackend : Backend {
         imports(p).forEach { line("import $it;") }
         line()
         header(".buildit/blocks/${p.className}.json").forEach(::line)
-        block("public class ${p.className} extends Activity {") {
+        block("public class ${p.className} extends ${p.baseClass.substringAfterLast('.')} {") {
             if (Helper.RandomInt in p.helpers) line("private static final java.util.Random RANDOM = new java.util.Random();")
             p.variables.forEach { v -> line("private ${type(v.type)} ${v.name} = ${initial(v.type)};") }
             p.views.forEach { v -> line("private ${v.className.substringAfterLast('.')} ${v.id};") }
@@ -358,7 +359,7 @@ object KotlinBackend : Backend {
         imports(p).filterNot { it == "java.util.ArrayList" || it == "java.util.HashMap" }.forEach { line("import $it") }
         line()
         header(".buildit/blocks/${p.className}.json").forEach(::line)
-        block("class ${p.className} : Activity() {") {
+        block("class ${p.className} : ${p.baseClass.substringAfterLast('.')}() {") {
             p.variables.forEach { v -> line("private ${if (v.type.isCollection) "val" else "var"} ${v.name}: ${type(v.type)} = ${initial(v.type)}") }
             p.views.forEach { v -> line("private lateinit var ${v.id}: ${v.className.substringAfterLast('.')}") }
             p.components.forEach { c ->
