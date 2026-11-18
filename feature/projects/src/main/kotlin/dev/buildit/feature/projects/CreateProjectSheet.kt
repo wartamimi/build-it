@@ -2,14 +2,12 @@ package dev.buildit.feature.projects
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import dev.buildit.core.designsystem.component.BiBottomSheet
 import dev.buildit.core.designsystem.component.BiButton
 import dev.buildit.core.designsystem.component.BiButtonStyle
@@ -73,22 +70,12 @@ fun CreateProjectSheet(
                 Text(stringResource(R.string.projects_kotlin_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(stringResource(R.string.projects_field_template), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
-            Column(Modifier.selectableGroup()) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 (listOf<AppTemplates.Kind?>(null) + AppTemplates.Kind.entries).forEach { k ->
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .selectable(selected = k == kind, role = Role.RadioButton, onClick = { kind = k })
-                            .padding(vertical = Spacing.xs),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = k == kind, onClick = null)
-                        Column(Modifier.padding(start = Spacing.md)) {
-                            Text(stringResource(templateTitle(k)), style = MaterialTheme.typography.bodyLarge)
-                            Text(stringResource(templateDescription(k)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
+                    FilterChip(selected = k == kind, onClick = { kind = k }, label = { Text(stringResource(templateTitle(k))) })
                 }
             }
+            Text(stringResource(templateDescription(kind)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Row(Modifier.fillMaxWidth().padding(top = Spacing.lg), horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End)) {
             BiButton(stringResource(R.string.projects_cancel), onDismiss, style = BiButtonStyle.Text)

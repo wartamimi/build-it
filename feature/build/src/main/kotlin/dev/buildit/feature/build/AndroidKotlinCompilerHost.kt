@@ -122,7 +122,7 @@ class AndroidKotlinCompilerHost(
     /** Delegates the stand-ins to Build It's class loader; everything else comes from the boot class path. */
     private class ShimParent(private val app: ClassLoader) : ClassLoader(getSystemClassLoader().parent) {
         override fun findClass(name: String): Class<*> =
-            if (name.startsWith("jvbuildit.") && !name.startsWith("jvbuildit.xmlstr.")) app.loadClass(name) else throw ClassNotFoundException(name)
+            if ((name.startsWith("jvbuildit.") || name.startsWith("jvbuilditb.")) && !name.startsWith("jvbuildit.xmlstr.")) app.loadClass(name) else throw ClassNotFoundException(name)
     }
 
     /** Missing optional classes in the compiler are normal; real errors throw. */
@@ -134,7 +134,7 @@ class AndroidKotlinCompilerHost(
     internal companion object {
         val STAX = dev.buildit.engine.deps.Coordinate("javax.xml.stream", "stax-api", "1.0-2")
         /** Bumped when the conversion changes, so cached DEX is redone. */
-        const val FORMAT = 2
+        const val FORMAT = 3
     }
 }
 
@@ -142,8 +142,8 @@ class AndroidKotlinCompilerHost(
 internal object Relocation {
     val renames: List<Pair<ByteArray, ByteArray>> = listOf(
         "java/lang/management/" to "jvbuildit/management/",
-        "javax/management/" to "jvbuildit/jmgmt/",
-        "java/beans/Introspector" to "jvbuildit/Introspector",
+        "javax/management/" to "jvbuildit/jxmgmt/",
+        "java/beans/Introspector" to "jvbuilditb/Introspector",
         "javax/xml/stream/" to "jvbuildit/xmlstr/",
     ).map { (a, b) -> check(a.length == b.length) { "$a -> $b" }; a.toByteArray() to b.toByteArray() }
 

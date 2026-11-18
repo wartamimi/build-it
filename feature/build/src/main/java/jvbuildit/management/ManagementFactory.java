@@ -21,7 +21,7 @@ public final class ManagementFactory {
     };
 
     private static final MemoryMXBean MEMORY = new MemoryMXBean() {
-        @Override public void addNotificationListener(jvbuildit.jmgmt.NotificationListener listener, jvbuildit.jmgmt.NotificationFilter filter, Object handback) {}
+        @Override public void addNotificationListener(jvbuildit.jxmgmt.NotificationListener listener, jvbuildit.jxmgmt.NotificationFilter filter, Object handback) {}
     };
 
     public static ThreadMXBean getThreadMXBean() { return THREADS; }

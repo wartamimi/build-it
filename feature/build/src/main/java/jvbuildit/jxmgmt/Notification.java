@@ -1,4 +1,4 @@
-package jvbuildit.jmgmt;
+package jvbuildit.jxmgmt;
 
 public class Notification {
     private final String type;

@@ -1,4 +1,4 @@
-package jvbuildit.jmgmt;
+package jvbuildit.jxmgmt;
 
 /** Stand-in for javax.management (not on Android); see jvbuildit.management.ManagementFactory. */
 public interface NotificationEmitter {
