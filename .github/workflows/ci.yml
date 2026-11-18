@@ -119,10 +119,12 @@ jobs:
         with:
           name: build-it-apk
           path: app/build/outputs/apk/release/*.apk
-      - name: Publish GitHub release (version tags, signed builds only)
-        if: startsWith(github.ref, 'refs/tags/v') && env.BUILDIT_KEYSTORE != ''
+      - name: Publish GitHub release (signed builds only)
+        if: github.event_name == 'push' && env.BUILDIT_KEYSTORE != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk "build-it-${GITHUB_REF_NAME}.apk"
-          gh release create "$GITHUB_REF_NAME" "build-it-${GITHUB_REF_NAME}.apk" --title "Build It ${GITHUB_REF_NAME#v}" --notes-file RELEASE_NOTES.md --prerelease
+          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tag="$GITHUB_REF_NAME"; else tag="v${version}-build.${GITHUB_RUN_NUMBER}"; fi
+          cp app/build/outputs/apk/release/app-release.apk "build-it-${tag#v}.apk"
+          gh release create "$tag" "build-it-${tag#v}.apk" --target "$GITHUB_SHA" --title "Build It ${tag#v}" --notes-file RELEASE_NOTES.md --prerelease
