@@ -68,7 +68,8 @@ class AndroidKotlinCompilerHost(
             // From the StAX jar only the javax.xml.stream API; Android has javax.xml.namespace.
             val entries = zip.entries().toList().filter { !it.isDirectory && (!stax || it.name.startsWith("javax/xml/stream/")) }
             val classes = entries.filter { it.name.endsWith(".class") && !it.name.startsWith("META-INF/versions/") && it.name != "module-info.class" }
-            val resources = entries.filter { !it.name.endsWith(".class") && !isSignature(it.name) }
+            // The compiler locates its own JAR by looking up PathUtil.class as a resource.
+            val resources = entries.filter { (!it.name.endsWith(".class") || it.name in CLASS_RESOURCES) && !isSignature(it.name) }
             val groups = classes.chunked(classesPerChunk).ifEmpty { listOf(emptyList()) }
             groups.forEachIndexed { i, group ->
                 if (isCancelled()) throw dev.buildit.engine.build.BuildCancelledException()
@@ -134,7 +135,8 @@ class AndroidKotlinCompilerHost(
     internal companion object {
         val STAX = dev.buildit.engine.deps.Coordinate("javax.xml.stream", "stax-api", "1.0-2")
         /** Bumped when the conversion changes, so cached DEX is redone. */
-        const val FORMAT = 3
+        const val FORMAT = 4
+        val CLASS_RESOURCES = setOf("org/jetbrains/kotlin/utils/PathUtil.class")
     }
 }
 
