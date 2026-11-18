@@ -1,0 +1,5 @@
+# Build It is installed from GitHub Releases, not Play, so ProfileInstaller compiles these rules
+# ahead of time after install. All of Build It's own code (editors, block canvas, designer preview,
+# build engine) is hot from the first launch; library profiles (Compose, etc.) are merged in by AGP.
+HSPLdev/buildit/**->**(**)**
+Ldev/buildit/**;
