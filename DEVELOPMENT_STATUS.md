@@ -4,7 +4,7 @@ Last updated: 2026-11-18
 
 ## Summary
 
-Phases 0–5 and 7 are implemented and Phase 6 is partly done. The app shell, design system,
+Phases 0–5 and 7 are implemented, Phase 6 is partly done, and Phase 8 published the APK but found that the on-device Java compile does not run on Android yet (see Phase 8). The app shell, design system,
 project management, the project workspace (settings + file explorer), the visual layout designer,
 the block editor (with Java and Kotlin code generation), the code editor, the on-device build of
 **Java** projects into signed, verified debug APKs, the AI assistant with reviewed changes and the
@@ -241,12 +241,36 @@ Known gaps
 - Console entries live in memory (newest 5,000); logs from before the bridge starts (very early
   process start) can be missed.
 
+## Phase 8 — Integration and release: APK published, on-device build not working yet
+
+Done
+- Release APK (R8 shrinking, 13.6 MB, signed with the Build It release key, version 0.8.0)
+  published on GitHub Releases. CI builds a release APK after the unit tests pass; it is signed
+  when the release key is stored as repository secrets, otherwise unsigned.
+- Emulator job in CI (API 34) with instrumented tests. On ART these pass: the Claude SDK streams
+  (Jackson/OkHttp work on Android), API keys are encrypted and read back with the Keystore, and
+  an OpenAI-compatible server on plain http on the device is reachable.
+- Fixed from device testing: plain http to local AI servers was blocked by Android's default
+  network policy (now allowed; the app itself still only accepts http for local addresses).
+
+**Not working on a device yet (the most important open item)**
+- The emulator test that builds a Java project on the device **fails**: the Eclipse compiler
+  (ECJ 3.46) needs Java APIs that Android does not have. The first one (`javax.lang.model.SourceVersion`)
+  is now provided; the next is `java.lang.Runtime.Version` (Java 9+). Until this is solved the
+  Build tab will fail at the Compile step on a phone, even though the same pipeline passes every
+  JVM test. Options: an ECJ version that targets an older Java runtime, or desugaring ECJ's use of
+  these APIs. At the owner's request the emulator job reports this but does not block the release.
+- Because of that, the debug console bridge has not been seen working end to end on a device
+  (it depends on building and installing an app on the device).
+- Not done in this phase: Kotlin-on-ART spike, separate build process, memory checks before
+  builds, a formal security review.
+
 ## Build status
 
 - `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:ai:test` —
   passing locally (130 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
-- APK: intentionally not built yet (owner's instruction: only after the final phase).
+- APK: release 0.8.0 published on GitHub Releases (signed). Emulator job: runs, reports the on-device compile failure, non-blocking.
 
 ## Test results (latest local run)
 
