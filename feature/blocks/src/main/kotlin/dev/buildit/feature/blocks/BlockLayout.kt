@@ -5,6 +5,8 @@ import dev.buildit.engine.blocks.BlockDef
 import dev.buildit.engine.blocks.BlockDocument
 import dev.buildit.engine.blocks.BlockRegistry
 import dev.buildit.engine.blocks.BlockShape
+import dev.buildit.engine.blocks.Procedures
+import dev.buildit.engine.blocks.defOf
 import dev.buildit.engine.blocks.FieldKind
 import dev.buildit.engine.blocks.MessagePart
 import dev.buildit.engine.blocks.Slot
@@ -87,12 +89,19 @@ class BlockLayout(
     val hatCap = 12 * unit
 
     private val sizes = HashMap<String, TextSize>()
+    /** The document being laid out: calls take their inputs from the procedure they call. */
+    private var doc: BlockDocument? = null
 
-    fun layout(doc: BlockDocument): List<LaidStack> = doc.stacks.mapIndexed { i, s ->
-        var y = s.y
-        val blocks = s.blocks.map { b -> placeStatement(b, s.x, y).also { y = it.box.bottom } }
-        val bounds = blocks.map { it.box }.reduceOrNull(Area::union) ?: Area.of(s.x, s.y, 0f, 0f)
-        LaidStack(i, blocks, bounds)
+    private fun defOf(b: Block): BlockDef? = doc?.defOf(b) ?: BlockRegistry.find(b.type)
+
+    fun layout(doc: BlockDocument): List<LaidStack> {
+        this.doc = doc
+        return doc.stacks.mapIndexed { i, s ->
+            var y = s.y
+            val blocks = s.blocks.map { b -> placeStatement(b, s.x, y).also { y = it.box.bottom } }
+            val bounds = blocks.map { it.box }.reduceOrNull(Area::union) ?: Area.of(s.x, s.y, 0f, 0f)
+            LaidStack(i, blocks, bounds)
+        }
     }
 
     /** Lays out a detached chain (being dragged) at the given origin. */
@@ -130,7 +139,7 @@ class BlockLayout(
         return TextSize(w, h)
     }
 
-    private fun valueSize(b: Block): TextSize = rowSize(items(b, BlockRegistry.find(b.type)), minValue)
+    private fun valueSize(b: Block): TextSize = rowSize(items(b, defOf(b)), minValue)
 
     // ------------------------------------------------------------ placing
 
@@ -158,7 +167,7 @@ class BlockLayout(
     }
 
     private fun placeValue(b: Block, x: Float, y: Float): LaidBlock {
-        val def = BlockRegistry.find(b.type)
+        val def = defOf(b)
         val size = valueSize(b)
         val box = Area.of(x, y, size.width, size.height)
         val (pieces, children) = placeRow(b, def, x, y, size.height)
@@ -166,7 +175,7 @@ class BlockLayout(
     }
 
     private fun placeStatement(b: Block, x: Float, y0: Float): LaidBlock {
-        val def = BlockRegistry.find(b.type)
+        val def = defOf(b)
         if (def?.shape == BlockShape.Value) return placeValue(b, x, y0)
         val hat = def?.shape == BlockShape.Hat
         val top = if (hat) y0 + hatCap else y0
@@ -249,6 +258,8 @@ class BlockLayout(
                 is FieldKind.Code -> (v.lineSequence().firstOrNull()?.take(28)?.let { if (v.contains('\n') || v.length > 28) "$it…" else it } ?: "").ifEmpty { "…" } to v.isBlank()
                 is FieldKind.Number -> (v.toDoubleOrNull()?.let { d -> if (d == Math.rint(d) && kotlin.math.abs(d) < 1e15) d.toLong().toString() else d.toString() } ?: v) to false
                 is FieldKind.Text -> (if (v.length > 24) v.take(24) + "…" else v) to false
+                FieldKind.Params -> Procedures.parse(v).orEmpty().let { ps -> if (ps.isEmpty()) "＋" to true else ps.joinToString(", ", "(", ")") { it.name } to false }
+                is FieldKind.Color -> "■ $v" to false
                 else -> if (v.isEmpty()) "▾" to true else "$v ▾" to false
             }
         }

@@ -16,6 +16,8 @@ data class BlockContext(
     val activities: List<String>,
     /** Sound files in res/raw, by resource name. */
     val sounds: List<String> = emptyList(),
+    /** Images in res/drawable, by resource name. */
+    val images: List<String> = emptyList(),
 )
 
 /**
@@ -75,7 +77,7 @@ object BlockValidator {
         // Every block (disabled blocks and everything inside them are not compiled, so not checked)
         val inactive = doc.allBlocks().filter { it.disabled }.flatMap { it.walk() }.map { it.id }.toSet()
         doc.allBlocks().filter { it.id !in inactive }.forEach { b ->
-            val def = BlockRegistry.find(b.type)
+            val def = doc.defOf(b)
             if (def == null) { err(b.id, "unknown_block", b.type); return@forEach }
 
             def.inputs.forEach { input ->
@@ -132,11 +134,50 @@ object BlockValidator {
                         value.isEmpty() -> err(b.id, "missing_sound")
                         value !in ctx.sounds -> err(b.id, "unknown_sound", value)
                     }
-                    is FieldKind.Text -> if (b.type == "view_set_text_color" && !colorPattern.matches(value)) err(b.id, "invalid_color", value)
+                    FieldKind.DrawableResource -> when {
+                        value.isEmpty() -> err(b.id, "missing_image")
+                        value !in ctx.images -> err(b.id, "unknown_image", value)
+                    }
+                    is FieldKind.Color -> if (!colorPattern.matches(value)) err(b.id, "invalid_color", value)
+                    is FieldKind.Text -> Unit
+                    FieldKind.Params -> {
+                        val params = Procedures.parse(value)
+                        if (params == null) err(b.id, "invalid_params", value)
+                        else params.forEachIndexed { i, p ->
+                            Procedures.problem(p.name, params.take(i).map { it.name }, doc, viewIds)?.let { err(b.id, "invalid_param", p.name) }
+                        }
+                    }
+                    FieldKind.Param -> {
+                        val define = Procedures.enclosingDefine(doc, b.id)
+                        when {
+                            define == null -> err(b.id, "param_outside_procedure")
+                            Procedures.parse(define.field("params")).orEmpty().none { it.name == value } -> err(b.id, "unknown_param", value)
+                        }
+                    }
                 }
             }
         }
+
+        // Loop-only blocks and blocks that can never run (Java refuses to compile unreachable code)
+        fun checkList(list: List<Block>, inLoop: Boolean) {
+            var ended = false
+            list.filterNot { it.disabled }.forEach { s ->
+                val def = BlockRegistry.find(s.type) ?: return@forEach
+                if (ended) err(s.id, "unreachable")
+                if (def.loopOnly && !inLoop) err(s.id, "outside_loop")
+                if (def.terminal) ended = true
+                val loop = s.type in LOOPS
+                s.statements.values.forEach { checkList(it, inLoop || loop) }
+            }
+        }
+        doc.stacks.forEach { stack ->
+            val first = stack.blocks.firstOrNull() ?: return@forEach
+            if (first.disabled || BlockRegistry.find(first.type)?.shape != BlockShape.Hat) return@forEach
+            first.statements.values.forEach { checkList(it, inLoop = false) }
+        }
     }
+
+    private val LOOPS = setOf("ctrl_repeat", "ctrl_while", "ctrl_for", "ctrl_foreach", "ctrl_foreach_number")
 
     fun hasErrors(diagnostics: List<BlockDiagnostic>) = diagnostics.any { it.severity == BlockDiagnostic.Severity.Error }
 }

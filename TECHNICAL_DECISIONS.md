@@ -286,6 +286,25 @@ is no plugin system for them.
 
 ---
 
+## D20 — Template blocks and procedures with parameters
+
+*Decision:* most new blocks are declared with a Java and a Kotlin code template (`{input}` and
+`{field}` placeholders) instead of a dedicated IR node and printer per block. Lowering converts
+inputs (text inputs to text), records the imports and helper methods a block needs, and the
+backends substitute. Blocks with structure (for each) keep dedicated IR. Procedure parameters live
+in the `params` field of the define block (`name:type,...`); a call's inputs are derived from the
+procedure it calls (`BlockDocument.defOf`), and changing parameters moves orphaned argument blocks
+out to loose stacks rather than deleting them.
+
+*Why:* the Sketchware catalog is large; templates let it grow quickly without per-block code in
+three places. Correctness is guarded by CatalogTest, which places every block of the registry in
+one document and compiles the generated Java (javac) and Kotlin (kotlinc) against android.jar.
+
+*Trade-off:* templates are text, so a bad template is only caught by that test, not by the type
+system; value templates must be single atomic expressions.
+
+---
+
 ## Part C — Risks and mitigations (§20 item 11)
 
 | Risk | Likelihood | Impact | Mitigation |

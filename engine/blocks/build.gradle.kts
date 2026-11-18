@@ -6,4 +6,5 @@ plugins {
 dependencies {
     api(project(":engine:project"))
     api(libs.kotlinx.serialization.json)
+    testImplementation(libs.kotlin.compiler.embeddable)
 }

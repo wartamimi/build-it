@@ -10,12 +10,24 @@ enum class ValueType {
     @SerialName("number") Number,
     @SerialName("text") Text,
     @SerialName("textList") TextList,
+    @SerialName("numberList") NumberList,
+    /** Text keys to text values (HashMap). */
+    @SerialName("map") TextMap,
     ;
+
+    val isCollection get() = this == TextList || this == NumberList || this == TextMap
+
+    /** The name used in stored documents (same as the serial name). */
+    val key: String get() = when (this) {
+        Boolean -> "boolean"; Number -> "number"; Text -> "text"; TextList -> "textList"; NumberList -> "numberList"; TextMap -> "map"
+    }
 
     companion object {
         /** Whether a value of type [actual] may be plugged into an input of type [expected]. */
         fun accepts(expected: ValueType, actual: ValueType): kotlin.Boolean =
             expected == actual || expected == Text // any value is converted to text where text is expected
+
+        fun fromKey(key: String): ValueType? = entries.firstOrNull { it.key == key }
     }
 }
 

@@ -320,6 +320,37 @@ Not done / limits
   still stop at the Check step on the device).
 - The UI test on the emulator covers the new tabs and tools; Run → install was not automated.
 
+## Phase 11 — Sketchware parity: blocks and editor (owner request)
+
+Done
+- 74 new blocks (58 → 132 in the registry): text (contains, starts/ends with, position, letters
+  # to #, letter #, replace, upper/lower case, trim, reverse, repeat, split, join list, new line),
+  math (functions sin/cos/tan/asin/acos/atan/sqrt/cbrt/log/log10/exp/abs/floor/ceil/
+  toRadians/toDegrees, power, min/max, PI/E, random fraction, whole part, clamp, format with
+  decimals), logic (if-then-else value for text and numbers, is empty, is a number), control
+  (for each in a list of text or numbers, stop the loop, skip to next round, stop this event),
+  text lists (insert, set, remove, contains, position, sort, shuffle, set from another list),
+  new variable types list of numbers and map (text → text) with their blocks, views (background
+  colour, text size, hint, image from res/drawable, opacity, rotation, progress of ProgressBar /
+  SeekBar, is visible, focus with keyboard, hide keyboard), app (long message, screen title,
+  copy to clipboard, share text, current time, format time).
+- Procedures with parameters ("more blocks"): define block has a parameters editor (name and
+  type); calls get one input per parameter; parameter blocks read them in the body; renaming a
+  procedure renames its calls; removed parameters move their argument blocks to loose stacks.
+- Validation: loop-only blocks outside a loop, blocks after stop/return (javac refuses them),
+  colours, images, parameters.
+- Editor: long-press a palette block and drag it onto the canvas (snaps into the slot under it);
+  the canvas scrolls while a dragged block is held near an edge. Snapping and the trash were
+  already there.
+- CatalogTest compiles a document with every block as Java (javac) and Kotlin (kotlinc) against
+  android.jar.
+
+Not done / limits
+- Procedures don't return values yet.
+- Palette drag and drop is not covered by an automated UI test (unit tests cover the drop and
+  snapping logic in the view model).
+- Renaming a parameter in the editor is remove + add (the argument blocks move out).
+
 ## Build status
 
 - `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:deps:test :engine:ai:test` —
@@ -342,8 +373,9 @@ Not done / limits
 | engine:blocks BlockOpsTest | 7 | pass |
 | engine:blocks ValidatorTest | 3 | pass |
 | engine:blocks CodegenTest (incl. javac against android.jar) | 6 | pass |
+| engine:blocks CatalogTest (every block: validates, compiles as Java and Kotlin against android.jar; procedures; loop checks) | 7 | pass |
 | feature:blocks BlockLayoutTest | 3 | pass |
-| feature:blocks BlocksViewModelTest (save → generated Java on disk, hand-edit protection) | 3 | pass |
+| feature:blocks BlocksViewModelTest (save → generated Java on disk, hand-edit protection, procedure parameters, palette drop) | 4 | pass |
 | engine:editor EditorEngineTest (lexers, search/replace, checks, history, indent) | 7 | pass |
 | feature:code CodeViewModelTest (autosave to disk, conflict instead of overwrite, save/discard, problems) | 5 | pass |
 | feature:code CodeEditTextTest (Robolectric, real view: auto-indent, undo/redo) | 2 | pass |

@@ -7,7 +7,7 @@ enum class BlockCategory { Events, Control, Logic, Math, Text, Variables, Lists,
 enum class BlockShape { Hat, Statement, Value }
 
 /** Which views a view field may reference, by widget family. */
-enum class ViewKind { Any, Text, Compound }
+enum class ViewKind { Any, Text, Compound, Image, Progress }
 
 sealed interface FieldKind {
     data class Text(val default: String = "") : FieldKind
@@ -23,7 +23,25 @@ sealed interface FieldKind {
     data class ComponentRef(val type: ComponentType) : FieldKind
     /** Name of a sound file in res/raw (without extension). */
     data object RawResource : FieldKind
+    /** Name of an image in res/drawable (without extension). */
+    data object DrawableResource : FieldKind
+    /** A color as #RRGGBB or #AARRGGBB. */
+    data class Color(val default: String = "#FF000000") : FieldKind
+    /** Parameters of a procedure, stored as `name:type,name:type` (see [Procedures]). */
+    data object Params : FieldKind
+    /** A parameter of the procedure the block is in. */
+    data object Param : FieldKind
 }
+
+/**
+ * Code a block generates, for blocks that need no dedicated IR: `{name}` stands for the value of
+ * the input or field of that name. Value templates must be a single atomic expression (wrapped in
+ * parentheses when they contain an operator); statement templates are complete statements.
+ */
+data class CodeTemplate(val java: String, val kotlin: String)
+
+/** A private method a template calls; added once to the generated class. Null for a language that doesn't need it. */
+data class TemplateHelper(val name: String, val java: String?, val kotlin: String?)
 
 data class FieldDef(val name: String, val kind: FieldKind)
 data class InputDef(val name: String, val type: ValueType)
@@ -44,6 +62,15 @@ data class BlockDef(
     val statements: List<StatementDef> = emptyList(),
     /** Output type for value blocks; null when it depends on the referenced variable (`var_get`). */
     val output: ValueType? = null,
+    /** Generated code, for blocks lowered generically (see [CodeTemplate]). */
+    val code: CodeTemplate? = null,
+    /** Classes the generated code needs imported. */
+    val imports: List<String> = emptyList(),
+    val helper: TemplateHelper? = null,
+    /** Statement blocks that only make sense inside a loop (break, continue). */
+    val loopOnly: Boolean = false,
+    /** Statement blocks after which nothing in the same list can run (break, continue, return). */
+    val terminal: Boolean = false,
 ) {
     fun fieldDef(name: String) = fields.firstOrNull { it.name == name }
     fun inputDef(name: String) = inputs.firstOrNull { it.name == name }
@@ -90,7 +117,7 @@ object BlockRegistry {
     private val compareOps = listOf("=", "≠", "<", "≤", ">", "≥")
     private val arithOps = listOf("+", "−", "×", "÷", "mod")
 
-    val all: List<BlockDef> = listOf(
+    private val core: List<BlockDef> = listOf(
         // Events
         BlockDef("event_create", BlockCategory.Events, BlockShape.Hat, "when screen is created", statements = listOf(StatementDef("do", ""))),
         BlockDef("event_resume", BlockCategory.Events, BlockShape.Hat, "when screen resumes", statements = listOf(StatementDef("do", ""))),
@@ -98,7 +125,8 @@ object BlockRegistry {
         BlockDef("event_destroy", BlockCategory.Events, BlockShape.Hat, "when screen is destroyed", statements = listOf(StatementDef("do", ""))),
         BlockDef("event_click", BlockCategory.Events, BlockShape.Hat, "when {view} is clicked", fields = listOf(FieldDef("view", FieldKind.View())), statements = listOf(StatementDef("do", ""))),
         BlockDef("event_checked", BlockCategory.Events, BlockShape.Hat, "when {view} is checked or unchecked", fields = listOf(FieldDef("view", FieldKind.View(ViewKind.Compound))), statements = listOf(StatementDef("do", ""))),
-        BlockDef("proc_define", BlockCategory.Events, BlockShape.Hat, "define procedure {name}", fields = listOf(FieldDef("name", FieldKind.Procedure(defines = true))), statements = listOf(StatementDef("do", ""))),
+        BlockDef("proc_define", BlockCategory.Events, BlockShape.Hat, "define procedure {name} {params}",
+            fields = listOf(FieldDef("name", FieldKind.Procedure(defines = true)), FieldDef("params", FieldKind.Params)), statements = listOf(StatementDef("do", ""))),
         BlockDef("event_timer", BlockCategory.Events, BlockShape.Hat, "when {timer} ticks", fields = listOf(FieldDef("timer", FieldKind.ComponentRef(ComponentType.Timer))), statements = listOf(StatementDef("do", ""))),
         BlockDef("event_dialog_ok", BlockCategory.Events, BlockShape.Hat, "when OK is pressed in {dialog}", fields = listOf(FieldDef("dialog", FieldKind.ComponentRef(ComponentType.Dialog))), statements = listOf(StatementDef("do", ""))),
         BlockDef("event_sound_done", BlockCategory.Events, BlockShape.Hat, "when {sound} finishes", fields = listOf(FieldDef("sound", FieldKind.ComponentRef(ComponentType.Sound))), statements = listOf(StatementDef("do", ""))),
@@ -112,6 +140,8 @@ object BlockRegistry {
             fields = listOf(FieldDef("var", FieldKind.VariableRef(ValueType.Number))),
             inputs = listOf(InputDef("from", ValueType.Number), InputDef("to", ValueType.Number)), statements = listOf(StatementDef("do", "do"))),
         BlockDef("proc_call", BlockCategory.Control, BlockShape.Statement, "call {name}", fields = listOf(FieldDef("name", FieldKind.Procedure(defines = false)))),
+        /** Value of a parameter of the enclosing procedure; its type is the parameter's. */
+        BlockDef("proc_param", BlockCategory.Control, BlockShape.Value, "{param}", fields = listOf(FieldDef("param", FieldKind.Param))),
 
         // Logic
         BlockDef("logic_bool", BlockCategory.Logic, BlockShape.Value, "{value}", fields = listOf(FieldDef("value", FieldKind.Dropdown(listOf("true", "false")))), output = ValueType.Boolean),
@@ -154,7 +184,7 @@ object BlockRegistry {
         BlockDef("view_set_enabled", BlockCategory.Components, BlockShape.Statement, "set {view} enabled to {enabled}", fields = listOf(FieldDef("view", FieldKind.View())), inputs = listOf(InputDef("enabled", ValueType.Boolean))),
         BlockDef("view_is_checked", BlockCategory.Components, BlockShape.Value, "{view} is checked", fields = listOf(FieldDef("view", FieldKind.View(ViewKind.Compound))), output = ValueType.Boolean),
         BlockDef("view_set_checked", BlockCategory.Components, BlockShape.Statement, "set {view} checked to {checked}", fields = listOf(FieldDef("view", FieldKind.View(ViewKind.Compound))), inputs = listOf(InputDef("checked", ValueType.Boolean))),
-        BlockDef("view_set_text_color", BlockCategory.Components, BlockShape.Statement, "set text color of {view} to {color}", fields = listOf(FieldDef("view", FieldKind.View(ViewKind.Text)), FieldDef("color", FieldKind.Text("#FF000000")))),
+        BlockDef("view_set_text_color", BlockCategory.Components, BlockShape.Statement, "set text color of {view} to {color}", fields = listOf(FieldDef("view", FieldKind.View(ViewKind.Text)), FieldDef("color", FieldKind.Color("#FF000000")))),
 
         // Parts (non-visual components)
         BlockDef("timer_start", BlockCategory.Parts, BlockShape.Statement, "start {timer} {mode} after {ms} ms",
@@ -185,7 +215,12 @@ object BlockRegistry {
         BlockDef("code_expr", BlockCategory.Code, BlockShape.Value, "text from code {code}", fields = listOf(FieldDef("code", FieldKind.Code)), output = ValueType.Text),
     )
 
+    /** Every block, core blocks first and then the [Catalog], in palette order within a category. */
+    val all: List<BlockDef> = core + Catalog.blocks
+
     private val byType = all.associateBy { it.type }
+
+    init { require(byType.size == all.size) { "Duplicate block types" } }
 
     fun find(type: String): BlockDef? = byType[type]
     operator fun get(type: String): BlockDef = byType[type] ?: error("Unknown block type $type")
@@ -194,7 +229,15 @@ object BlockRegistry {
      * A new block of [type] with default field values and default literal blocks in its value
      * inputs, so freshly added blocks are valid wherever possible.
      */
-    fun create(type: String, ids: () -> String, variables: List<Variable> = emptyList(), views: List<ViewInfo> = emptyList(), components: List<Component> = emptyList(), sounds: List<String> = emptyList()): Block {
+    fun create(
+        type: String,
+        ids: () -> String,
+        variables: List<Variable> = emptyList(),
+        views: List<ViewInfo> = emptyList(),
+        components: List<Component> = emptyList(),
+        sounds: List<String> = emptyList(),
+        images: List<String> = emptyList(),
+    ): Block {
         val def = get(type)
         val fields = def.fields.associate { f ->
             f.name to when (val k = f.kind) {
@@ -207,6 +250,9 @@ object BlockRegistry {
                 FieldKind.Activity -> ""
                 is FieldKind.ComponentRef -> components.firstOrNull { it.type == k.type }?.name.orEmpty()
                 FieldKind.RawResource -> sounds.firstOrNull().orEmpty()
+                FieldKind.DrawableResource -> images.firstOrNull().orEmpty()
+                is FieldKind.Color -> k.default
+                FieldKind.Params, FieldKind.Param -> ""
                 FieldKind.Code -> ""
             }
         }
@@ -214,11 +260,11 @@ object BlockRegistry {
         return Block(ids(), type, fields, inputs.filterValues { it != null }.mapValues { it.value!! })
     }
 
-    private fun defaultLiteral(t: ValueType, ids: () -> String): Block? = when (t) {
+    internal fun defaultLiteral(t: ValueType, ids: () -> String): Block? = when (t) {
         ValueType.Boolean -> Block(ids(), "logic_bool", mapOf("value" to "true"))
         ValueType.Number -> Block(ids(), "math_number", mapOf("num" to "0"))
         ValueType.Text -> Block(ids(), "text_literal", mapOf("text" to ""))
-        ValueType.TextList -> null
+        ValueType.TextList, ValueType.NumberList, ValueType.TextMap -> null
     }
 }
 
@@ -237,10 +283,15 @@ object ViewFamilies {
         "com.google.android.material.checkbox.MaterialCheckBox", "com.google.android.material.materialswitch.MaterialSwitch",
     )
 
+    private val image = setOf("ImageView", "ImageButton", "androidx.appcompat.widget.AppCompatImageView", "com.google.android.material.imageview.ShapeableImageView")
+    private val progress = setOf("ProgressBar", "SeekBar", "androidx.appcompat.widget.AppCompatSeekBar")
+
     fun matches(kind: ViewKind, tag: String): Boolean = when (kind) {
         ViewKind.Any -> true
         ViewKind.Text -> tag in text
         ViewKind.Compound -> tag in compound
+        ViewKind.Image -> tag in image
+        ViewKind.Progress -> tag in progress
     }
 
     /** Fully qualified class for a layout tag (framework short names live in android.widget/android.view/android.webkit). */

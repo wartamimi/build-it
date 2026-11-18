@@ -1,7 +1,14 @@
 package dev.buildit.feature.blocks
 
+import android.content.ClipData
+import android.content.ClipDescription
+import androidx.compose.foundation.draganddrop.dragAndDropSource
+import androidx.compose.ui.draganddrop.DragAndDropTransferData
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -65,6 +72,9 @@ import dev.buildit.core.designsystem.component.BiLoadingState
 import dev.buildit.core.designsystem.icon.BiIcons
 import dev.buildit.core.designsystem.theme.CodeTypography
 import dev.buildit.core.designsystem.theme.Spacing
+import dev.buildit.engine.blocks.BlockDocument
+import dev.buildit.engine.blocks.ProcParam
+import dev.buildit.engine.blocks.Procedures
 import dev.buildit.engine.blocks.Block
 import dev.buildit.engine.blocks.BlockCategory
 import dev.buildit.engine.blocks.BlockDef
@@ -156,6 +166,7 @@ fun BlocksScreen(
                                     onFieldTap = { b, f -> viewModel.select(b.id); fieldEdit = b to f },
                                     onDragCommit = viewModel::commitDrag,
                                     description = stringResource(R.string.bk_canvas),
+                                    onDropNew = viewModel::drop,
                                 )
                                 state.selectedId?.let { id -> SelectionBar(id, state, viewModel, canvas, Modifier.align(Alignment.TopEnd)) }
                             }
@@ -361,6 +372,7 @@ private fun paletteText(def: BlockDef, res: android.content.res.Resources): Stri
                 is FieldKind.Dropdown -> k.default
                 is FieldKind.Number -> k.default
                 is FieldKind.Text -> "…"
+                is FieldKind.Color -> "■"
                 else -> "▾"
             }
         }
@@ -371,6 +383,12 @@ private fun PaletteBlock(def: BlockDef, text: String, onClick: () -> Unit) {
     Box(
         Modifier.padding(vertical = Spacing.xs)
             .background(categoryColor(def.category), RoundedCornerShape(8.dp))
+            // Long-press and drag onto the canvas to drop the block where it should go; tap to add it at the selection
+            .dragAndDropSource { _ ->
+                DragAndDropTransferData(
+                    ClipData(ClipDescription("$PALETTE_CLIP_LABEL:${def.type}", arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN)), ClipData.Item(def.type)),
+                )
+            }
             .clickable(onClick = onClick)
             .heightIn(min = 40.dp)
             .padding(horizontal = Spacing.md, vertical = Spacing.sm),
@@ -381,16 +399,79 @@ private fun PaletteBlock(def: BlockDef, text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun typeLabel(t: ValueType) = stringResource(
+private fun typeLabel(t: ValueType) = stringResource(typeLabelRes(t))
+
+@Composable
+private fun typeLabelText(t: ValueType) = typeLabel(t)
+
+private fun typeLabelRes(t: ValueType) =
     when (t) {
         ValueType.Boolean -> R.string.bk_type_boolean
         ValueType.Number -> R.string.bk_type_number
         ValueType.Text -> R.string.bk_type_text
         ValueType.TextList -> R.string.bk_type_textList
-    },
-)
+        ValueType.NumberList -> R.string.bk_type_numberList
+        ValueType.TextMap -> R.string.bk_type_map
+    }
+
+/** Edits a procedure's parameters: a list with remove buttons, and a name plus type to add one. */
+@Composable
+private fun ParamsEditor(current: String, doc: BlockDocument, viewIds: Set<String>, onDismiss: () -> Unit, onSet: (String) -> Unit) {
+    var params by remember { mutableStateOf(Procedures.parse(current).orEmpty()) }
+    var name by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf(ValueType.Number) }
+    val problem = name.trim().takeIf { it.isNotEmpty() }?.let { Procedures.problem(it, params.map { p -> p.name }, doc, viewIds) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.bk_params_title)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                params.forEach { p ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${p.name} · ${typeLabel(p.type)}", Modifier.weight(1f))
+                        TextButton(onClick = { params = params - p }) { Text(stringResource(R.string.bk_param_remove, p.name)) }
+                    }
+                }
+                OutlinedTextField(
+                    name, { name = it }, singleLine = true, label = { Text(stringResource(R.string.bk_param_name)) },
+                    isError = problem != null,
+                    supportingText = problem?.let { code ->
+                        {
+                            Text(stringResource(when (code) {
+                                "duplicate_name" -> R.string.bk_param_duplicate_name
+                                "name_clash" -> R.string.bk_param_name_clash
+                                else -> R.string.bk_param_invalid_name
+                            }))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    ValueType.entries.forEach { t ->
+                        androidx.compose.material3.FilterChip(selected = t == type, onClick = { type = t }, label = { Text(typeLabel(t)) })
+                    }
+                }
+                TextButton(
+                    enabled = name.isNotBlank() && problem == null,
+                    onClick = { params = params + ProcParam(name.trim(), type); name = "" },
+                ) { Text(stringResource(R.string.bk_param_add)) }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSet(Procedures.format(params)) }) { Text(stringResource(R.string.bk_ok)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.bk_cancel)) } },
+    )
+}
 
 // ------------------------------------------------------------ dialogs
+
+private val PRESET_COLORS = listOf("#FF000000", "#FFFFFFFF", "#FFE53935", "#FFFB8C00", "#FFFDD835", "#FF43A047", "#FF1E88E5", "#FF8E24AA")
+private val COLOR_VALUE = Regex("#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
+
+private fun fieldValueOk(kind: FieldKind, text: String) = when (kind) {
+    is FieldKind.Number -> text.toDoubleOrNull()?.isFinite() == true
+    is FieldKind.Color -> COLOR_VALUE.matches(text)
+    else -> true
+}
 
 @Composable
 private fun FieldEditor(block: Block, field: String, state: BlocksUiState, onDismiss: () -> Unit, onSet: (String) -> Unit, onNewVariable: () -> Unit) {
@@ -398,6 +479,10 @@ private fun FieldEditor(block: Block, field: String, state: BlocksUiState, onDis
     val kind = def.fieldDef(field)?.kind ?: return onDismiss()
     val current = block.field(field)
     val doc = state.document ?: return
+    if (kind == FieldKind.Params) {
+        ParamsEditor(current, doc, state.views.map { it.id }.toSet(), onDismiss, onSet)
+        return
+    }
     val choices: List<Pair<String, String>>? = when (kind) {
         is FieldKind.Dropdown -> kind.options.map { it to it }
         is FieldKind.View -> state.views.filter { ViewFamilies.matches(kind.kind, it.tag) }.map { it.id to "${it.id} · ${it.tag.substringAfterLast('.')}" }
@@ -406,6 +491,9 @@ private fun FieldEditor(block: Block, field: String, state: BlocksUiState, onDis
         FieldKind.Activity -> state.activities.map { it to it }
         is FieldKind.ComponentRef -> doc.components.filter { it.type == kind.type }.map { it.name to it.name }
         FieldKind.RawResource -> state.sounds.map { it to it }
+        FieldKind.DrawableResource -> state.images.map { it to it }
+        FieldKind.Param -> Procedures.enclosingDefine(doc, block.id)?.let { Procedures.parse(it.field("params")) }.orEmpty()
+            .map { it.name to "${it.name} · ${typeLabelText(it.type)}" }
         else -> null
     }
     if (choices != null) {
@@ -418,6 +506,8 @@ private fun FieldEditor(block: Block, field: String, state: BlocksUiState, onDis
                         is FieldKind.View -> R.string.bk_no_views
                         is FieldKind.ComponentRef -> R.string.bk_no_components_of_type
                         FieldKind.RawResource -> R.string.bk_no_sounds
+                        FieldKind.DrawableResource -> R.string.bk_no_images
+                        FieldKind.Param -> R.string.bk_no_params
                         else -> R.string.bk_none_available
                     }))
                     choices.forEach { (value, label) ->
@@ -435,13 +525,27 @@ private fun FieldEditor(block: Block, field: String, state: BlocksUiState, onDis
         AlertDialog(
             onDismissRequest = onDismiss,
             text = {
-                OutlinedTextField(text, { text = it }, singleLine = !code, minLines = if (code) 4 else 1,
-                    textStyle = if (code || kind is FieldKind.Number) CodeTypography.body else MaterialTheme.typography.bodyLarge,
-                    isError = kind is FieldKind.Number && text.toDoubleOrNull() == null,
-                    modifier = Modifier.fillMaxWidth())
+                Column {
+                    if (kind is FieldKind.Color) {
+                        Row(Modifier.fillMaxWidth().padding(bottom = Spacing.md), horizontalArrangement = Arrangement.SpaceBetween) {
+                            PRESET_COLORS.forEach { c ->
+                                Box(
+                                    Modifier.size(28.dp).background(androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(c)), RoundedCornerShape(6.dp))
+                                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp))
+                                        .clickable { text = c },
+                                )
+                            }
+                        }
+                    }
+                    OutlinedTextField(text, { text = it }, singleLine = !code, minLines = if (code) 4 else 1,
+                        textStyle = if (code || kind is FieldKind.Number || kind is FieldKind.Color) CodeTypography.body else MaterialTheme.typography.bodyLarge,
+                        isError = !fieldValueOk(kind, text),
+                        supportingText = if (kind is FieldKind.Color) ({ Text(stringResource(R.string.bk_color_hint)) }) else null,
+                        modifier = Modifier.fillMaxWidth())
+                }
             },
             confirmButton = {
-                TextButton(enabled = kind !is FieldKind.Number || text.toDoubleOrNull() != null, onClick = { onSet(text) }) { Text(stringResource(R.string.bk_ok)) }
+                TextButton(enabled = fieldValueOk(kind, text), onClick = { onSet(text) }) { Text(stringResource(R.string.bk_ok)) }
             },
             dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.bk_cancel)) } },
         )

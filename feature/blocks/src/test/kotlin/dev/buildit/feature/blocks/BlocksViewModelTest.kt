@@ -125,4 +125,31 @@ class BlocksViewModelTest {
         vm.undo()
         assertEquals(2, vm.state.value.document!!.stacks.size)
     }
+
+    @Test fun procedureParametersFlowIntoCallsAndDropsSnap() = runTest(dispatcher) {
+        val vm = vm()
+        advanceUntilIdle()
+        val event = vm.state.value.document!!.stacks.single().blocks.single()
+        vm.add("proc_define", 0f, 600f)
+        val define = vm.state.value.document!!.stacks.last().blocks.single()
+        assertEquals("doSomething", define.field("name"))
+        vm.setField(define.id, "params", "times:number,label:text")
+
+        // Dropped from the palette onto the event: the canvas reports the slot it snaps to
+        vm.drop("proc_call", 0f, 0f) { _, _ -> Slot.Statement(event.id, "do", 0) }
+        advanceUntilIdle()
+        val call = vm.state.value.document!!.find(event.id)!!.statements["do"]!!.single()
+        assertEquals("proc_call", call.type)
+        assertEquals(setOf("arg_times", "arg_label"), call.inputs.keys)
+        val java = File(project.directory, "app/src/main/java/com/example/demo/MainActivity.java").readText()
+        assertTrue(java, java.contains("runDoSomething(0.0, \"\");"))
+
+        // Renaming the procedure renames its calls; removing a parameter keeps its argument block
+        vm.setField(define.id, "name", "greet")
+        vm.setField(define.id, "params", "times:number")
+        val doc = vm.state.value.document!!
+        assertEquals("greet", doc.find(call.id)!!.field("name"))
+        assertEquals(setOf("arg_times"), doc.find(call.id)!!.inputs.keys)
+        assertTrue(doc.stacks.any { s -> s.blocks.single().type == "text_literal" })
+    }
 }

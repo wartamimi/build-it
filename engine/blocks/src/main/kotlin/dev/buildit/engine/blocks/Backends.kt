@@ -37,6 +37,19 @@ private fun header(source: String) = listOf(
 private fun handlerName(prefix: String, view: String, suffix: String) = prefix + view.replaceFirstChar { it.uppercase() } + suffix
 private fun procName(name: String) = "run" + name.replaceFirstChar { it.uppercase() }
 
+private val placeholder = Regex("\\{(\\w+)\\}")
+
+/** Fills a template: inputs are printed with [expr], text fields with [str], other fields as is. */
+private fun fill(template: String, inputs: Map<String, Expr>, fields: Map<String, TField>, expr: (Expr) -> String, str: (String) -> String): String =
+    placeholder.replace(template) { m ->
+        val n = m.groupValues[1]
+        inputs[n]?.let(expr) ?: when (val f = fields[n]) {
+            is TField.Raw -> f.code
+            is TField.Str -> str(f.text)
+            null -> m.value
+        }
+    }
+
 private fun usesClass(p: Program, predicate: (Stmt) -> Boolean): Boolean {
     fun any(list: List<Stmt>): Boolean = list.any { s ->
         predicate(s) || when (s) {
@@ -44,6 +57,7 @@ private fun usesClass(p: Program, predicate: (Stmt) -> Boolean): Boolean {
             is Repeat -> any(s.body)
             is While -> any(s.body)
             is ForRange -> any(s.body)
+            is ForEach -> any(s.body)
             else -> false
         }
     }
@@ -62,7 +76,9 @@ private fun Program.cleanup(kotlin: Boolean): List<String> =
 private fun imports(p: Program): List<String> {
     val set = sortedSetOf("android.app.Activity", "android.os.Bundle")
     p.views.forEach { set += it.className }
-    if (p.variables.any { it.type == ValueType.TextList }) set += "java.util.ArrayList"
+    if (p.variables.any { it.type == ValueType.TextList || it.type == ValueType.NumberList }) set += "java.util.ArrayList"
+    if (p.variables.any { it.type == ValueType.TextMap }) set += "java.util.HashMap"
+    set += p.imports
     if (usesClass(p) { it is Toast }) set += "android.widget.Toast"
     if (usesClass(p) { it is Log }) set += "android.util.Log"
     if (usesClass(p) { it is StartActivity }) set += "android.content.Intent"
@@ -120,9 +136,13 @@ object JavaBackend : Backend {
             }
             p.clicks.forEach { h -> line(); block("private void ${handlerName("on", h.view, "Click")}() {") { stmts(h.body) } }
             p.checkedChanges.forEach { h -> line(); block("private void ${handlerName("on", h.view, "CheckedChange")}() {") { stmts(h.body) } }
-            p.procedures.forEach { pr -> line(); block("private void ${procName(pr.name)}() {") { stmts(pr.body) } }
+            p.procedures.forEach { pr ->
+                line()
+                block("private void ${procName(pr.name)}(${pr.params.joinToString(", ") { "${if (it.type.isCollection) "" else "final "}${type(it.type)} ${it.name}" }}) {") { stmts(pr.body) }
+            }
             p.components.forEach { c -> component(c, p.componentEvents[c.name].orEmpty()) }
             helpers(p.helpers)
+            p.templateHelpers.forEach { h -> h.java?.let { line(); raw(it) } }
         }
     }.toString()
 
@@ -165,10 +185,12 @@ object JavaBackend : Backend {
 
     private fun type(t: ValueType) = when (t) {
         ValueType.Boolean -> "boolean"; ValueType.Number -> "double"; ValueType.Text -> "String"; ValueType.TextList -> "ArrayList<String>"
+        ValueType.NumberList -> "ArrayList<Double>"; ValueType.TextMap -> "HashMap<String, String>"
     }
 
     private fun initial(t: ValueType) = when (t) {
-        ValueType.Boolean -> "false"; ValueType.Number -> "0"; ValueType.Text -> "\"\""; ValueType.TextList -> "new ArrayList<>()"
+        ValueType.Boolean -> "false"; ValueType.Number -> "0"; ValueType.Text -> "\"\""; ValueType.TextList, ValueType.NumberList -> "new ArrayList<>()"
+        ValueType.TextMap -> "new HashMap<>()"
     }
 
     private fun Out.stmts(list: List<Stmt>) = list.forEach { stmt(it) }
@@ -181,7 +203,8 @@ object JavaBackend : Backend {
                 close()
             }
             is Repeat -> block("for (int ${s.counter} = 0; ${s.counter} < (int) ${e(s.times)}; ${s.counter}++) {") { stmts(s.body) }
-            is While -> block("while (${c(s.cond)}) {") { stmts(s.body) }
+            // A constant condition would make javac reject the code after (or inside) the loop as unreachable
+            is While -> block("while (${if (s.cond is BoolLit) "Boolean.${s.cond.value.toString().uppercase()}" else c(s.cond)}) {") { stmts(s.body) }
             is ForRange -> block("for (${s.variable} = ${e(s.from)}; ${s.variable} <= ${e(s.to)}; ${s.variable}++) {") { stmts(s.body) }
             is SetVar -> line("${s.name} = ${c(s.value)};")
             is ChangeVar -> line("${s.name} += ${e(s.by)};")
@@ -196,7 +219,7 @@ object JavaBackend : Backend {
             is Log -> line("Log.d(\"BuildIt\", ${e(s.text)});")
             is StartActivity -> line("startActivity(new Intent(this, ${s.activity}.class));")
             Finish -> line("finish();")
-            is CallProcedure -> line("${procName(s.name)}();")
+            is CallProcedure -> line("${procName(s.name)}(${s.args.joinToString(", ") { c(it) }});")
             is RawStmt -> raw(s.code)
             is TimerStart -> line("${handlerName("start", s.timer, "")}((long) ${e(s.delayMs)}, ${s.repeating});")
             is TimerStop -> line("${s.timer}.removeCallbacksAndMessages(null);")
@@ -206,6 +229,11 @@ object JavaBackend : Backend {
             is SoundPlay -> line("${handlerName("play", s.sound, "")}(R.raw.${s.file});")
             is SoundStop -> line("${handlerName("stop", s.sound, "")}();")
             is OpenLink -> line("startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(${c(s.url)})));")
+            is ForEach -> block("for (${if (s.elementType == ValueType.Number) "double" else "String"} ${s.item} : new ArrayList<>(${s.list})) {") {
+                line("${s.variable} = ${s.item};")
+                stmts(s.body)
+            }
+            is TemplateStmt -> raw(fill(s.code.java, s.inputs, s.fields, ::e, ::str))
         }
     }
 
@@ -239,6 +267,7 @@ object JavaBackend : Backend {
         is ViewText -> "${x.view}.getText().toString()"
         is ViewChecked -> "${x.view}.isChecked()"
         is RawExpr -> "String.valueOf(${x.code})"
+        is TemplateExpr -> fill(x.code.java, x.inputs, x.fields, ::e, ::str)
     }
 
     private fun Out.helpers(h: Set<Helper>) {
@@ -286,11 +315,11 @@ object KotlinBackend : Backend {
     override fun generate(p: Program): String = Out().apply {
         line("package ${p.packageName}")
         line()
-        imports(p).filterNot { it == "java.util.ArrayList" }.forEach { line("import $it") }
+        imports(p).filterNot { it == "java.util.ArrayList" || it == "java.util.HashMap" }.forEach { line("import $it") }
         line()
         header(".buildit/blocks/${p.className}.json").forEach(::line)
         block("class ${p.className} : Activity() {") {
-            p.variables.forEach { v -> line("private ${if (v.type == ValueType.TextList) "val" else "var"} ${v.name}: ${type(v.type)} = ${initial(v.type)}") }
+            p.variables.forEach { v -> line("private ${if (v.type.isCollection) "val" else "var"} ${v.name}: ${type(v.type)} = ${initial(v.type)}") }
             p.views.forEach { v -> line("private lateinit var ${v.id}: ${v.className.substringAfterLast('.')}") }
             p.components.forEach { c ->
                 when (c.type) {
@@ -323,9 +352,13 @@ object KotlinBackend : Backend {
             }
             p.clicks.forEach { h -> line(); block("private fun ${handlerName("on", h.view, "Click")}() {") { stmts(h.body) } }
             p.checkedChanges.forEach { h -> line(); block("private fun ${handlerName("on", h.view, "CheckedChange")}() {") { stmts(h.body) } }
-            p.procedures.forEach { pr -> line(); block("private fun ${procName(pr.name)}() {") { stmts(pr.body) } }
+            p.procedures.forEach { pr ->
+                line()
+                block("private fun ${procName(pr.name)}(${pr.params.joinToString(", ") { "${it.name}: ${type(it.type)}" }}) {") { stmts(pr.body) }
+            }
             p.components.forEach { c -> component(c, p.componentEvents[c.name].orEmpty()) }
             helpers(p.helpers)
+            p.templateHelpers.forEach { h -> h.kotlin?.let { line(); raw(it) } }
         }
     }.toString()
 
@@ -368,10 +401,12 @@ object KotlinBackend : Backend {
 
     private fun type(t: ValueType) = when (t) {
         ValueType.Boolean -> "Boolean"; ValueType.Number -> "Double"; ValueType.Text -> "String"; ValueType.TextList -> "ArrayList<String>"
+        ValueType.NumberList -> "ArrayList<Double>"; ValueType.TextMap -> "HashMap<String, String>"
     }
 
     private fun initial(t: ValueType) = when (t) {
-        ValueType.Boolean -> "false"; ValueType.Number -> "0.0"; ValueType.Text -> "\"\""; ValueType.TextList -> "ArrayList()"
+        ValueType.Boolean -> "false"; ValueType.Number -> "0.0"; ValueType.Text -> "\"\""; ValueType.TextList, ValueType.NumberList -> "ArrayList()"
+        ValueType.TextMap -> "HashMap()"
     }
 
     private fun Out.stmts(list: List<Stmt>) = list.forEach { stmt(it) }
@@ -383,7 +418,7 @@ object KotlinBackend : Backend {
                 if (s.otherwise != null) { mid("} else {"); stmts(s.otherwise) }
                 close()
             }
-            is Repeat -> block("repeat(${e(s.times)}.toInt()) {") { stmts(s.body) }
+            is Repeat -> block("for (${s.counter} in 0 until ${e(s.times)}.toInt()) {") { stmts(s.body) }
             is While -> block("while (${c(s.cond)}) {") { stmts(s.body) }
             is ForRange -> {
                 line("${s.variable} = ${e(s.from)}")
@@ -402,7 +437,7 @@ object KotlinBackend : Backend {
             is Log -> line("Log.d(\"BuildIt\", ${e(s.text)})")
             is StartActivity -> line("startActivity(Intent(this, ${s.activity}::class.java))")
             Finish -> line("finish()")
-            is CallProcedure -> line("${procName(s.name)}()")
+            is CallProcedure -> line("${procName(s.name)}(${s.args.joinToString(", ") { c(it) }})")
             is RawStmt -> raw(s.code)
             is TimerStart -> line("${handlerName("start", s.timer, "")}(${e(s.delayMs)}.toLong(), ${s.repeating})")
             is TimerStop -> line("${s.timer}.removeCallbacksAndMessages(null)")
@@ -412,6 +447,11 @@ object KotlinBackend : Backend {
             is SoundPlay -> line("${handlerName("play", s.sound, "")}(R.raw.${s.file})")
             is SoundStop -> line("${handlerName("stop", s.sound, "")}()")
             is OpenLink -> line("startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(${c(s.url)})))")
+            is ForEach -> block("for (${s.item} in ArrayList(${s.list})) {") {
+                line("${s.variable} = ${s.item}")
+                stmts(s.body)
+            }
+            is TemplateStmt -> raw(fill(s.code.kotlin, s.inputs, s.fields, ::e, ::str))
         }
     }
 
@@ -432,7 +472,7 @@ object KotlinBackend : Backend {
         is TextEquals -> "(${e(x.a)} == ${e(x.b)})"
         is ToText -> when (x.a.type) {
             ValueType.Number -> "formatNumber(${e(x.a)})"
-            else -> "${e(x.a)}.toString()"
+            else -> if (x.a is Not || x.a is Binary) "(${e(x.a)}).toString()" else "${e(x.a)}.toString()"
         }
         is Concat -> "(${e(x.a)} + ${e(x.b)})"
         is TextLength -> "${e(x.a)}.length.toDouble()"
@@ -445,6 +485,7 @@ object KotlinBackend : Backend {
         is ViewChecked -> "${x.view}.isChecked"
         is RawExpr -> "(${x.code}).toString()"
         is StorageGet -> "(${x.store}.getString(${c(x.key)}, \"\") ?: \"\")"
+        is TemplateExpr -> fill(x.code.kotlin, x.inputs, x.fields, ::e, ::str)
     }
 
     private fun Out.helpers(h: Set<Helper>) {

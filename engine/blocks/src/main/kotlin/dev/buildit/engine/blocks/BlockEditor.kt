@@ -34,6 +34,8 @@ object BlockOps {
     fun outputType(doc: BlockDocument, block: Block): ValueType? {
         val def = BlockRegistry.find(block.type) ?: return null
         if (block.type == "var_get") return doc.variables.firstOrNull { it.name == block.field("var") }?.type
+        if (block.type == "proc_param") return Procedures.enclosingDefine(doc, block.id)
+            ?.let { d -> Procedures.parse(d.field("params"))?.firstOrNull { it.name == block.field("param") }?.type }
         return def.output
     }
 
@@ -76,7 +78,7 @@ object BlockOps {
             is Slot.Value -> {
                 if (shape != BlockShape.Value || chain.size != 1) return false
                 val parent = doc.find(slot.parentId) ?: return false
-                val input = BlockRegistry.find(parent.type)?.inputDef(slot.input) ?: return false
+                val input = doc.defOf(parent)?.inputDef(slot.input) ?: return false
                 val out = outputType(doc, first) ?: return true // unresolved variable: allowed, reported by validation
                 ValueType.accepts(input.type, out) && parent.walk().none { it.id == first.id }
             }

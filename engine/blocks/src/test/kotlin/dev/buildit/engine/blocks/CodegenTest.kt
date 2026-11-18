@@ -63,7 +63,7 @@ class CodegenTest {
             "private val items: ArrayList<String> = ArrayList()",
             "private lateinit var greeting: TextView",
             "button1.setOnClickListener { onButton1Click() }",
-            "repeat(3.0.toInt()) {",
+            "for (i1 in 0 until 3.0.toInt()) {",
             "name = \"Ada \\\"\\$\\\" \\\\ \\n\"",
             "greeting.text = \"Count: \" + formatNumber(count)",
             "startActivity(Intent(this, SettingsActivity::class.java))",

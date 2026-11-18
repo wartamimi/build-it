@@ -1,6 +1,16 @@
 package dev.buildit.feature.blocks
 
+import android.content.ClipDescription
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.draganddrop.dragAndDropTarget
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.draganddrop.DragAndDropEvent
+import androidx.compose.ui.draganddrop.DragAndDropTarget
+import androidx.compose.ui.draganddrop.mimeTypes
+import androidx.compose.ui.draganddrop.toAndroidDragEvent
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -45,6 +55,7 @@ import dev.buildit.engine.blocks.BlockDocument
 import dev.buildit.engine.blocks.BlockOps
 import dev.buildit.engine.blocks.BlockRegistry
 import dev.buildit.engine.blocks.BlockShape
+import dev.buildit.engine.blocks.Slot
 import kotlin.math.hypot
 
 /** Viewport of the block canvas (pan in screen pixels, zoom factor). */
@@ -86,6 +97,17 @@ private class Drag(
     var origin by mutableStateOf(Offset.Zero)
     var target by mutableStateOf<SnapTarget?>(null)
     var overTrash by mutableStateOf(false)
+    /** Last pointer position on screen, for scrolling the canvas while the finger rests near an edge. */
+    var pointer by mutableStateOf(Offset.Zero)
+}
+
+/** Label of the clip a palette block carries while it is dragged onto the canvas; the text is the block type. */
+const val PALETTE_CLIP_LABEL = "dev.buildit.block"
+
+/** A palette block being dragged over the canvas (platform drag and drop). */
+private class NewDrag(val shape: BlockShape) {
+    var world by mutableStateOf(Offset.Zero)
+    var target by mutableStateOf<SnapTarget?>(null)
 }
 
 fun categoryColor(c: BlockCategory?): Color = when (c) {
@@ -114,6 +136,11 @@ fun BlockCanvas(
     onDragCommit: (original: BlockDocument, result: BlockDocument) -> Unit,
     modifier: Modifier = Modifier,
     description: String = "",
+    /**
+     * A palette block of [type] was dropped at a world position. [slotFor] finds the slot it snaps to
+     * in a document (null: a new stack at the drop position).
+     */
+    onDropNew: (type: String, x: Float, y: Float, slotFor: (BlockDocument, List<Block>) -> Slot?) -> Unit = { _, _, _, _ -> },
 ) {
     val density = LocalDensity.current.density
     val measurer = rememberTextMeasurer(cacheSize = 256)
@@ -148,10 +175,84 @@ fun BlockCanvas(
 
     fun trashCenter() = Offset(canvas.size.width - trashRadius * 1.6f, canvas.size.height - trashRadius * 1.6f)
 
+    /** Nearest compatible slot for [chain] whose origin is at [origin], within the snap radius. */
+    fun snap(base: BlockDocument, chain: List<Block>?, shape: BlockShape, origin: Offset): SnapTarget? =
+        if (shape == BlockShape.Hat) null else layout.targets(layout.layout(base), shape)
+            .filter { chain == null || BlockOps.canInsert(base, chain, it.slot) }
+            .minByOrNull { hypot(it.x - origin.x, it.y - origin.y) }
+            ?.takeIf { hypot(it.x - origin.x, it.y - origin.y) < snapRadius / canvas.zoom.coerceAtMost(1f) }
+
+    fun moveDrag(d: Drag, p: Offset) {
+        d.pointer = p
+        d.origin = canvas.toWorld(p) - d.grab
+        d.overTrash = (p - trashCenter()).getDistance() < trashRadius * 1.4f
+        val shape = BlockRegistry.find(d.chain.first().type)?.shape
+        d.target = if (d.overTrash || shape == null) null else snap(d.base, d.chain, shape, d.origin)
+    }
+
+    // Scroll while a dragged block is held near an edge, so blocks can travel beyond the screen.
+    val edge = 48f * density
+    LaunchedEffect(drag) {
+        val d = drag ?: return@LaunchedEffect
+        while (true) {
+            withFrameNanos { }
+            val p = d.pointer
+            val dx = when { p.x < edge -> 1f; p.x > canvas.size.width - edge -> -1f; else -> 0f }
+            val dy = when { p.y < edge -> 1f; p.y > canvas.size.height - edge -> -1f; else -> 0f }
+            if ((dx != 0f || dy != 0f) && !d.overTrash) {
+                canvas.pan += Offset(dx, dy) * (10f * density)
+                moveDrag(d, p)
+            }
+        }
+    }
+
+    var newDrag by remember { mutableStateOf<NewDrag?>(null) }
+    var rootOffset by remember { mutableStateOf(Offset.Zero) }
+    val dropNew by rememberUpdatedState(onDropNew)
+    val dropTarget = remember(layout) {
+        object : DragAndDropTarget {
+            private fun local(event: DragAndDropEvent) = event.toAndroidDragEvent().let { Offset(it.x, it.y) } - rootOffset
+            private fun type(event: DragAndDropEvent) = event.toAndroidDragEvent().clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
+
+            override fun onEntered(event: DragAndDropEvent) {
+                val t = event.toAndroidDragEvent().clipDescription?.label?.toString()?.removePrefix("$PALETTE_CLIP_LABEL:")
+                newDrag = BlockRegistry.find(t.orEmpty())?.let { NewDrag(it.shape) }
+            }
+
+            override fun onMoved(event: DragAndDropEvent) {
+                val n = newDrag ?: return
+                n.world = canvas.toWorld(local(event))
+                n.target = snap(doc, null, n.shape, n.world)
+            }
+
+            override fun onExited(event: DragAndDropEvent) { newDrag = null }
+            override fun onEnded(event: DragAndDropEvent) { newDrag = null }
+
+            override fun onDrop(event: DragAndDropEvent): Boolean {
+                val t = type(event) ?: return false
+                val w = canvas.toWorld(local(event))
+                newDrag = null
+                dropNew(t, w.x, w.y, slot@{ d, chain ->
+                    val shape = BlockRegistry.find(chain.first().type)?.shape ?: return@slot null
+                    snap(d, chain, shape, w)?.slot
+                })
+                return true
+            }
+        }
+    }
+
     Canvas(
         modifier
             .fillMaxSize()
             .onSizeChanged { canvas.size = it }
+            .onGloballyPositioned { rootOffset = it.positionInRoot() }
+            .dragAndDropTarget(
+                shouldStartDragAndDrop = { e ->
+                    e.mimeTypes().contains(ClipDescription.MIMETYPE_TEXT_PLAIN) &&
+                        e.toAndroidDragEvent().clipDescription?.label?.toString()?.startsWith(PALETTE_CLIP_LABEL) == true
+                },
+                target = dropTarget,
+            )
             .semantics { contentDescription = description }
             .pointerInput(layout) {
                 awaitEachGesture {
@@ -187,15 +288,7 @@ fun BlockCanvas(
                             if (moved) {
                                 val d = drag
                                 if (d != null) {
-                                    val w = canvas.toWorld(p)
-                                    d.origin = w - d.grab
-                                    d.overTrash = (p - trashCenter()).getDistance() < trashRadius * 1.4f
-                                    val shape = BlockRegistry.find(d.chain.first().type)?.shape
-                                    d.target = if (d.overTrash || shape == null || shape == BlockShape.Hat) null else
-                                        layout.targets(layout.layout(d.base), shape)
-                                            .filter { BlockOps.canInsert(d.base, d.chain, it.slot) }
-                                            .minByOrNull { hypot(it.x - d.origin.x, it.y - d.origin.y) }
-                                            ?.takeIf { hypot(it.x - d.origin.x, it.y - d.origin.y) < snapRadius / canvas.zoom.coerceAtMost(1f) }
+                                    moveDrag(d, p)
                                 } else {
                                     canvas.pan += p - last
                                 }
@@ -232,6 +325,9 @@ fun BlockCanvas(
                     drawRoundRect(selection, Offset(t.x - 4f, t.y - 3f), Size(60f * density, 6f), CornerRadius(3f, 3f))
                 }
                 layout.layoutChain(d.chain, d.origin.x, d.origin.y).forEach { drawBlock(it, measurer, textStyle, null, emptySet(), selection, error, alpha = 0.85f) }
+            }
+            newDrag?.target?.let { t ->
+                drawRoundRect(selection, Offset(t.x - 4f, t.y - 3f), Size(60f * density, 6f), CornerRadius(3f, 3f))
             }
         }
         drag?.let { d ->
@@ -285,5 +381,12 @@ private fun DrawScope.drawBlock(
 }
 
 /** Block message in the app language; falls back to English if a translation's placeholders don't match. */
-internal fun localizedParts(def: dev.buildit.engine.blocks.BlockDef, res: android.content.res.Resources): List<dev.buildit.engine.blocks.MessagePart> =
-    blockMessageRes(def.type)?.let(res::getString)?.takeIf(def::matches)?.let(def::parse) ?: def.parts
+internal fun localizedParts(def: dev.buildit.engine.blocks.BlockDef, res: android.content.res.Resources): List<dev.buildit.engine.blocks.MessagePart> {
+    if (def.type == "proc_call" && def.inputs.isNotEmpty()) {
+        // A call with parameters: translated "call {name}" followed by the parameter inputs
+        val base = BlockRegistry["proc_call"]
+        val head = localizedParts(base, res)
+        return head + def.parts.drop(base.parts.size)
+    }
+    return blockMessageRes(def.type)?.let(res::getString)?.takeIf(def::matches)?.let(def::parse) ?: def.parts
+}

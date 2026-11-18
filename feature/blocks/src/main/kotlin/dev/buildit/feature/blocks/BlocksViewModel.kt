@@ -19,7 +19,9 @@ import dev.buildit.engine.blocks.Component
 import dev.buildit.engine.blocks.ComponentType
 import dev.buildit.engine.blocks.BlockSync
 import dev.buildit.engine.blocks.BlockValidator
+import dev.buildit.engine.blocks.Procedures
 import dev.buildit.engine.blocks.Slot
+import dev.buildit.engine.blocks.defOf
 import dev.buildit.engine.blocks.ValueType
 import dev.buildit.engine.blocks.Variable
 import dev.buildit.engine.blocks.ViewInfo
@@ -62,6 +64,8 @@ data class BlocksUiState(
     val views: List<ViewInfo> = emptyList(),
     /** Sound files in res/raw (resource names), for sound blocks. */
     val sounds: List<String> = emptyList(),
+    /** Images in res/drawable, by resource name. */
+    val images: List<String> = emptyList(),
     val diagnostics: List<BlockDiagnostic> = emptyList(),
     val selectedId: String? = null,
     val canUndo: Boolean = false,
@@ -119,13 +123,13 @@ class BlocksViewModel(
                 val (doc, views) = withContext(dispatchers.io) {
                     store!!.load(chosen.name, ids) to readViews(File(p.directory, "app/src/main/res/layout/${chosen.layout}.xml"))
                 }
-                val sounds = withContext(dispatchers.io) { readSounds(p.directory) }
+                val (sounds, images) = withContext(dispatchers.io) { readSounds(p.directory) to readImages(p.directory) }
                 editor = BlockEditor(doc)
                 _state.update {
                     it.copy(
                         loading = false, error = null, activities = activities.map { a -> a.name }, activity = chosen.name,
                         layouts = activities.associate { a -> a.name to a.layout },
-                        document = doc, views = views, sounds = sounds, selectedId = null, canUndo = false, canRedo = false, dirty = false,
+                        document = doc, views = views, sounds = sounds, images = images, selectedId = null, canUndo = false, canRedo = false, dirty = false,
                         codeStatus = CodeStatus.Unknown, keepHandEdits = false,
                         sourcePath = BlockSync.sourcePath(p.manifest, chosen.name),
                     )
@@ -154,13 +158,13 @@ class BlocksViewModel(
         val activity = m.modules.flatMap { it.activities }.firstOrNull { it.name == _state.value.activity } ?: return
         viewModelScope.launch {
             val views = withContext(dispatchers.io) { readViews(File(dir, "app/src/main/res/layout/${activity.layout}.xml")) }
-            val sounds = withContext(dispatchers.io) { readSounds(dir) }
-            _state.update { it.copy(views = views, sounds = sounds) }
+            val (sounds, images) = withContext(dispatchers.io) { readSounds(dir) to readImages(dir) }
+            _state.update { it.copy(views = views, sounds = sounds, images = images) }
             refreshDiagnostics()
         }
     }
 
-    private fun context() = BlockContext(_state.value.views, _state.value.activities, _state.value.sounds)
+    private fun context() = BlockContext(_state.value.views, _state.value.activities, _state.value.sounds, _state.value.images)
 
     private fun refreshDiagnostics() {
         val doc = _state.value.document ?: return
@@ -212,20 +216,41 @@ class BlocksViewModel(
      * Adds a new block from the palette: after the selected statement, into the first empty
      * compatible input of the selected block, or as a new stack at ([x], [y]).
      */
+    /** A palette block dropped on the canvas: into the slot [slotFor] finds, else as a new stack at ([x], [y]). */
+    fun drop(type: String, x: Float, y: Float, slotFor: (BlockDocument, List<Block>) -> Slot?) {
+        if (BlockRegistry.find(type) == null) return
+        place(type, x, y) { d, block -> slotFor(d, listOf(block)) }
+    }
+
     fun add(type: String, x: Float, y: Float) {
-        val doc = _state.value.document ?: return
-        val block = BlockRegistry.create(type, ids, doc.variables, _state.value.views, doc.components, _state.value.sounds)
+        val selected = _state.value.selectedId?.let { _state.value.document?.find(it) }
         val shape = BlockRegistry[type].shape
+        place(type, x, y) { d, block -> selected?.let { sel -> preferredSlot(d, sel, shape, block) } }
+    }
+
+    private fun place(type: String, x: Float, y: Float, slotFor: (BlockDocument, Block) -> Slot?) {
+        val doc = _state.value.document ?: return
+        val created = BlockRegistry.create(type, ids, doc.variables, _state.value.views, doc.components, _state.value.sounds, _state.value.images)
         val selected = _state.value.selectedId?.let { doc.find(it) }
+        val procedure = doc.stacks.mapNotNull { s -> s.blocks.firstOrNull()?.takeIf { it.type == "proc_define" } }
+        val block = when (type) {
+            // A call starts on the first procedure; a parameter on the first parameter of the selected procedure
+            "proc_call" -> procedure.firstOrNull()?.let { created.copy(fields = mapOf("name" to it.field("name"))) } ?: created
+            "proc_param" -> selected?.let { Procedures.enclosingDefine(doc, it.id) }?.let { Procedures.parse(it.field("params"))?.firstOrNull() }
+                ?.let { created.copy(fields = mapOf("param" to it.name)) } ?: created
+            "proc_define" -> created.copy(fields = created.fields + ("name" to freeProcedureName(procedure.map { it.field("name") })))
+            else -> created
+        }
         edit { d ->
-            val slot = selected?.let { sel -> preferredSlot(d, sel, shape, block) }
-            if (slot != null) BlockOps.insert(d, listOf(block), slot, x to y) else BlockOps.addStack(d, listOf(block), x, y)
+            val slot = slotFor(d, block)?.takeIf { BlockOps.canInsert(d, listOf(block), it) }
+            val next = if (slot != null) BlockOps.insert(d, listOf(block), slot, x to y) else BlockOps.addStack(d, listOf(block), x, y)
+            if (type == "proc_call") Procedures.syncCalls(next, block.field("name"), ids) else next
         }
         _state.update { it.copy(selectedId = block.id) }
     }
 
     private fun preferredSlot(d: BlockDocument, sel: Block, shape: BlockShape, block: Block): Slot? {
-        val selDef = BlockRegistry.find(sel.type) ?: return null
+        val selDef = d.defOf(sel) ?: return null
         return when (shape) {
             BlockShape.Statement -> when {
                 selDef.statements.isNotEmpty() && (selDef.shape == BlockShape.Hat || sel.statements.values.all { it.isEmpty() }) ->
@@ -243,7 +268,25 @@ class BlocksViewModel(
         }
     }
 
-    fun setField(id: String, name: String, value: String) = edit { BlockOps.setField(it, id, name, value) }
+    fun setField(id: String, name: String, value: String) = edit { d ->
+        val block = d.find(id)
+        val next = BlockOps.setField(d, id, name, value)
+        when {
+            // Calls follow their procedure's parameters (and its new name)
+            block?.type == "proc_define" && name == "name" -> {
+                val old = block.field("name")
+                val renamed = next.allBlocks().filter { it.type == "proc_call" && it.field("name") == old }
+                    .fold(next) { acc, c -> BlockOps.setField(acc, c.id, "name", value) }
+                Procedures.syncCalls(renamed, value, ids)
+            }
+            block?.type == "proc_define" && name == "params" -> Procedures.syncCalls(next, block.field("name"), ids)
+            block?.type == "proc_call" && name == "name" -> Procedures.syncCalls(next, value, ids)
+            else -> next
+        }
+    }
+
+    private fun freeProcedureName(taken: List<String>) =
+        generateSequence(1) { it + 1 }.map { if (it == 1) "doSomething" else "doSomething$it" }.first { it !in taken }
     fun delete(id: String) = edit { BlockOps.delete(it, id) }
     fun duplicate(id: String, x: Float, y: Float) = edit { BlockOps.duplicate(it, id, ids, x, y) }
     fun toggleDisabled(id: String) = edit { d -> BlockOps.setDisabled(d, id, !(d.find(id)?.disabled ?: false)) }
@@ -270,7 +313,7 @@ class BlocksViewModel(
         val doc = _state.value.document ?: return null
         doc.stacks.firstOrNull { s -> s.blocks.firstOrNull()?.let { h -> h.type == type && fields.all { (k, v) -> h.field(k) == v } } == true }
             ?.let { return it.blocks.first().id }
-        val base = BlockRegistry.create(type, ids, doc.variables, _state.value.views, doc.components, _state.value.sounds)
+        val base = BlockRegistry.create(type, ids, doc.variables, _state.value.views, doc.components, _state.value.sounds, _state.value.images)
         val block = base.copy(fields = base.fields + fields)
         // Below the lowest stack, estimating each block's height generously so nothing overlaps.
         val y = doc.stacks.maxOfOrNull { st -> st.y + st.blocks.sumOf { b -> b.walk().count() } * 56f } ?.plus(EVENT_SPACING) ?: 40f
@@ -371,6 +414,10 @@ class BlocksViewModel(
         /** Resource names of the files in res/raw. */
         fun readSounds(projectDir: File): List<String> =
             File(projectDir, "app/src/main/res/raw").listFiles().orEmpty().filter { it.isFile }.map { it.name.substringBefore('.') }.distinct().sorted()
+
+        /** Resource names of the images in res/drawable. */
+        fun readImages(projectDir: File): List<String> =
+            dev.buildit.engine.project.ProjectAssets(projectDir).list(dev.buildit.engine.project.AssetKind.Image).map { it.name }.distinct()
 
         fun readViews(layout: File): List<ViewInfo> {
             if (!layout.isFile) return emptyList()

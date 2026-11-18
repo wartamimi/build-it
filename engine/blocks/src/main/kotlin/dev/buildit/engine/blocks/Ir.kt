@@ -37,7 +37,20 @@ data class ViewChecked(val view: String) : Expr { override val type = ValueType.
 data class RawExpr(val code: String) : Expr { override val type = ValueType.Text }
 data class StorageGet(val store: String, val key: Expr) : Expr { override val type = ValueType.Text }
 
+/** A field value substituted into a [CodeTemplate]: code as is, or text printed as a string literal. */
+sealed interface TField {
+    data class Raw(val code: String) : TField
+    data class Str(val text: String) : TField
+}
+
+/** A value block lowered from its [CodeTemplate]. */
+data class TemplateExpr(val code: CodeTemplate, val inputs: Map<String, Expr>, val fields: Map<String, TField>, override val type: ValueType) : Expr
+
 sealed interface Stmt
+/** A statement block lowered from its [CodeTemplate]. */
+data class TemplateStmt(val code: CodeTemplate, val inputs: Map<String, Expr>, val fields: Map<String, TField>) : Stmt
+/** Runs [body] for each item of a copy of [list] (so the body may change the list), storing it in [variable]. */
+data class ForEach(val variable: String, val list: String, val elementType: ValueType, val body: List<Stmt>, val item: String) : Stmt
 data class If(val cond: Expr, val then: List<Stmt>, val otherwise: List<Stmt>?) : Stmt
 data class Repeat(val times: Expr, val body: List<Stmt>, val counter: String) : Stmt
 data class While(val cond: Expr, val body: List<Stmt>) : Stmt
@@ -55,7 +68,7 @@ data class Toast(val text: Expr) : Stmt
 data class Log(val text: Expr) : Stmt
 data class StartActivity(val activity: String) : Stmt
 data object Finish : Stmt
-data class CallProcedure(val name: String) : Stmt
+data class CallProcedure(val name: String, val args: List<Expr> = emptyList()) : Stmt
 data class RawStmt(val code: String) : Stmt
 data class TimerStart(val timer: String, val delayMs: Expr, val repeating: Boolean) : Stmt
 data class TimerStop(val timer: String) : Stmt
@@ -71,7 +84,7 @@ enum class Helper { FormatNumber, RandomInt, ParseNumber }
 
 data class ViewField(val id: String, val className: String)
 data class Handler(val view: String, val body: List<Stmt>)
-data class Procedure(val name: String, val body: List<Stmt>)
+data class Procedure(val name: String, val body: List<Stmt>, val params: List<ProcParam> = emptyList())
 
 data class Program(
     val packageName: String,
@@ -88,6 +101,10 @@ data class Program(
     val components: List<Component> = emptyList(),
     /** Component events: timer ticks, dialog OK, sound finished (the handler's view is the component name). */
     val componentEvents: Map<String, List<Stmt>> = emptyMap(),
+    /** Classes needed by template blocks. */
+    val imports: Set<String> = emptySet(),
+    /** Helper methods needed by template blocks, by name. */
+    val templateHelpers: List<TemplateHelper> = emptyList(),
 )
 
 data class ActivityTarget(val packageName: String, val className: String, val layout: String)
@@ -96,6 +113,8 @@ data class ActivityTarget(val packageName: String, val className: String, val la
 class Lowering private constructor(private val doc: BlockDocument, private val ctx: BlockContext) {
     private val usedViews = sortedSetOf<String>()
     private val helpers = mutableSetOf<Helper>()
+    private val imports = sortedSetOf<String>()
+    private val templateHelpers = sortedMapOf<String, TemplateHelper>()
     private var counter = 0
 
     companion object {
@@ -119,7 +138,7 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
         }
         val clicks = hats.filter { it.type == "event_click" }.map { Handler(view(it.field("view")), body(it)) }.sortedBy { it.view }
         val checks = hats.filter { it.type == "event_checked" }.map { Handler(view(it.field("view")), body(it)) }.sortedBy { it.view }
-        val procs = hats.filter { it.type == "proc_define" }.map { Procedure(it.field("name"), body(it)) }.sortedBy { it.name }
+        val procs = hats.filter { it.type == "proc_define" }.map { Procedure(it.field("name"), body(it), Procedures.parse(it.field("params")).orEmpty()) }.sortedBy { it.name }
         val componentEvents = hats.filter { it.type in COMPONENT_EVENTS }.associate { h ->
             h.field(COMPONENT_EVENTS.getValue(h.type)) to body(h)
         }
@@ -138,6 +157,8 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
             helpers = helpers,
             components = doc.components,
             componentEvents = componentEvents,
+            imports = imports,
+            templateHelpers = templateHelpers.values.toList(),
         )
     }
 
@@ -151,7 +172,10 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
         "ctrl_repeat" -> Repeat(expr(b, "times"), stmts(b.statements["do"].orEmpty()), "i${++counter}")
         "ctrl_while" -> While(expr(b, "cond"), stmts(b.statements["do"].orEmpty()))
         "ctrl_for" -> ForRange(b.field("var"), expr(b, "from"), expr(b, "to"), stmts(b.statements["do"].orEmpty()))
-        "proc_call" -> CallProcedure(b.field("name"))
+        "proc_call" -> CallProcedure(b.field("name"), Procedures.params(doc, b.field("name")).map { p ->
+            val input = Procedures.INPUT_PREFIX + p.name
+            if (p.type == ValueType.Text) text(b, input) else expr(b, input)
+        })
         "var_set" -> {
             val v = doc.variables.first { it.name == b.field("var") }
             SetVar(v.name, if (v.type == ValueType.Text) text(b, "value") else expr(b, "value"))
@@ -177,7 +201,11 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
         "sound_play" -> SoundPlay(b.field("sound"), b.field("file"))
         "sound_stop" -> SoundStop(b.field("sound"))
         "app_open_link" -> OpenLink(text(b, "url"))
-        else -> error("Not a statement block: ${b.type}")
+        "ctrl_foreach", "ctrl_foreach_number" -> ForEach(
+            b.field("var"), b.field("list"), if (b.type == "ctrl_foreach") ValueType.Text else ValueType.Number,
+            stmts(b.statements["do"].orEmpty()), "item${++counter}",
+        )
+        else -> template(b)?.let { (code, inputs, fields) -> TemplateStmt(code, inputs, fields) } ?: error("Not a statement block: ${b.type}")
     }
 
     private fun expr(parent: Block, input: String): Expr = value(parent.inputs.getValue(input))
@@ -212,12 +240,33 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
         "text_join" -> Concat(text(b, "a"), text(b, "b"))
         "text_length" -> TextLength(text(b, "text"))
         "var_get" -> doc.variables.first { it.name == b.field("var") }.let { VarRef(it.name, it.type) }
+        "proc_param" -> VarRef(b.field("param"), BlockOps.outputType(doc, b)!!)
         "list_get" -> ListGet(b.field("list"), expr(b, "index"))
         "list_size" -> ListSize(b.field("list"))
         "view_get_text" -> ViewText(view(b.field("view")))
         "view_is_checked" -> ViewChecked(view(b.field("view")))
         "code_expr" -> RawExpr(b.field("code"))
         "storage_get" -> StorageGet(b.field("store"), text(b, "key"))
-        else -> error("Not a value block: ${b.type}")
+        else -> template(b)?.let { (code, inputs, fields) -> TemplateExpr(code, inputs, fields, BlockRegistry[b.type].output!!) }
+            ?: error("Not a value block: ${b.type}")
+    }
+
+    /** Inputs (text inputs converted to text) and field values of a template block, registering what it uses. */
+    private fun template(b: Block): Triple<CodeTemplate, Map<String, Expr>, Map<String, TField>>? {
+        val def = BlockRegistry.find(b.type) ?: return null
+        val code = def.code ?: return null
+        imports += def.imports
+        def.helper?.let { templateHelpers[it.name] = it }
+        val inputs = def.inputs.associate { i -> i.name to if (i.type == ValueType.Text) text(b, i.name) else expr(b, i.name) }
+        val fields = def.fields.associate { f ->
+            val v = b.field(f.name)
+            f.name to when (f.kind) {
+                is FieldKind.View -> TField.Raw(view(v))
+                is FieldKind.Text, is FieldKind.Color -> TField.Str(v)
+                is FieldKind.Number -> TField.Raw(JavaBackend.num(v.toDouble()))
+                else -> TField.Raw(v)
+            }
+        }
+        return Triple(code, inputs, fields)
     }
 }

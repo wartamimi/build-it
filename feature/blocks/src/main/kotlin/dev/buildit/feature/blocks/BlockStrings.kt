@@ -20,6 +20,7 @@ internal fun blockMessageRes(type: String): Int? = when (type) {
     "ctrl_while" -> R.string.blk_ctrl_while
     "ctrl_for" -> R.string.blk_ctrl_for
     "proc_call" -> R.string.blk_proc_call
+    "proc_param" -> R.string.blk_proc_param
     "logic_bool" -> R.string.blk_logic_bool
     "logic_compare" -> R.string.blk_logic_compare
     "logic_text_equals" -> R.string.blk_logic_text_equals
@@ -65,6 +66,79 @@ internal fun blockMessageRes(type: String): Int? = when (type) {
     "sound_play" -> R.string.blk_sound_play
     "sound_stop" -> R.string.blk_sound_stop
     "app_open_link" -> R.string.blk_app_open_link
+    "ctrl_foreach" -> R.string.blk_ctrl_foreach
+    "ctrl_foreach_number" -> R.string.blk_ctrl_foreach_number
+    "ctrl_break" -> R.string.blk_ctrl_break
+    "ctrl_continue" -> R.string.blk_ctrl_continue
+    "ctrl_return" -> R.string.blk_ctrl_return
+    "logic_choose" -> R.string.blk_logic_choose
+    "logic_choose_number" -> R.string.blk_logic_choose_number
+    "logic_is_empty" -> R.string.blk_logic_is_empty
+    "logic_is_number" -> R.string.blk_logic_is_number
+    "math_function" -> R.string.blk_math_function
+    "math_power" -> R.string.blk_math_power
+    "math_min_max" -> R.string.blk_math_min_max
+    "math_constant" -> R.string.blk_math_constant
+    "math_random_fraction" -> R.string.blk_math_random_fraction
+    "math_whole" -> R.string.blk_math_whole
+    "math_clamp" -> R.string.blk_math_clamp
+    "math_format" -> R.string.blk_math_format
+    "text_contains" -> R.string.blk_text_contains
+    "text_starts_with" -> R.string.blk_text_starts_with
+    "text_ends_with" -> R.string.blk_text_ends_with
+    "text_index_of" -> R.string.blk_text_index_of
+    "text_substring" -> R.string.blk_text_substring
+    "text_char_at" -> R.string.blk_text_char_at
+    "text_replace" -> R.string.blk_text_replace
+    "text_upper" -> R.string.blk_text_upper
+    "text_lower" -> R.string.blk_text_lower
+    "text_trim" -> R.string.blk_text_trim
+    "text_reverse" -> R.string.blk_text_reverse
+    "text_repeat" -> R.string.blk_text_repeat
+    "text_split" -> R.string.blk_text_split
+    "text_join_list" -> R.string.blk_text_join_list
+    "text_new_line" -> R.string.blk_text_new_line
+    "list_insert" -> R.string.blk_list_insert
+    "list_set" -> R.string.blk_list_set
+    "list_remove" -> R.string.blk_list_remove
+    "list_contains" -> R.string.blk_list_contains
+    "list_index_of" -> R.string.blk_list_index_of
+    "list_sort" -> R.string.blk_list_sort
+    "list_shuffle" -> R.string.blk_list_shuffle
+    "list_set_all" -> R.string.blk_list_set_all
+    "nlist_add" -> R.string.blk_nlist_add
+    "nlist_get" -> R.string.blk_nlist_get
+    "nlist_set" -> R.string.blk_nlist_set
+    "nlist_remove" -> R.string.blk_nlist_remove
+    "nlist_size" -> R.string.blk_nlist_size
+    "nlist_contains" -> R.string.blk_nlist_contains
+    "nlist_sum" -> R.string.blk_nlist_sum
+    "nlist_sort" -> R.string.blk_nlist_sort
+    "nlist_clear" -> R.string.blk_nlist_clear
+    "map_put" -> R.string.blk_map_put
+    "map_get" -> R.string.blk_map_get
+    "map_has" -> R.string.blk_map_has
+    "map_remove" -> R.string.blk_map_remove
+    "map_size" -> R.string.blk_map_size
+    "map_keys" -> R.string.blk_map_keys
+    "map_clear" -> R.string.blk_map_clear
+    "view_set_background" -> R.string.blk_view_set_background
+    "view_set_text_size" -> R.string.blk_view_set_text_size
+    "view_set_hint" -> R.string.blk_view_set_hint
+    "view_set_image" -> R.string.blk_view_set_image
+    "view_set_alpha" -> R.string.blk_view_set_alpha
+    "view_set_rotation" -> R.string.blk_view_set_rotation
+    "view_set_progress" -> R.string.blk_view_set_progress
+    "view_get_progress" -> R.string.blk_view_get_progress
+    "view_is_visible" -> R.string.blk_view_is_visible
+    "view_focus" -> R.string.blk_view_focus
+    "view_hide_keyboard" -> R.string.blk_view_hide_keyboard
+    "app_toast_long" -> R.string.blk_app_toast_long
+    "app_set_title" -> R.string.blk_app_set_title
+    "app_copy" -> R.string.blk_app_copy
+    "app_share" -> R.string.blk_app_share
+    "app_now" -> R.string.blk_app_now
+    "app_format_time" -> R.string.blk_app_format_time
     else -> null
 }
 
@@ -125,5 +199,13 @@ internal fun diagnosticRes(code: String): Int? = when (code) {
     "unknown_component" -> R.string.bk_diag_unknown_component
     "missing_sound" -> R.string.bk_diag_missing_sound
     "unknown_sound" -> R.string.bk_diag_unknown_sound
+    "outside_loop" -> R.string.bk_diag_outside_loop
+    "invalid_params" -> R.string.bk_diag_invalid_params
+    "invalid_param" -> R.string.bk_diag_invalid_param
+    "param_outside_procedure" -> R.string.bk_diag_param_outside_procedure
+    "unknown_param" -> R.string.bk_diag_unknown_param
+    "unreachable" -> R.string.bk_diag_unreachable
+    "missing_image" -> R.string.bk_diag_missing_image
+    "unknown_image" -> R.string.bk_diag_unknown_image
     else -> null
 }
