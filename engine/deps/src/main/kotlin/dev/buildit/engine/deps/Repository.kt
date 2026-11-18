@@ -18,20 +18,31 @@ fun interface Http {
     fun get(url: String): ByteArray?
 
     companion object {
+        /** Busy answers (429, 503) are retried a few times, waiting as the server asks (at most 20 s). */
         val Default = Http { url ->
-            val c = URI(url).toURL().openConnection() as HttpURLConnection
-            try {
-                c.connectTimeout = 20_000
-                c.readTimeout = 60_000
-                c.instanceFollowRedirects = true
-                c.setRequestProperty("User-Agent", "BuildIt")
-                when (val code = c.responseCode) {
-                    in 200..299 -> c.inputStream.use { it.readBytes() }
-                    404, 410 -> null
-                    else -> throw IOException("HTTP $code for $url")
-                }
-            } finally { c.disconnect() }
+            var attempt = 0
+            while (true) {
+                val c = URI(url).toURL().openConnection() as HttpURLConnection
+                val wait: Long = try {
+                    c.connectTimeout = 20_000
+                    c.readTimeout = 60_000
+                    c.instanceFollowRedirects = true
+                    c.setRequestProperty("User-Agent", "BuildIt")
+                    when (val code = c.responseCode) {
+                        in 200..299 -> return@Http c.inputStream.use { it.readBytes() }
+                        404, 410 -> return@Http null
+                        429, 503 -> if (attempt < 4) retryDelay(c.getHeaderField("Retry-After"), attempt) else throw IOException("HTTP $code for $url (server busy, try again later)")
+                        else -> throw IOException("HTTP $code for $url")
+                    }
+                } finally { c.disconnect() }
+                Thread.sleep(wait)
+                attempt++
+            }
+            @Suppress("UNREACHABLE_CODE") null
         }
+
+        internal fun retryDelay(retryAfter: String?, attempt: Int): Long =
+            (retryAfter?.trim()?.toLongOrNull()?.times(1000) ?: (1000L shl (attempt * 2))).coerceIn(500, 20_000)
     }
 }
 
