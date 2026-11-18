@@ -36,7 +36,7 @@ class AndroidKotlinCompilerHost(
     private val androidJar: () -> File?,
     private val classesPerChunk: Int = 2500,
 ) : KotlinCompilerHost {
-    override val extraLibraries = listOf(STAX)
+    override val extraLibraries = listOf(STAX, TROVE)
     private var loaded: Pair<List<File>, ClassLoader>? = null
 
     @Synchronized
@@ -134,6 +134,8 @@ class AndroidKotlinCompilerHost(
 
     internal companion object {
         val STAX = dev.buildit.engine.deps.Coordinate("javax.xml.stream", "stax-api", "1.0-2")
+        /** IntelliJ's FileUtil refers to Trove, which the embeddable compiler does not bundle; ART resolves it. */
+        val TROVE = dev.buildit.engine.deps.Coordinate("org.jetbrains.intellij.deps", "trove4j", "1.0.20200330")
         /** Bumped when the conversion changes, so cached DEX is redone. */
         const val FORMAT = 4
         val CLASS_RESOURCES = setOf("org/jetbrains/kotlin/utils/PathUtil.class")
