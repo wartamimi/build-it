@@ -1,12 +1,17 @@
 Build It for Android 8.0 and newer.
 
-New in 0.11.0: many more blocks, closer to Sketchware. Text, math, lists of numbers, maps,
+New in 0.12.0: 12 new components with their blocks and events: Intent, Vibrator, Calendar,
+Animator, Sensor, Text to speech, Speech to text, File picker, Request network, Notification,
+Date picker and Time picker. Components add the Android permissions they need to the app's
+manifest when you save.
+
+In 0.11.0: many more blocks, closer to Sketchware. Text, math, lists of numbers, maps,
 for-each loops, stop/skip, views (background, text size, hint, image, opacity, rotation,
 progress, keyboard) and app blocks (clipboard, share, time). Procedures can take parameters.
 Long-press a block in the drawer and drag it onto the canvas; the canvas scrolls when you hold a
 block near the edge.
 
-New in 0.10.0: a new workflow inspired by Sketchware Pro, in Build It's own style. Design,
+In 0.10.0: a new workflow inspired by Sketchware Pro, in Build It's own style. Design,
 Events and Components tabs; a bottom bar to pick the screen and Run (save, build and install in
 one tap); every other tool in the Project tools drawer. The designer has the widget palette
 beside the phone and a property bar for the selected view. Events lists the screen's events;

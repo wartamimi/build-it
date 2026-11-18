@@ -65,6 +65,7 @@ import dev.buildit.engine.blocks.BlockOps
 import dev.buildit.engine.blocks.BlockRegistry
 import dev.buildit.engine.blocks.BlockShape
 import dev.buildit.engine.blocks.ComponentType
+import dev.buildit.engine.blocks.Components
 import dev.buildit.engine.blocks.MessagePart
 import dev.buildit.engine.blocks.Names
 import dev.buildit.engine.blocks.ViewFamilies
@@ -75,7 +76,7 @@ import kotlinx.coroutines.launch
 internal enum class EventSection(val label: Int, val types: List<String>) {
     Screen(R.string.bk_section_screen, listOf("event_create", "event_resume", "event_pause", "event_destroy")),
     Views(R.string.bk_section_views, listOf("event_click", "event_checked")),
-    Components(R.string.bk_section_components, listOf("event_timer", "event_dialog_ok", "event_sound_done")),
+    Components(R.string.bk_section_components, dev.buildit.engine.blocks.Components.specs.flatMap { s -> s.events.map { it.hat } }),
     More(R.string.bk_section_more, listOf("proc_define")),
     Loose(R.string.bk_section_loose, emptyList()),
 }
@@ -213,13 +214,9 @@ private fun AddEventDialog(
             listOf("event_click" to mapOf("view" to v.id)) +
                 if (ViewFamilies.matches(ViewKind.Compound, v.tag)) listOf("event_checked" to mapOf("view" to v.id)) else emptyList()
         }
-        EventSection.Components -> doc.components.mapNotNull { c ->
-            when (c.type) {
-                ComponentType.Timer -> "event_timer" to mapOf("timer" to c.name)
-                ComponentType.Dialog -> "event_dialog_ok" to mapOf("dialog" to c.name)
-                ComponentType.Sound -> "event_sound_done" to mapOf("sound" to c.name)
-                ComponentType.Storage -> null
-            }
+        EventSection.Components -> doc.components.flatMap { c ->
+            val spec = Components.spec(c.type)
+            spec.events.map { it.hat to mapOf(spec.field to c.name) }
         }
         EventSection.More, EventSection.Loose -> emptyList()
     }
@@ -264,6 +261,18 @@ internal fun componentIcon(t: ComponentType): ImageVector = when (t) {
     ComponentType.Storage -> BiIcons.Save
     ComponentType.Dialog -> BiIcons.Info
     ComponentType.Sound -> BiIcons.Sound
+    ComponentType.Intent -> BiIcons.OpenOut
+    ComponentType.Vibrator -> BiIcons.Vibrate
+    ComponentType.Calendar -> BiIcons.Calendar
+    ComponentType.Animator -> BiIcons.Motion
+    ComponentType.Sensor -> BiIcons.Sensor
+    ComponentType.TextToSpeech -> BiIcons.Speak
+    ComponentType.SpeechToText -> BiIcons.Mic
+    ComponentType.FilePicker -> BiIcons.File
+    ComponentType.Network -> BiIcons.Network
+    ComponentType.Notification -> BiIcons.Bell
+    ComponentType.DatePicker -> BiIcons.Calendar
+    ComponentType.TimePicker -> BiIcons.Clock
 }
 
 internal fun componentLabel(t: ComponentType): Int = when (t) {
@@ -271,6 +280,18 @@ internal fun componentLabel(t: ComponentType): Int = when (t) {
     ComponentType.Storage -> R.string.bk_comp_Storage
     ComponentType.Dialog -> R.string.bk_comp_Dialog
     ComponentType.Sound -> R.string.bk_comp_Sound
+    ComponentType.Intent -> R.string.bk_comp_Intent
+    ComponentType.Vibrator -> R.string.bk_comp_Vibrator
+    ComponentType.Calendar -> R.string.bk_comp_Calendar
+    ComponentType.Animator -> R.string.bk_comp_Animator
+    ComponentType.Sensor -> R.string.bk_comp_Sensor
+    ComponentType.TextToSpeech -> R.string.bk_comp_TextToSpeech
+    ComponentType.SpeechToText -> R.string.bk_comp_SpeechToText
+    ComponentType.FilePicker -> R.string.bk_comp_FilePicker
+    ComponentType.Network -> R.string.bk_comp_Network
+    ComponentType.Notification -> R.string.bk_comp_Notification
+    ComponentType.DatePicker -> R.string.bk_comp_DatePicker
+    ComponentType.TimePicker -> R.string.bk_comp_TimePicker
 }
 
 internal fun componentDescription(t: ComponentType): Int = when (t) {
@@ -278,6 +299,18 @@ internal fun componentDescription(t: ComponentType): Int = when (t) {
     ComponentType.Storage -> R.string.bk_comp_Storage_desc
     ComponentType.Dialog -> R.string.bk_comp_Dialog_desc
     ComponentType.Sound -> R.string.bk_comp_Sound_desc
+    ComponentType.Intent -> R.string.bk_comp_Intent_desc
+    ComponentType.Vibrator -> R.string.bk_comp_Vibrator_desc
+    ComponentType.Calendar -> R.string.bk_comp_Calendar_desc
+    ComponentType.Animator -> R.string.bk_comp_Animator_desc
+    ComponentType.Sensor -> R.string.bk_comp_Sensor_desc
+    ComponentType.TextToSpeech -> R.string.bk_comp_TextToSpeech_desc
+    ComponentType.SpeechToText -> R.string.bk_comp_SpeechToText_desc
+    ComponentType.FilePicker -> R.string.bk_comp_FilePicker_desc
+    ComponentType.Network -> R.string.bk_comp_Network_desc
+    ComponentType.Notification -> R.string.bk_comp_Notification_desc
+    ComponentType.DatePicker -> R.string.bk_comp_DatePicker_desc
+    ComponentType.TimePicker -> R.string.bk_comp_TimePicker_desc
 }
 
 /**

@@ -351,6 +351,36 @@ Not done / limits
   snapping logic in the view model).
 - Renaming a parameter in the editor is remove + add (the argument blocks move out).
 
+## Phase 12 — Sketchware parity: components (owner request)
+
+Done
+- 12 new components, each with its blocks, events and generated Java and Kotlin: Intent (open a
+  screen or app, extras; "value given to this screen" block), Vibrator, Calendar (set, add, read,
+  format), Animator (ObjectAnimator on alpha / translation / rotation / scale, once or repeating,
+  "finishes" event), Sensor (accelerometer, gyroscope, light, proximity, magnetic field; x/y/z
+  event), Text to speech, Speech to text (system recogniser; result and error events), File picker
+  (picked event, read text of a file, set image from a file), Request network (GET/POST/PUT/DELETE
+  on a background thread; response with code, and error events), Notification (channel on 8.0+,
+  asks for the permission on 13+), Date picker and Time picker.
+- Event values (network response, sensor x/y/z, picked date, ...) are read with the same
+  parameter block as procedure parameters.
+- Components declare the manifest permissions they need (VIBRATE, INTERNET, POST_NOTIFICATIONS);
+  saving the blocks adds missing ones to the project (`app.permissions` in buildit.json) and to
+  AndroidManifest.xml. A hand-edited manifest is left alone and the user is told which permission
+  to add.
+- Generic component mechanism (ComponentSpec): fields, init, members, cleanup in onDestroy, and a
+  shared onActivityResult. CatalogTest compiles every component and event as Java and Kotlin
+  against android.jar.
+
+Not done / limits
+- Firebase components (auth, database, storage) are not built in; Firebase libraries can be added
+  in Libraries and used from code blocks.
+- SoundPool is not a separate component (the Sound player covers playback).
+- http:// URLs are blocked by Android's cleartext policy unless the user changes it in the
+  manifest; there is no switch for it yet.
+- The first notification on Android 13+ only asks for the permission; it is not shown until the
+  next call.
+
 ## Build status
 
 - `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:deps:test :engine:ai:test` —
@@ -373,9 +403,9 @@ Not done / limits
 | engine:blocks BlockOpsTest | 7 | pass |
 | engine:blocks ValidatorTest | 3 | pass |
 | engine:blocks CodegenTest (incl. javac against android.jar) | 6 | pass |
-| engine:blocks CatalogTest (every block: validates, compiles as Java and Kotlin against android.jar; procedures; loop checks) | 7 | pass |
+| engine:blocks CatalogTest (every block and component: validates, compiles as Java and Kotlin against android.jar; procedures; loop checks) | 7 | pass |
 | feature:blocks BlockLayoutTest | 3 | pass |
-| feature:blocks BlocksViewModelTest (save → generated Java on disk, hand-edit protection, procedure parameters, palette drop) | 4 | pass |
+| feature:blocks BlocksViewModelTest (save → generated Java on disk, hand-edit protection, procedure parameters, palette drop, component permissions in the manifest) | 5 | pass |
 | engine:editor EditorEngineTest (lexers, search/replace, checks, history, indent) | 7 | pass |
 | feature:code CodeViewModelTest (autosave to disk, conflict instead of overwrite, save/discard, problems) | 5 | pass |
 | feature:code CodeEditTextTest (Robolectric, real view: auto-indent, undo/redo) | 2 | pass |

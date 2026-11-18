@@ -99,7 +99,7 @@ data class Program(
     val procedures: List<Procedure>,
     val helpers: Set<Helper>,
     val components: List<Component> = emptyList(),
-    /** Component events: timer ticks, dialog OK, sound finished (the handler's view is the component name). */
+    /** Bodies of component event hats, by "hat type|component name". */
     val componentEvents: Map<String, List<Stmt>> = emptyMap(),
     /** Classes needed by template blocks. */
     val imports: Set<String> = emptySet(),
@@ -118,8 +118,6 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
     private var counter = 0
 
     companion object {
-        /** Component event hats and the field naming their component. */
-        val COMPONENT_EVENTS = mapOf("event_timer" to "timer", "event_dialog_ok" to "dialog", "event_sound_done" to "sound")
 
         fun lower(doc: BlockDocument, ctx: BlockContext, target: ActivityTarget): Program {
             require(!BlockValidator.hasErrors(BlockValidator.validate(doc, ctx))) { "Document has errors; validate before lowering" }
@@ -139,9 +137,7 @@ class Lowering private constructor(private val doc: BlockDocument, private val c
         val clicks = hats.filter { it.type == "event_click" }.map { Handler(view(it.field("view")), body(it)) }.sortedBy { it.view }
         val checks = hats.filter { it.type == "event_checked" }.map { Handler(view(it.field("view")), body(it)) }.sortedBy { it.view }
         val procs = hats.filter { it.type == "proc_define" }.map { Procedure(it.field("name"), body(it), Procedures.parse(it.field("params")).orEmpty()) }.sortedBy { it.name }
-        val componentEvents = hats.filter { it.type in COMPONENT_EVENTS }.associate { h ->
-            h.field(COMPONENT_EVENTS.getValue(h.type)) to body(h)
-        }
+        val componentEvents = hats.mapNotNull { h -> Components.event(h.type)?.let { (spec, _) -> "${h.type}|${h.field(spec.field)}" to body(h) } }.toMap()
         val tags = ctx.views.associate { it.id to it.tag }
         return Program(
             packageName = target.packageName,

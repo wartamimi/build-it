@@ -112,11 +112,13 @@ fun BlocksScreen(
 
     val rejected = rejectionTexts()
     val failed = stringResource(R.string.bk_failed)
+    val permissionsNotWritten = stringResource(R.string.bk_permissions_not_written)
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { m ->
             snackbar.showSnackbar(when (m) {
                 is BlocksMessage.Rejected -> rejected(m.code)
                 is BlocksMessage.Failed -> failed.format(m.detail)
+                is BlocksMessage.PermissionsNotWritten -> permissionsNotWritten.format(m.permissions.joinToString(", ") { it.substringAfterLast('.') })
             })
         }
     }
@@ -492,7 +494,7 @@ private fun FieldEditor(block: Block, field: String, state: BlocksUiState, onDis
         is FieldKind.ComponentRef -> doc.components.filter { it.type == kind.type }.map { it.name to it.name }
         FieldKind.RawResource -> state.sounds.map { it to it }
         FieldKind.DrawableResource -> state.images.map { it to it }
-        FieldKind.Param -> Procedures.enclosingDefine(doc, block.id)?.let { Procedures.parse(it.field("params")) }.orEmpty()
+        FieldKind.Param -> Procedures.enclosingParams(doc, block.id).orEmpty()
             .map { it.name to "${it.name} · ${typeLabelText(it.type)}" }
         else -> null
     }

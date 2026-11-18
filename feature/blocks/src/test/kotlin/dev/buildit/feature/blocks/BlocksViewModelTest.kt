@@ -49,6 +49,12 @@ class BlocksViewModelTest {
         override suspend fun open(id: String) = OpenProject(
             ProjectSummary(project.manifest.id, "Demo", "com.example.demo", project.directory.path, 0, 0, null), project.manifest, project.directory,
         )
+
+        var saved: dev.buildit.engine.project.ProjectManifest? = null
+        override suspend fun saveSettings(id: String, manifest: dev.buildit.engine.project.ProjectManifest, force: Boolean): dev.buildit.core.data.SaveResult {
+            saved = manifest
+            return dev.buildit.core.data.SaveResult(manifest, dev.buildit.engine.project.ManifestSync.apply(project.directory, manifest, force).conflicts)
+        }
     }
 
     private class Settings(autoSave: Boolean) : SettingsRepository {
@@ -151,5 +157,23 @@ class BlocksViewModelTest {
         assertEquals("greet", doc.find(call.id)!!.field("name"))
         assertEquals(setOf("arg_times"), doc.find(call.id)!!.inputs.keys)
         assertTrue(doc.stacks.any { s -> s.blocks.single().type == "text_literal" })
+    }
+
+    @Test fun componentsAddTheirManifestPermissions() = runTest(dispatcher) {
+        val repo = Repo()
+        var n = 0
+        val vm = BlocksViewModel("p", repo, Settings(true), object : DispatcherProvider {
+            override val io = dispatcher
+            override val default = dispatcher
+            override val main = dispatcher
+        }, ids = { "id${++n}" })
+        advanceUntilIdle()
+        vm.addComponent("api", dev.buildit.engine.blocks.ComponentType.Network)
+        advanceUntilIdle()
+        assertEquals(listOf("android.permission.INTERNET"), repo.saved!!.app.permissions)
+        val manifestXml = File(project.directory, "app/src/main/AndroidManifest.xml").readText()
+        assertTrue(manifestXml, manifestXml.contains("<uses-permission android:name=\"android.permission.INTERNET\" />"))
+        val java = File(project.directory, "app/src/main/java/com/example/demo/MainActivity.java").readText()
+        assertTrue(java, java.contains("private void requestApi(final String method, final String url, final String body) {"))
     }
 }

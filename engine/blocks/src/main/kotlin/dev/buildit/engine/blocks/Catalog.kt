@@ -6,6 +6,7 @@ import dev.buildit.engine.blocks.BlockCategory.Control
 import dev.buildit.engine.blocks.BlockCategory.Lists
 import dev.buildit.engine.blocks.BlockCategory.Logic
 import dev.buildit.engine.blocks.BlockCategory.Math
+import dev.buildit.engine.blocks.BlockCategory.Parts
 import dev.buildit.engine.blocks.BlockCategory.Text
 
 /**
@@ -108,7 +109,143 @@ internal object Catalog {
 
     private val mathFunctions = listOf("abs", "sqrt", "cbrt", "log", "log10", "exp", "sin", "cos", "tan", "asin", "acos", "atan", "floor", "ceil", "toRadians", "toDegrees")
 
-    val blocks: List<BlockDef> = listOf(
+    private fun comp(type: ComponentType) = dev.buildit.engine.blocks.Components.spec(type).let { FieldDef(it.field, FieldKind.ComponentRef(type)) }
+
+    private fun hat(type: String, message: String, component: ComponentType) =
+        BlockDef(type, BlockCategory.Events, BlockShape.Hat, message, fields = listOf(comp(component)), statements = listOf(StatementDef("do", "")))
+
+    private val readTextFile = TemplateHelper(
+        "readTextFile",
+        java = """
+            private String readTextFile(String uri) {
+                try (java.io.InputStream in = getContentResolver().openInputStream(android.net.Uri.parse(uri))) {
+                    if (in == null) return "";
+                    java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                    byte[] buffer = new byte[8192];
+                    int n;
+                    while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+                    return new String(out.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+                } catch (Exception e) {
+                    return "";
+                }
+            }
+        """.trimIndent(),
+        kotlin = """
+            private fun readTextFile(uri: String): String = try {
+                contentResolver.openInputStream(android.net.Uri.parse(uri))?.use { String(it.readBytes(), Charsets.UTF_8) } ?: ""
+            } catch (e: Exception) {
+                ""
+            }
+        """.trimIndent(),
+    )
+
+    private val textExtra = TemplateHelper(
+        "textExtra",
+        java = """
+            private String textExtra(String key) {
+                String value = getIntent().getStringExtra(key);
+                return value == null ? "" : value;
+            }
+        """.trimIndent(),
+        kotlin = null,
+    )
+
+    private val calendarFields = listOf("YEAR", "MONTH", "DAY_OF_MONTH", "HOUR_OF_DAY", "MINUTE", "SECOND")
+
+    /** Blocks and event hats of the Phase 12 components. */
+    private val componentBlocks: List<BlockDef> = listOf(
+        // Intent
+        stmt("intent_set_screen", Parts, "set {intent} to open {activity}", "{intent}.setClass(this, {activity}.class);", "{intent}.setClass(this, {activity}::class.java)",
+            fields = listOf(comp(ComponentType.Intent), FieldDef("activity", FieldKind.Activity))),
+        stmt("intent_set_action", Parts, "set {intent} to {action} {data}", "{intent}.setAction(Intent.ACTION_{action});\n{intent}.setData(Uri.parse({data}));",
+            "{intent}.action = Intent.ACTION_{action}\n{intent}.data = Uri.parse({data})",
+            inputs = listOf(t("data")), fields = listOf(comp(ComponentType.Intent), FieldDef("action", FieldKind.Dropdown(listOf("VIEW", "DIAL", "SENDTO", "EDIT")))),
+            imports = listOf("android.content.Intent", "android.net.Uri")),
+        stmt("intent_put_extra", Parts, "in {intent} put {key} = {value}", "{intent}.putExtra({key}, {value});", "{intent}.putExtra({key}, {value})",
+            inputs = listOf(t("key"), t("value")), fields = listOf(comp(ComponentType.Intent))),
+        stmt("intent_start", Parts, "start {intent}", "startActivity({intent});", "startActivity({intent})", fields = listOf(comp(ComponentType.Intent))),
+        stmt("intent_clear", Parts, "clear {intent}", "{intent} = new Intent();", "{intent} = Intent()", fields = listOf(comp(ComponentType.Intent))),
+        value("app_get_extra", App, "value {key} given to this screen", ValueType.Text, "textExtra({key})", "(intent.getStringExtra({key}) ?: \"\")",
+            inputs = listOf(t("key")), helper = textExtra),
+
+        // Vibrator
+        stmt("vibrator_vibrate", Parts, "vibrate {vibrator} for {ms} ms", "{vibrator}.vibrate((long) {ms});", "{vibrator}.vibrate({ms}.toLong())",
+            inputs = listOf(n("ms")), fields = listOf(comp(ComponentType.Vibrator))),
+        stmt("vibrator_cancel", Parts, "stop {vibrator}", "{vibrator}.cancel();", "{vibrator}.cancel()", fields = listOf(comp(ComponentType.Vibrator))),
+
+        // Calendar
+        stmt("calendar_now", Parts, "set {calendar} to now", "{calendar} = Calendar.getInstance();", "{calendar} = Calendar.getInstance()", fields = listOf(comp(ComponentType.Calendar))),
+        stmt("calendar_set_ms", Parts, "set {calendar} to time {ms}", "{calendar}.setTimeInMillis((long) {ms});", "{calendar}.timeInMillis = {ms}.toLong()",
+            inputs = listOf(n("ms")), fields = listOf(comp(ComponentType.Calendar))),
+        stmt("calendar_add", Parts, "add {amount} {unit} to {calendar}", "{calendar}.add(Calendar.{unit}, (int) {amount});", "{calendar}.add(Calendar.{unit}, {amount}.toInt())",
+            inputs = listOf(n("amount")), fields = listOf(comp(ComponentType.Calendar), FieldDef("unit", FieldKind.Dropdown(calendarFields)))),
+        stmt("calendar_set", Parts, "set {unit} of {calendar} to {value}", "{calendar}.set(Calendar.{unit}, (int) {value});", "{calendar}.set(Calendar.{unit}, {value}.toInt())",
+            inputs = listOf(n("value")), fields = listOf(comp(ComponentType.Calendar), FieldDef("unit", FieldKind.Dropdown(calendarFields)))),
+        value("calendar_get", Parts, "{unit} of {calendar}", ValueType.Number, "((double) {calendar}.get(Calendar.{unit}))", "{calendar}.get(Calendar.{unit}).toDouble()",
+            fields = listOf(comp(ComponentType.Calendar), FieldDef("unit", FieldKind.Dropdown(calendarFields + "DAY_OF_WEEK")))),
+        value("calendar_ms", Parts, "time in ms of {calendar}", ValueType.Number, "((double) {calendar}.getTimeInMillis())", "{calendar}.timeInMillis.toDouble()",
+            fields = listOf(comp(ComponentType.Calendar))),
+        value("calendar_format", Parts, "{calendar} as {pattern}", ValueType.Text, "new SimpleDateFormat({pattern}, Locale.getDefault()).format({calendar}.getTime())",
+            "SimpleDateFormat({pattern}, Locale.getDefault()).format({calendar}.time)",
+            inputs = listOf(t("pattern")), fields = listOf(comp(ComponentType.Calendar)), imports = listOf("java.text.SimpleDateFormat", "java.util.Locale")),
+
+        // Animator
+        stmt("animator_start", Parts, "with {animator} animate {property} of {view} from {from} to {to} in {ms} ms {mode}",
+            "animate{animator^}({view}, \"{property}\", {from}, {to}, {ms}, \"{mode}\".equals(\"repeat\"));",
+            "animate{animator^}({view}, \"{property}\", {from}, {to}, {ms}, \"{mode}\" == \"repeat\")",
+            inputs = listOf(n("from"), n("to"), n("ms")),
+            fields = listOf(comp(ComponentType.Animator), FieldDef("property", FieldKind.Dropdown(listOf("alpha", "translationX", "translationY", "rotation", "scaleX", "scaleY"))),
+                view(), FieldDef("mode", FieldKind.Dropdown(listOf("once", "repeat"))))),
+        stmt("animator_stop", Parts, "stop {animator}", "stop{animator^}();", "stop{animator^}()", fields = listOf(comp(ComponentType.Animator))),
+        hat("event_animator_end", "when {animator} finishes", ComponentType.Animator),
+
+        // Sensor
+        stmt("sensor_start", Parts, "start {sensor} reading {kind}", "start{sensor^}(Sensor.TYPE_{kind});", "start{sensor^}(Sensor.TYPE_{kind})",
+            fields = listOf(comp(ComponentType.Sensor), FieldDef("kind", FieldKind.Dropdown(listOf("ACCELEROMETER", "GYROSCOPE", "LIGHT", "PROXIMITY", "MAGNETIC_FIELD"))))),
+        stmt("sensor_stop", Parts, "stop {sensor}", "stop{sensor^}();", "stop{sensor^}()", fields = listOf(comp(ComponentType.Sensor))),
+        hat("event_sensor_change", "when {sensor} changes", ComponentType.Sensor),
+
+        // Text to speech
+        stmt("tts_speak", Parts, "say {text} with {speech}", "{speech}.speak({text}, TextToSpeech.QUEUE_FLUSH, null, null);", "{speech}.speak({text}, TextToSpeech.QUEUE_FLUSH, null, null)",
+            inputs = listOf(t("text")), fields = listOf(comp(ComponentType.TextToSpeech))),
+        stmt("tts_set", Parts, "set {setting} of {speech} to {value}", "{speech}.set{setting}((float) {value});", "{speech}.set{setting}({value}.toFloat())",
+            inputs = listOf(n("value")), fields = listOf(comp(ComponentType.TextToSpeech), FieldDef("setting", FieldKind.Dropdown(listOf("Pitch", "SpeechRate"))))),
+        stmt("tts_stop", Parts, "stop {speech}", "{speech}.stop();", "{speech}.stop()", fields = listOf(comp(ComponentType.TextToSpeech))),
+        value("tts_is_speaking", Parts, "{speech} is speaking", ValueType.Boolean, "{speech}.isSpeaking()", "{speech}.isSpeaking", fields = listOf(comp(ComponentType.TextToSpeech))),
+
+        // Speech to text
+        stmt("stt_listen", Parts, "listen with {recognizer} showing {prompt}", "listen{recognizer^}({prompt});", "listen{recognizer^}({prompt})",
+            inputs = listOf(t("prompt")), fields = listOf(comp(ComponentType.SpeechToText))),
+        hat("event_recognizer_result", "when {recognizer} hears speech", ComponentType.SpeechToText),
+        hat("event_recognizer_error", "when {recognizer} fails", ComponentType.SpeechToText),
+
+        // File picker
+        stmt("picker_pick", Parts, "pick a file with {picker} of type {type}", "pick{picker^}({type});", "pick{picker^}({type})",
+            inputs = listOf(t("type")), fields = listOf(comp(ComponentType.FilePicker))),
+        hat("event_picker_picked", "when a file is picked in {picker}", ComponentType.FilePicker),
+        value("file_read_text", App, "text of file {file}", ValueType.Text, "readTextFile({file})", "readTextFile({file})", inputs = listOf(t("file")), helper = readTextFile),
+        stmt("view_set_image_file", Components, "set image of {view} to file {file}", "{view}.setImageURI(Uri.parse({file}));", "{view}.setImageURI(Uri.parse({file}))",
+            inputs = listOf(t("file")), fields = listOf(view(ViewKind.Image)), imports = listOf("android.net.Uri")),
+
+        // Network
+        stmt("network_request", Parts, "with {network} send {method} to {url} with body {body}", "request{network^}(\"{method}\", {url}, {body});",
+            "request{network^}(\"{method}\", {url}, {body})",
+            inputs = listOf(t("url"), t("body")), fields = listOf(comp(ComponentType.Network), FieldDef("method", FieldKind.Dropdown(listOf("GET", "POST", "PUT", "DELETE"))))),
+        hat("event_network_response", "when {network} gets a response", ComponentType.Network),
+        hat("event_network_error", "when {network} fails", ComponentType.Network),
+
+        // Notification
+        stmt("notification_show", Parts, "with {notifier} show notification {title} {text}", "notify{notifier^}({title}, {text});", "notify{notifier^}({title}, {text})",
+            inputs = listOf(t("title"), t("text")), fields = listOf(comp(ComponentType.Notification))),
+
+        // Date and time pickers
+        stmt("date_picker_show", Parts, "show {datePicker}", "show{datePicker^}();", "show{datePicker^}()", fields = listOf(comp(ComponentType.DatePicker))),
+        hat("event_date_picked", "when a date is picked in {datePicker}", ComponentType.DatePicker),
+        stmt("time_picker_show", Parts, "show {timePicker}", "show{timePicker^}();", "show{timePicker^}()", fields = listOf(comp(ComponentType.TimePicker))),
+        hat("event_time_picked", "when a time is picked in {timePicker}", ComponentType.TimePicker),
+    )
+
+    val blocks: List<BlockDef> = componentBlocks + listOf(
         // Control
         BlockDef("ctrl_foreach", Control, BlockShape.Statement, "for each {var} in {list}",
             fields = listOf(FieldDef("var", FieldKind.VariableRef(ValueType.Text)), list(ValueType.TextList)), statements = listOf(StatementDef("do", "do"))),

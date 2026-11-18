@@ -59,11 +59,8 @@ object BlockValidator {
                 if (stack.blocks.size > 1) err(stack.blocks[1].id, "after_event")
                 val key = when (first.type) {
                     "event_click", "event_checked" -> first.type + ":" + first.field("view")
-                    "event_timer" -> first.type + ":" + first.field("timer")
-                    "event_dialog_ok" -> first.type + ":" + first.field("dialog")
-                    "event_sound_done" -> first.type + ":" + first.field("sound")
                     "proc_define" -> "proc:" + first.field("name")
-                    else -> first.type
+                    else -> Components.event(first.type)?.let { (spec, _) -> first.type + ":" + first.field(spec.field) } ?: first.type
                 }
                 if (!first.disabled && eventKeys.put(key, first.id) != null) {
                     err(first.id, if (first.type == "proc_define") "duplicate_procedure" else "duplicate_event", first.field(if (first.type == "proc_define") "name" else "view"))
@@ -148,10 +145,10 @@ object BlockValidator {
                         }
                     }
                     FieldKind.Param -> {
-                        val define = Procedures.enclosingDefine(doc, b.id)
+                        val params = Procedures.enclosingParams(doc, b.id)
                         when {
-                            define == null -> err(b.id, "param_outside_procedure")
-                            Procedures.parse(define.field("params")).orEmpty().none { it.name == value } -> err(b.id, "unknown_param", value)
+                            params == null -> err(b.id, "param_outside_procedure")
+                            params.none { it.name == value } -> err(b.id, "unknown_param", value)
                         }
                     }
                 }

@@ -34,6 +34,8 @@ data class AppConfig(
     val namespace: String? = null,
     /** Maven libraries (`group:artifact:version`) the app uses, managed in the Libraries tab. */
     val dependencies: List<LibraryDependency> = emptyList(),
+    /** Manifest permissions (`android.permission.INTERNET`, ...); components add the ones they need. */
+    val permissions: List<String> = emptyList(),
 ) {
     val effectiveNamespace: String get() = namespace ?: packageName
 }

@@ -17,6 +17,7 @@ import dev.buildit.engine.blocks.BlockShape
 import dev.buildit.engine.blocks.BlockStore
 import dev.buildit.engine.blocks.Component
 import dev.buildit.engine.blocks.ComponentType
+import dev.buildit.engine.blocks.Components
 import dev.buildit.engine.blocks.BlockSync
 import dev.buildit.engine.blocks.BlockValidator
 import dev.buildit.engine.blocks.Procedures
@@ -83,6 +84,8 @@ data class BlocksUiState(
 sealed interface BlocksMessage {
     data class Rejected(val code: String) : BlocksMessage
     data class Failed(val detail: String) : BlocksMessage
+    /** Components need these permissions but AndroidManifest.xml was edited by hand, so it was left alone. */
+    data class PermissionsNotWritten(val permissions: List<String>) : BlocksMessage
 }
 
 class BlocksViewModel(
@@ -236,7 +239,7 @@ class BlocksViewModel(
         val block = when (type) {
             // A call starts on the first procedure; a parameter on the first parameter of the selected procedure
             "proc_call" -> procedure.firstOrNull()?.let { created.copy(fields = mapOf("name" to it.field("name"))) } ?: created
-            "proc_param" -> selected?.let { Procedures.enclosingDefine(doc, it.id) }?.let { Procedures.parse(it.field("params"))?.firstOrNull() }
+            "proc_param" -> selected?.let { Procedures.enclosingParams(doc, it.id)?.firstOrNull() }
                 ?.let { created.copy(fields = mapOf("param" to it.name)) } ?: created
             "proc_define" -> created.copy(fields = created.fields + ("name" to freeProcedureName(procedure.map { it.field("name") })))
             else -> created
@@ -377,6 +380,7 @@ class BlocksViewModel(
                 store!!.save(doc)
                 BlockSync.write(dir, m, doc, context(), force)
             }
+            addPermissions(doc)
             _state.update {
                 it.copy(
                     saving = false,
@@ -392,6 +396,20 @@ class BlocksViewModel(
             _state.update { it.copy(saving = false) }
             _messages.send(BlocksMessage.Failed(e.message ?: e.javaClass.simpleName))
         }
+    }
+
+    /**
+     * Adds the manifest permissions the screen's components need (vibrator, network, notifications).
+     * Permissions are only added, never removed: the user may need them for their own code.
+     */
+    private suspend fun addPermissions(doc: BlockDocument) {
+        val m = manifest ?: return
+        val missing = Components.permissions(doc) - m.app.permissions.toSet()
+        if (missing.isEmpty()) return
+        val updated = m.copy(app = m.app.copy(permissions = (m.app.permissions + missing).sorted()))
+        val r = repository.saveSettings(projectId, updated)
+        manifest = r.manifest
+        if (r.conflicts.isNotEmpty()) _messages.send(BlocksMessage.PermissionsNotWritten(missing.sorted()))
     }
 
     /** Saves and then runs [after] when nothing is left unsaved. */

@@ -66,6 +66,46 @@ internal fun blockMessageRes(type: String): Int? = when (type) {
     "sound_play" -> R.string.blk_sound_play
     "sound_stop" -> R.string.blk_sound_stop
     "app_open_link" -> R.string.blk_app_open_link
+    "intent_set_screen" -> R.string.blk_intent_set_screen
+    "intent_set_action" -> R.string.blk_intent_set_action
+    "intent_put_extra" -> R.string.blk_intent_put_extra
+    "intent_start" -> R.string.blk_intent_start
+    "intent_clear" -> R.string.blk_intent_clear
+    "app_get_extra" -> R.string.blk_app_get_extra
+    "vibrator_vibrate" -> R.string.blk_vibrator_vibrate
+    "vibrator_cancel" -> R.string.blk_vibrator_cancel
+    "calendar_now" -> R.string.blk_calendar_now
+    "calendar_set_ms" -> R.string.blk_calendar_set_ms
+    "calendar_add" -> R.string.blk_calendar_add
+    "calendar_set" -> R.string.blk_calendar_set
+    "calendar_get" -> R.string.blk_calendar_get
+    "calendar_ms" -> R.string.blk_calendar_ms
+    "calendar_format" -> R.string.blk_calendar_format
+    "animator_start" -> R.string.blk_animator_start
+    "animator_stop" -> R.string.blk_animator_stop
+    "sensor_start" -> R.string.blk_sensor_start
+    "sensor_stop" -> R.string.blk_sensor_stop
+    "tts_speak" -> R.string.blk_tts_speak
+    "tts_set" -> R.string.blk_tts_set
+    "tts_stop" -> R.string.blk_tts_stop
+    "tts_is_speaking" -> R.string.blk_tts_is_speaking
+    "stt_listen" -> R.string.blk_stt_listen
+    "picker_pick" -> R.string.blk_picker_pick
+    "file_read_text" -> R.string.blk_file_read_text
+    "view_set_image_file" -> R.string.blk_view_set_image_file
+    "network_request" -> R.string.blk_network_request
+    "notification_show" -> R.string.blk_notification_show
+    "date_picker_show" -> R.string.blk_date_picker_show
+    "time_picker_show" -> R.string.blk_time_picker_show
+    "event_animator_end" -> R.string.blk_event_animator_end
+    "event_sensor_change" -> R.string.blk_event_sensor_change
+    "event_recognizer_result" -> R.string.blk_event_recognizer_result
+    "event_recognizer_error" -> R.string.blk_event_recognizer_error
+    "event_picker_picked" -> R.string.blk_event_picker_picked
+    "event_network_response" -> R.string.blk_event_network_response
+    "event_network_error" -> R.string.blk_event_network_error
+    "event_date_picked" -> R.string.blk_event_date_picked
+    "event_time_picked" -> R.string.blk_event_time_picked
     "ctrl_foreach" -> R.string.blk_ctrl_foreach
     "ctrl_foreach_number" -> R.string.blk_ctrl_foreach_number
     "ctrl_break" -> R.string.blk_ctrl_break

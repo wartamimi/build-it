@@ -42,7 +42,7 @@ class CatalogTest {
                     .associate { i -> i.name to get(ids.next(), variables.first { it.type == i.type }.name) }
                 val fields = when (type) {
                     "proc_call" -> mapOf("name" to "doSomething")
-                    "app_start" -> mapOf("activity" to "SettingsActivity")
+                    "app_start", "intent_set_screen" -> block.fields + ("activity" to "SettingsActivity")
                     "code_stmt" -> mapOf("code" to "done = true;")
                     "code_expr" -> mapOf("code" to "count")
                     else -> block.fields
@@ -61,7 +61,12 @@ class CatalogTest {
                         fields = mapOf("name" to "doSomething", "params" to "n:number,t:text,flag:boolean,words:textList"),
                         statements = mapOf("do" to listOf(param("n"), param("t"), param("flag"), param("words"))),
                     )
-                } else if (def.type != "event_create") hats += create(def.type)
+                } else if (def.type != "event_create") {
+                    // Component events: read every value the event provides
+                    val params = Components.event(def.type)?.second?.params.orEmpty()
+                    val reads = params.map { p -> create("app_log").copy(inputs = mapOf("text" to create("proc_param").copy(fields = mapOf("param" to p.name)))) }
+                    hats += create(def.type).let { h -> if (reads.isEmpty()) h else h.copy(statements = mapOf("do" to reads)) }
+                }
                 BlockShape.Statement -> body += create(def.type).let { if (def.terminal) inLoop(it) else it }
                 BlockShape.Value -> if (def.type != "proc_param") body += create("app_log").copy(inputs = mapOf("text" to create(def.type)))
             }
@@ -88,7 +93,7 @@ class CatalogTest {
     }
 
     @Test fun templatesUseOnlyTheirOwnPlaceholders() {
-        val re = Regex("\\{(\\w+)\\}")
+        val re = Regex("\\{(\\w+)\\^?\\}")
         BlockRegistry.all.filter { it.code != null }.forEach { def ->
             val names = (def.inputs.map { it.name } + def.fields.map { it.name }).toSet()
             listOf(def.code!!.java, def.code.kotlin).forEach { tpl ->

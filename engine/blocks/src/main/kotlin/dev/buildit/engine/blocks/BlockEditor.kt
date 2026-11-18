@@ -34,8 +34,7 @@ object BlockOps {
     fun outputType(doc: BlockDocument, block: Block): ValueType? {
         val def = BlockRegistry.find(block.type) ?: return null
         if (block.type == "var_get") return doc.variables.firstOrNull { it.name == block.field("var") }?.type
-        if (block.type == "proc_param") return Procedures.enclosingDefine(doc, block.id)
-            ?.let { d -> Procedures.parse(d.field("params"))?.firstOrNull { it.name == block.field("param") }?.type }
+        if (block.type == "proc_param") return Procedures.enclosingParams(doc, block.id)?.firstOrNull { it.name == block.field("param") }?.type
         return def.output
     }
 

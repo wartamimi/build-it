@@ -37,14 +37,15 @@ private fun header(source: String) = listOf(
 private fun handlerName(prefix: String, view: String, suffix: String) = prefix + view.replaceFirstChar { it.uppercase() } + suffix
 private fun procName(name: String) = "run" + name.replaceFirstChar { it.uppercase() }
 
-private val placeholder = Regex("\\{(\\w+)\\}")
+private val placeholder = Regex("\\{(\\w+)(\\^)?\\}")
 
 /** Fills a template: inputs are printed with [expr], text fields with [str], other fields as is. */
 private fun fill(template: String, inputs: Map<String, Expr>, fields: Map<String, TField>, expr: (Expr) -> String, str: (String) -> String): String =
     placeholder.replace(template) { m ->
         val n = m.groupValues[1]
         inputs[n]?.let(expr) ?: when (val f = fields[n]) {
-            is TField.Raw -> f.code
+            // {field^}: the value capitalised, for member names like startTimer1
+            is TField.Raw -> if (m.groupValues[2].isNotEmpty()) Components.capitalized(f.code) else f.code
             is TField.Str -> str(f.text)
             null -> m.value
         }
@@ -66,12 +67,24 @@ private fun usesClass(p: Program, predicate: (Stmt) -> Boolean): Boolean {
 }
 
 private fun Program.has(t: ComponentType) = components.any { it.type == t }
+private fun Program.eventBody(hat: String, name: String) = componentEvents["$hat|$name"].orEmpty()
+private fun Program.legacyEvent(c: Component) = eventBody(Components.spec(c.type).events.firstOrNull()?.hat.orEmpty(), c.name)
+private fun Program.requestCode(c: Component) = 1000 + components.indexOf(c)
+
+/** Components whose code comes from their [ComponentSpec], with that code in one language. */
+private fun Program.specCode(kotlin: Boolean): List<Triple<Component, ComponentSpec, ComponentCode>> = components.mapNotNull { c ->
+    val spec = Components.spec(c.type)
+    (if (kotlin) spec.kotlin else spec.java)?.let { Triple(c, spec, it) }
+}
+
+private fun Program.fillFor(c: Component, code: String) = Components.fill(code, c.name, requestCode(c))
 private fun Program.ofType(t: ComponentType) = components.filter { it.type == t }
 
 /** Lines that stop timers and release players when the screen is destroyed. */
 private fun Program.cleanup(kotlin: Boolean): List<String> =
     ofType(ComponentType.Timer).map { "${it.name}.removeCallbacksAndMessages(null)" + if (kotlin) "" else ";" } +
-        ofType(ComponentType.Sound).map { handlerName("stop", it.name, "") + "()" + if (kotlin) "" else ";" }
+        ofType(ComponentType.Sound).map { handlerName("stop", it.name, "") + "()" + if (kotlin) "" else ";" } +
+        specCode(kotlin).mapNotNull { (c, _, code) -> code.cleanup?.let { fillFor(c, it) } }
 
 private fun imports(p: Program): List<String> {
     val set = sortedSetOf("android.app.Activity", "android.os.Bundle")
@@ -89,6 +102,8 @@ private fun imports(p: Program): List<String> {
     if (p.has(ComponentType.Storage)) set += "android.content.SharedPreferences"
     if (p.has(ComponentType.Dialog)) set += "android.app.AlertDialog"
     if (p.has(ComponentType.Sound)) set += "android.media.MediaPlayer"
+    p.components.forEach { c -> set += Components.spec(c.type).imports }
+    if (p.specCode(false).any { it.third.result != null }) set += "android.content.Intent"
     return set.toList()
 }
 
@@ -109,6 +124,7 @@ object JavaBackend : Backend {
                     ComponentType.Storage -> line("private SharedPreferences ${c.name};")
                     ComponentType.Sound -> line("private MediaPlayer ${c.name};")
                     ComponentType.Dialog -> Unit
+                    else -> Components.spec(c.type).java?.field?.let { raw(p.fillFor(c, it)) }
                 }
             }
             if (p.variables.isNotEmpty() || p.views.isNotEmpty() || p.components.any { it.type != ComponentType.Dialog } || Helper.RandomInt in p.helpers) line()
@@ -119,6 +135,7 @@ object JavaBackend : Backend {
                 line("setContentView(R.layout.${p.layout});")
                 p.views.forEach { line("${it.id} = findViewById(R.id.${it.id});") }
                 p.ofType(ComponentType.Storage).forEach { line("${it.name} = getSharedPreferences(${str(it.name)}, MODE_PRIVATE);") }
+                p.specCode(false).forEach { (c, _, code) -> code.init?.let { raw(p.fillFor(c, it)) } }
                 p.clicks.forEach { line("${it.view}.setOnClickListener(v -> ${handlerName("on", it.view, "Click")}());") }
                 p.checkedChanges.forEach { line("${it.view}.setOnCheckedChangeListener((button, isChecked) -> ${handlerName("on", it.view, "CheckedChange")}());") }
                 stmts(p.onCreate)
@@ -140,7 +157,24 @@ object JavaBackend : Backend {
                 line()
                 block("private void ${procName(pr.name)}(${pr.params.joinToString(", ") { "${if (it.type.isCollection) "" else "final "}${type(it.type)} ${it.name}" }}) {") { stmts(pr.body) }
             }
-            p.components.forEach { c -> component(c, p.componentEvents[c.name].orEmpty()) }
+            p.components.forEach { c -> component(c, p.legacyEvent(c)) }
+            p.specCode(false).forEach { (c, spec, code) ->
+                code.members?.let { line(); raw(p.fillFor(c, it)) }
+                spec.events.forEach { ev ->
+                    line()
+                    val params = ev.params.joinToString(", ") { "final ${type(it.type)} ${it.name}" }
+                    block("private void ${handlerName("on", c.name, ev.suffix)}($params) {") { stmts(p.eventBody(ev.hat, c.name)) }
+                }
+            }
+            val results = p.specCode(false).mapNotNull { (c, _, code) -> code.result?.let { p.fillFor(c, it) } }
+            if (results.isNotEmpty()) {
+                line()
+                line("@Override")
+                block("protected void onActivityResult(int requestCode, int resultCode, Intent data) {") {
+                    line("super.onActivityResult(requestCode, resultCode, data);")
+                    results.forEach { raw(it) }
+                }
+            }
             helpers(p.helpers)
             p.templateHelpers.forEach { h -> h.java?.let { line(); raw(it) } }
         }
@@ -179,7 +213,7 @@ object JavaBackend : Backend {
                 }
                 line(); block("private void ${handlerName("on", n, "Done")}() {") { stmts(event) }
             }
-            ComponentType.Storage -> Unit
+            else -> Unit
         }
     }
 
@@ -327,6 +361,7 @@ object KotlinBackend : Backend {
                     ComponentType.Storage -> line("private lateinit var ${c.name}: SharedPreferences")
                     ComponentType.Sound -> line("private var ${c.name}: MediaPlayer? = null")
                     ComponentType.Dialog -> Unit
+                    else -> Components.spec(c.type).kotlin?.field?.let { raw(p.fillFor(c, it)) }
                 }
             }
             if (p.variables.isNotEmpty() || p.views.isNotEmpty() || p.components.any { it.type != ComponentType.Dialog }) line()
@@ -336,6 +371,7 @@ object KotlinBackend : Backend {
                 line("setContentView(R.layout.${p.layout})")
                 p.views.forEach { line("${it.id} = findViewById(R.id.${it.id})") }
                 p.ofType(ComponentType.Storage).forEach { line("${it.name} = getSharedPreferences(${str(it.name)}, MODE_PRIVATE)") }
+                p.specCode(true).forEach { (c, _, code) -> code.init?.let { raw(p.fillFor(c, it)) } }
                 p.clicks.forEach { line("${it.view}.setOnClickListener { ${handlerName("on", it.view, "Click")}() }") }
                 p.checkedChanges.forEach { line("${it.view}.setOnCheckedChangeListener { _, _ -> ${handlerName("on", it.view, "CheckedChange")}() }") }
                 stmts(p.onCreate)
@@ -356,7 +392,24 @@ object KotlinBackend : Backend {
                 line()
                 block("private fun ${procName(pr.name)}(${pr.params.joinToString(", ") { "${it.name}: ${type(it.type)}" }}) {") { stmts(pr.body) }
             }
-            p.components.forEach { c -> component(c, p.componentEvents[c.name].orEmpty()) }
+            p.components.forEach { c -> component(c, p.legacyEvent(c)) }
+            p.specCode(true).forEach { (c, spec, code) ->
+                code.members?.let { line(); raw(p.fillFor(c, it)) }
+                spec.events.forEach { ev ->
+                    line()
+                    val params = ev.params.joinToString(", ") { "${it.name}: ${type(it.type)}" }
+                    block("private fun ${handlerName("on", c.name, ev.suffix)}($params) {") { stmts(p.eventBody(ev.hat, c.name)) }
+                }
+            }
+            val results = p.specCode(true).mapNotNull { (c, _, code) -> code.result?.let { p.fillFor(c, it) } }
+            if (results.isNotEmpty()) {
+                line()
+                line("@Deprecated(\"Deprecated in Java\")")
+                block("override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {") {
+                    line("super.onActivityResult(requestCode, resultCode, data)")
+                    results.forEach { raw(it) }
+                }
+            }
             helpers(p.helpers)
             p.templateHelpers.forEach { h -> h.kotlin?.let { line(); raw(it) } }
         }
@@ -395,7 +448,7 @@ object KotlinBackend : Backend {
                 }
                 line(); block("private fun ${handlerName("on", n, "Done")}() {") { stmts(event) }
             }
-            ComponentType.Storage -> Unit
+            else -> Unit
         }
     }
 

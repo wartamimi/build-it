@@ -60,6 +60,8 @@ object AndroidSources {
         appendLine("""<?xml version="1.0" encoding="utf-8"?>""")
         appendLine("""<manifest xmlns:android="http://schemas.android.com/apk/res/android">""")
         appendLine()
+        m.app.permissions.distinct().sorted().forEach { appendLine("""    <uses-permission android:name="$it" />""") }
+        if (m.app.permissions.isNotEmpty()) appendLine()
         appendLine("""    <application""")
         appendLine("""        android:allowBackup="true"""")
         appendLine("""        android:label="@string/app_name"""")

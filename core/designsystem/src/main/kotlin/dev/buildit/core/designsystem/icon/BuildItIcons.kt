@@ -250,6 +250,61 @@ object BiIcons {
         outline("Screens") { moveTo(9f, 3f); lineTo(19f, 3f); lineTo(19f, 17f); moveTo(5f, 7f); lineTo(15f, 7f); lineTo(15f, 21f); lineTo(5f, 21f); close() }
     }
 
+    /** Arrow leaving a box: open another screen or app. */
+    val OpenOut: ImageVector by lazy {
+        outline("OpenOut") { moveTo(14f, 4f); lineTo(20f, 4f); lineTo(20f, 10f); moveTo(20f, 4f); lineTo(11f, 13f); moveTo(18f, 14f); lineTo(18f, 20f); lineTo(4f, 20f); lineTo(4f, 6f); lineTo(10f, 6f) }
+    }
+
+    /** Phone with shake marks: vibration. */
+    val Vibrate: ImageVector by lazy {
+        outline("Vibrate") { moveTo(8f, 4f); lineTo(16f, 4f); lineTo(16f, 20f); lineTo(8f, 20f); close(); moveTo(4f, 8f); lineTo(4f, 16f); moveTo(20f, 8f); lineTo(20f, 16f) }
+    }
+
+    /** Calendar page. */
+    val Calendar: ImageVector by lazy {
+        outline("Calendar") { moveTo(4f, 6f); lineTo(20f, 6f); lineTo(20f, 20f); lineTo(4f, 20f); close(); moveTo(4f, 10f); lineTo(20f, 10f); moveTo(8f, 3f); lineTo(8f, 7f); moveTo(16f, 3f); lineTo(16f, 7f) }
+    }
+
+    /** Motion lines behind a dot: animation. */
+    val Motion: ImageVector by lazy {
+        outline("Motion") { moveTo(3f, 8f); lineTo(9f, 8f); moveTo(5f, 12f); lineTo(11f, 12f); moveTo(3f, 16f); lineTo(9f, 16f); moveTo(17f, 12f); arcTo(3f, 3f, 0f, true, true, 11f, 12f); arcTo(3f, 3f, 0f, true, true, 17f, 12f) }
+    }
+
+    /** Concentric arcs: sensor readings. */
+    val Sensor: ImageVector by lazy {
+        outline("Sensor") { moveTo(12f, 12f); lineTo(12f, 12.01f); moveTo(8f, 8f); arcTo(5.5f, 5.5f, 0f, false, false, 8f, 16f); moveTo(16f, 8f); arcTo(5.5f, 5.5f, 0f, false, true, 16f, 16f); moveTo(5f, 5f); arcTo(10f, 10f, 0f, false, false, 5f, 19f); moveTo(19f, 5f); arcTo(10f, 10f, 0f, false, true, 19f, 19f) }
+    }
+
+    /** Speaker with waves: speech output. */
+    val Speak: ImageVector by lazy {
+        outline("Speak") { moveTo(4f, 9f); lineTo(8f, 9f); lineTo(13f, 5f); lineTo(13f, 19f); lineTo(8f, 15f); lineTo(4f, 15f); close(); moveTo(16f, 9f); arcTo(4f, 4f, 0f, false, true, 16f, 15f); moveTo(18.5f, 6.5f); arcTo(7.5f, 7.5f, 0f, false, true, 18.5f, 17.5f) }
+    }
+
+    /** Microphone: speech input. */
+    val Mic: ImageVector by lazy {
+        outline("Mic") { moveTo(9f, 6f); arcTo(3f, 3f, 0f, false, true, 15f, 6f); lineTo(15f, 12f); arcTo(3f, 3f, 0f, false, true, 9f, 12f); close(); moveTo(5f, 11f); arcTo(7f, 7f, 0f, false, false, 19f, 11f); moveTo(12f, 18f); lineTo(12f, 21f) }
+    }
+
+    /** Page with a folded corner: files. */
+    val File: ImageVector by lazy {
+        outline("File") { moveTo(6f, 3f); lineTo(14f, 3f); lineTo(19f, 8f); lineTo(19f, 21f); lineTo(6f, 21f); close(); moveTo(14f, 3f); lineTo(14f, 8f); lineTo(19f, 8f) }
+    }
+
+    /** Globe: network requests. */
+    val Network: ImageVector by lazy {
+        outline("Network") { moveTo(21f, 12f); arcTo(9f, 9f, 0f, true, true, 3f, 12f); arcTo(9f, 9f, 0f, true, true, 21f, 12f); moveTo(3f, 12f); lineTo(21f, 12f); moveTo(12f, 3f); arcTo(14f, 14f, 0f, false, true, 12f, 21f); arcTo(14f, 14f, 0f, false, true, 12f, 3f) }
+    }
+
+    /** Bell: notifications. */
+    val Bell: ImageVector by lazy {
+        outline("Bell") { moveTo(6f, 17f); lineTo(6f, 11f); arcTo(6f, 6f, 0f, false, true, 18f, 11f); lineTo(18f, 17f); lineTo(20f, 19f); lineTo(4f, 19f); close(); moveTo(10f, 21f); lineTo(14f, 21f) }
+    }
+
+    /** Clock face: time. */
+    val Clock: ImageVector by lazy {
+        outline("Clock") { moveTo(21f, 12f); arcTo(9f, 9f, 0f, true, true, 3f, 12f); arcTo(9f, 9f, 0f, true, true, 21f, 12f); moveTo(12f, 7f); lineTo(12f, 12f); lineTo(15f, 14f) }
+    }
+
     private fun outline(name: String, stroke: Float = 1.8f, block: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply {
             path(

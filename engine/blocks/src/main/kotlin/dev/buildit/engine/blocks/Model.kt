@@ -69,6 +69,25 @@ enum class ComponentType {
     @SerialName("dialog") Dialog,
     /** Plays a sound from res/raw (android.media.MediaPlayer). */
     @SerialName("sound") Sound,
+    /** Opens another screen or app, with extras (android.content.Intent). */
+    @SerialName("intent") Intent,
+    @SerialName("vibrator") Vibrator,
+    /** A date and time that blocks can change and read (java.util.Calendar). */
+    @SerialName("calendar") Calendar,
+    /** Animates a property of a view (android.animation.ObjectAnimator). */
+    @SerialName("animator") Animator,
+    /** Accelerometer, gyroscope, light, proximity or magnetic field readings. */
+    @SerialName("sensor") Sensor,
+    @SerialName("textToSpeech") TextToSpeech,
+    /** Speech input through the system recogniser. */
+    @SerialName("speechToText") SpeechToText,
+    /** Lets the user pick a file with the system picker. */
+    @SerialName("filePicker") FilePicker,
+    /** HTTP requests on a background thread, results on the main thread. */
+    @SerialName("network") Network,
+    @SerialName("notification") Notification,
+    @SerialName("datePicker") DatePicker,
+    @SerialName("timePicker") TimePicker,
 }
 
 @Serializable

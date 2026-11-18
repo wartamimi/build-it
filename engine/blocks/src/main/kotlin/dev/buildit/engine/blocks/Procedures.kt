@@ -42,6 +42,16 @@ object Procedures {
         head.takeIf { it.type == "proc_define" && s.blocks.any { b -> b.walk().any { it.id == blockId } } }
     }
 
+    /**
+     * Parameters available to [blockId]: those of the procedure it is in, or the values its
+     * component event provides (e.g. the response of a network request). Null outside both.
+     */
+    fun enclosingParams(doc: BlockDocument, blockId: String): List<ProcParam>? {
+        val head = doc.stacks.firstOrNull { s -> s.blocks.any { b -> b.walk().any { it.id == blockId } } }?.blocks?.firstOrNull() ?: return null
+        if (head.type == "proc_define") return parse(head.field("params")).orEmpty()
+        return Components.event(head.type)?.second?.params?.takeIf { it.isNotEmpty() }
+    }
+
     /** Definition of a call block: the static `proc_call` plus one input per parameter of the called procedure. */
     fun callDef(doc: BlockDocument, call: Block): BlockDef {
         val base = BlockRegistry["proc_call"]
