@@ -390,4 +390,11 @@
     <string name="bk_collection_invalid_name">Use letters, digits, spaces, _ . or - (up to 60)</string>
     <string name="bk_collection_remove">Remove from collection</string>
     <string name="bk_collection_empty">Select a block and tap the collection button to save it here.</string>
+    <string name="bk_source_screen">Opens, comes back, goes to the background, closes</string>
+    <string name="bk_source_more">Procedures: blocks you name and reuse</string>
+    <string name="bk_source_loose">Events of views or components that are gone, and stacks without an event</string>
+    <string name="bk_new_procedure">New procedure</string>
+    <string name="bk_search_blocks">Search blocks</string>
+    <string name="bk_search_clear">Clear search</string>
+    <string name="bk_search_none">No blocks match</string>
 </resources>

@@ -15,6 +15,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.unit.dp
 import dev.buildit.core.designsystem.theme.Spacing
 import dev.buildit.engine.layout.DropResolver
 import dev.buildit.engine.layout.LayoutCommand
@@ -47,6 +50,10 @@ fun DesignerCanvas(
     onCommand: (LayoutCommand) -> Unit,
     onIssues: (List<PreviewIssue>) -> Unit,
     modifier: Modifier = Modifier,
+    /** Floating actions shown next to the selected view (not for the root). */
+    bubble: (@Composable () -> Unit)? = null,
+    /** Extra room on the left (for the widget dock floating over the canvas). */
+    startInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     val root = state.root ?: return
     val latestRoot by rememberUpdatedState(root)
@@ -55,12 +62,16 @@ fun DesignerCanvas(
     val issues by rememberUpdatedState(onIssues)
     var dragUid by remember { mutableStateOf<Long?>(null) }
     val surface = MaterialTheme.colorScheme.surfaceContainerHighest
+    var selection by remember { mutableStateOf<android.graphics.RectF?>(null) }
+    var hostPos by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
 
-    Box(modifier.fillMaxSize().background(surface).padding(Spacing.md), contentAlignment = Alignment.Center) {
+    Box(modifier.fillMaxSize().background(surface).padding(start = Spacing.md + startInset, top = Spacing.md, end = Spacing.md, bottom = Spacing.md), contentAlignment = Alignment.Center) {
         AndroidView(
+            modifier = Modifier.onPlaced { hostPos = it.positionInParent() },
             factory = { ctx ->
                 PreviewHost(ctx).also { host ->
                     handle.host = host
+                    host.onSelectionBounds = { selection = it }
                     host.onTap = { x, y -> select(DropResolver.hit(latestRoot, host.boxes(), x, y)) }
                     host.onDragStart = { x, y ->
                         val uid = DropResolver.hit(latestRoot, host.boxes(), x, y)
@@ -98,6 +109,34 @@ fun DesignerCanvas(
                 host.selectedUid = state.selectedUid
             },
         )
+        val r = selection
+        if (bubble != null && r != null && state.selectedUid != null && state.selectedUid != root.uid) {
+            SelectionBubble(r, hostPos, bubble)
+        }
+    }
+}
+
+/**
+ * Places [content] centred under the selected view's bounds [r] (host pixels; the host sits at
+ * [hostPos] in this box), or above it when there is no room below, kept inside the box.
+ */
+@Composable
+private fun SelectionBubble(r: android.graphics.RectF, hostPos: androidx.compose.ui.geometry.Offset, content: @Composable () -> Unit) {
+    val gap = with(androidx.compose.ui.platform.LocalDensity.current) { 6.dp.roundToPx() }
+    androidx.compose.ui.layout.Layout(content, Modifier.fillMaxSize()) { measurables, constraints ->
+        val p = measurables.first().measure(constraints.copy(minWidth = 0, minHeight = 0))
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            val cx = hostPos.x + r.centerX()
+            val x = (cx - p.width / 2f).toInt().coerceIn(0, (constraints.maxWidth - p.width).coerceAtLeast(0))
+            val below = (hostPos.y + r.bottom).toInt() + gap
+            val above = (hostPos.y + r.top).toInt() - gap - p.height
+            val y = when {
+                below + p.height <= constraints.maxHeight -> below
+                above >= 0 -> above
+                else -> (constraints.maxHeight - p.height).coerceAtLeast(0)
+            }
+            p.place(x, y)
+        }
     }
 }
 

@@ -3,6 +3,7 @@ package dev.buildit.core.designsystem.theme
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -14,44 +15,45 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import dev.buildit.core.model.ThemeMode
 
+// Warm scheme: brick orange actions, clay-brown secondary, mint for success, paper neutrals.
 internal val LightScheme: ColorScheme = lightColorScheme(
-    primary = Palette.Blueprint40, onPrimary = Palette.White,
-    primaryContainer = Palette.Blueprint90, onPrimaryContainer = Palette.Blueprint10,
-    secondary = Palette.Kiln40, onSecondary = Palette.White,
-    secondaryContainer = Palette.Kiln90, onSecondaryContainer = Palette.Kiln10,
+    primary = Palette.Brick40, onPrimary = Palette.White,
+    primaryContainer = Palette.Brick90, onPrimaryContainer = Palette.Brick10,
+    secondary = Color(0xFF6F4C35), onSecondary = Palette.White,
+    secondaryContainer = Color(0xFFF3E1D3), onSecondaryContainer = Palette.Clay10,
     tertiary = Palette.Mint40, onTertiary = Palette.White,
     tertiaryContainer = Palette.Mint90, onTertiaryContainer = Palette.Mint20,
     error = Palette.Red40, onError = Palette.White,
     errorContainer = Palette.Red90, onErrorContainer = Palette.Red20,
-    background = Palette.Graphite98, onBackground = Palette.Graphite10,
-    surface = Palette.Graphite98, onSurface = Palette.Graphite10,
-    surfaceVariant = Palette.Graphite90, onSurfaceVariant = Palette.Graphite30,
+    background = Palette.Sand98, onBackground = Palette.Sand10,
+    surface = Palette.Sand98, onSurface = Palette.Sand10,
+    surfaceVariant = Palette.Sand90, onSurfaceVariant = Palette.Sand30,
     surfaceContainerLowest = Palette.White,
-    surfaceContainerLow = Palette.Graphite96,
-    surfaceContainer = Palette.Graphite94,
-    surfaceContainerHigh = Palette.Graphite90,
-    surfaceContainerHighest = Palette.Graphite80,
-    outline = Palette.Graphite50, outlineVariant = Palette.Graphite80,
+    surfaceContainerLow = Palette.Sand96,
+    surfaceContainer = Palette.Sand94,
+    surfaceContainerHigh = Palette.Sand90,
+    surfaceContainerHighest = Palette.Sand80,
+    outline = Palette.Sand50, outlineVariant = Palette.Sand80,
 )
 
 internal val DarkScheme: ColorScheme = darkColorScheme(
-    primary = Palette.Blueprint80, onPrimary = Palette.Blueprint20,
-    primaryContainer = Palette.Blueprint30, onPrimaryContainer = Palette.Blueprint90,
-    secondary = Palette.Kiln80, onSecondary = Palette.Kiln20,
-    secondaryContainer = Palette.Kiln30, onSecondaryContainer = Palette.Kiln90,
+    primary = Palette.Brick80, onPrimary = Palette.Brick20,
+    primaryContainer = Palette.Brick30, onPrimaryContainer = Palette.Brick90,
+    secondary = Color(0xFFE2C0A8), onSecondary = Color(0xFF412A1B),
+    secondaryContainer = Color(0xFF5A3F2D), onSecondaryContainer = Color(0xFFF3E1D3),
     tertiary = Palette.Mint80, onTertiary = Palette.Mint20,
     tertiaryContainer = Palette.Mint30, onTertiaryContainer = Palette.Mint90,
     error = Palette.Red80, onError = Palette.Red20,
     errorContainer = Palette.Red30, onErrorContainer = Palette.Red90,
-    background = Palette.Graphite6, onBackground = Palette.Graphite90,
-    surface = Palette.Graphite6, onSurface = Palette.Graphite90,
-    surfaceVariant = Palette.Graphite30, onSurfaceVariant = Palette.Graphite80,
-    surfaceContainerLowest = Palette.Graphite4,
-    surfaceContainerLow = Palette.Graphite10,
-    surfaceContainer = Palette.Graphite12,
-    surfaceContainerHigh = Palette.Graphite17,
-    surfaceContainerHighest = Palette.Graphite22,
-    outline = Palette.Graphite60, outlineVariant = Palette.Graphite30,
+    background = Palette.Sand6, onBackground = Palette.Sand90,
+    surface = Palette.Sand6, onSurface = Palette.Sand90,
+    surfaceVariant = Palette.Sand30, onSurfaceVariant = Palette.Sand80,
+    surfaceContainerLowest = Palette.Sand4,
+    surfaceContainerLow = Palette.Sand10,
+    surfaceContainer = Palette.Sand12,
+    surfaceContainerHigh = Palette.Sand17,
+    surfaceContainerHighest = Palette.Sand22,
+    outline = Palette.Sand60, outlineVariant = Palette.Sand30,
 )
 
 val LocalExtendedColors = staticCompositionLocalOf { LightExtended }

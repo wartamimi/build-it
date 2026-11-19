@@ -48,6 +48,29 @@ internal object Palette {
     val Graphite96 = Color(0xFFF4F3FA)
     val Graphite98 = Color(0xFFFAF9FF)
     val White = Color(0xFFFFFFFF)
+
+    // Warm neutrals for the "preview at the centre" look (0.18.0): paper and clay instead of grey.
+    val Clay10 = Color(0xFF3B1F10)
+    val Sand4 = Color(0xFF120D0A)
+    val Sand6 = Color(0xFF17110D)
+    val Sand10 = Color(0xFF1F1813)
+    val Sand12 = Color(0xFF241C17)
+    val Sand17 = Color(0xFF2E251F)
+    val Sand22 = Color(0xFF392E27)
+    val Sand30 = Color(0xFF4F4238)
+    val Sand50 = Color(0xFF7F6F62)
+    val Sand60 = Color(0xFFA08F80)
+    val Sand80 = Color(0xFFD7C6B6)
+    val Sand90 = Color(0xFFEDE1D5)
+    val Sand94 = Color(0xFFF3EAE1)
+    val Sand96 = Color(0xFFF7F0E9)
+    val Sand98 = Color(0xFFFBF7F3)
+    val Brick40 = Color(0xFFB0420F)
+    val Brick80 = Color(0xFFFFB693)
+    val Brick90 = Color(0xFFFFDBCB)
+    val Brick20 = Color(0xFF5B1B00)
+    val Brick30 = Color(0xFF822E05)
+    val Brick10 = Color(0xFF380C00)
 }
 
 /** Semantic colors that Material's scheme does not cover (success, build state, code tokens). */

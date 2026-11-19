@@ -390,4 +390,11 @@
     <string name="bk_collection_invalid_name">Gunakan huruf, angka, spasi, _ . atau - (maks. 60)</string>
     <string name="bk_collection_remove">Hapus dari koleksi</string>
     <string name="bk_collection_empty">Pilih blok lalu ketuk tombol koleksi untuk menyimpannya di sini.</string>
+    <string name="bk_source_screen">Dibuka, kembali, ke latar belakang, ditutup</string>
+    <string name="bk_source_more">Prosedur: blok buatanmu yang bisa dipakai ulang</string>
+    <string name="bk_source_loose">Event milik view atau komponen yang sudah dihapus, dan tumpukan tanpa event</string>
+    <string name="bk_new_procedure">Prosedur baru</string>
+    <string name="bk_search_blocks">Cari blok</string>
+    <string name="bk_search_clear">Hapus pencarian</string>
+    <string name="bk_search_none">Tidak ada blok yang cocok</string>
 </resources>

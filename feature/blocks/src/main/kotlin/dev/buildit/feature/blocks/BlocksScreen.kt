@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -191,7 +192,7 @@ fun BlocksScreen(
                                 onAddCollected = { name -> canvas.center().let { c -> viewModel.addFromCollection(name, c.x, c.y) } },
                                 onDeleteCollected = viewModel::deleteFromCollection,
                                 onNewVariable = { newVariable = true }, onRenameVariable = { renameVariable = it },
-                                onRemoveVariable = viewModel::removeVariable, modifier = m)
+                                onRemoveVariable = viewModel::removeVariable, modifier = m, bubbles = maxWidth < 840.dp)
                         }
                         if (maxWidth >= 840.dp) {
                             Row(Modifier.fillMaxSize()) {
@@ -381,29 +382,42 @@ private fun Palette(
     onRenameVariable: (String) -> Unit,
     onRemoveVariable: (String) -> Unit,
     modifier: Modifier,
+    /** Phone drawer: a search field and a row of round category bubbles above the blocks. */
+    bubbles: Boolean = false,
 ) {
     // null: the collection
     var category by rememberSaveable { mutableStateOf<BlockCategory?>(BlockCategory.Events) }
+    var query by rememberSaveable { mutableStateOf("") }
+    val searching = query.isNotBlank()
     val res = LocalContext.current.resources
     val painter = rememberBlockPainter()
     val doc = state.document
     // Sample blocks as they will be created, so the palette shows real shapes with real defaults
-    val samples = remember(category, doc?.variables, doc?.components, state.views, state.sounds, state.images) {
+    val samples = remember(category, query, doc?.variables, doc?.components, state.views, state.sounds, state.images) {
         var n = 0
-        BlockRegistry.all.filter { it.category == category }.map { def ->
+        val q = query.trim()
+        BlockRegistry.all.filter { if (q.isNotEmpty()) paletteText(it, res).contains(q, ignoreCase = true) else it.category == category }.map { def ->
             def to runCatching {
                 BlockRegistry.create(def.type, { "p" + n++ }, doc?.variables.orEmpty(), state.views, doc?.components.orEmpty(), state.sounds, state.images)
             }.getOrNull()
         }
     }
-    Row(modifier) {
-        LazyColumn(
-            Modifier.weight(1f).fillMaxHeight().testTag(PALETTE_TAG),
+    val categories: @Composable () -> Unit = {
+        if (state.collectedBlocks != null) {
+            CategoryTile(stringResource(R.string.bk_collection), MaterialTheme.colorScheme.tertiary, category == null && !searching, bubbles) { category = null; query = "" }
+        }
+        BlockCategory.entries.forEach { c ->
+            CategoryTile(stringResource(categoryRes(c)), categoryColor(c), c == category && !searching, bubbles) { category = c; query = "" }
+        }
+    }
+    val content: @Composable (Modifier) -> Unit = { m -> LazyColumn(
+            m.testTag(PALETTE_TAG),
             contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            item { Text(stringResource(R.string.bk_palette_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Spacing.xs)) }
-            if (category == BlockCategory.Variables || category == BlockCategory.Lists) {
+            if (searching && samples.isEmpty()) item { Text(stringResource(R.string.bk_search_none), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Spacing.xs)) }
+            if (!searching) item { Text(stringResource(R.string.bk_palette_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Spacing.xs)) }
+            if (!searching && (category == BlockCategory.Variables || category == BlockCategory.Lists)) {
                 item {
                     Surface(onClick = onNewVariable, shape = RoundedCornerShape(8.dp), color = categoryColor(category), contentColor = androidx.compose.ui.graphics.Color.White) {
                         Row(Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
@@ -419,7 +433,7 @@ private fun Palette(
                     }
                 }
             }
-            if (category == null) {
+            if (!searching && category == null) {
                 val names = state.collectedBlocks.orEmpty()
                 if (names.isEmpty()) item {
                     Text(stringResource(R.string.bk_collection_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Spacing.xs))
@@ -442,25 +456,74 @@ private fun Palette(
             items(samples, key = { it.first.type }) { (def, sample) ->
                 PaletteBlock(def, paletteText(def, res), sample, painter, onClick = { onAdd(def.type) })
             }
+        } }
+    if (bubbles) {
+        Column(modifier) {
+            PaletteSearch(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = 4.dp))
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.sm, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) { categories() }
+            HorizontalDivider(Modifier.padding(top = 2.dp))
+            content(Modifier.weight(1f).fillMaxWidth())
         }
-        // Category rail on the right, within reach of the thumb: a coloured tile per category.
+    } else Row(modifier) {
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+            PaletteSearch(query, { query = it }, Modifier.fillMaxWidth().padding(Spacing.sm))
+            content(Modifier.weight(1f).fillMaxWidth())
+        }
+        // Category rail on the right: a coloured tile per category.
         Column(
             Modifier.width(100.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainer)
                 .verticalScroll(rememberScrollState()).padding(vertical = Spacing.xs, horizontal = 4.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            if (state.collectedBlocks != null) {
-                CategoryTile(stringResource(R.string.bk_collection), MaterialTheme.colorScheme.tertiary, category == null) { category = null }
-            }
-            BlockCategory.entries.forEach { c ->
-                CategoryTile(stringResource(categoryRes(c)), categoryColor(c), c == category) { category = c }
-            }
+        ) { categories() }
+    }
+}
+
+/** A small rounded search field for the blocks palette. */
+@Composable
+private fun PaletteSearch(query: String, onQuery: (String) -> Unit, modifier: Modifier) {
+    Row(
+        modifier.height(38.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(19.dp)).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(BiIcons.Search, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(Modifier.weight(1f).padding(start = 8.dp)) {
+            if (query.isEmpty()) Text(stringResource(R.string.bk_search_blocks), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            androidx.compose.foundation.text.BasicTextField(
+                query, onQuery, singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
+        if (query.isNotEmpty()) Icon(BiIcons.Close, stringResource(R.string.bk_search_clear), Modifier.size(18.dp).clip(CircleShape).clickable { onQuery("") })
     }
 }
 
 @Composable
-private fun CategoryTile(label: String, color: androidx.compose.ui.graphics.Color, selected: Boolean, onClick: () -> Unit) {
+private fun CategoryTile(label: String, color: androidx.compose.ui.graphics.Color, selected: Boolean, bubble: Boolean, onClick: () -> Unit) {
+    if (bubble) {
+        // A round coloured bubble with the name under it; the selected one gets a ring.
+        Column(
+            Modifier.width(60.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier.size(30.dp)
+                    .then(if (selected) Modifier.border(2.dp, color, CircleShape).padding(4.dp) else Modifier.padding(4.dp))
+                    .background(color, CircleShape),
+            )
+            Text(
+                label, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        return
+    }
     Row(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))

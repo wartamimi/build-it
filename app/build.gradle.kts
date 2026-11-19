@@ -9,8 +9,8 @@ android {
 
     defaultConfig {
         applicationId = "dev.buildit.studio"
-        versionCode = 18
-        versionName = "0.17.1"
+        versionCode = 19
+        versionName = "0.18.0"
     }
 
     androidResources {

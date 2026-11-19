@@ -1,5 +1,14 @@
 Build It for Android 8.0 and newer.
 
+New in 0.18.0: a new look built around the preview, with warm colours and a brick-orange
+accent. The preview fills the designer; widgets sit in a round dock on its left (tap + to open the
+full list, or drag an icon onto the screen). Tap a view and a bubble next to it offers
+Properties, Events, Collection, Duplicate and Delete; Events jumps straight to that view's events.
+"Screen events" in the designer's toolbar opens the screen's own events. The Events tab shows one
+card per thing that has events (the screen, each view, each component, your procedures) with a
+chip per event: a tick means the screen has it (tap to open its blocks), + adds it. The blocks
+drawer has a search field and a row of round category bubbles.
+
 New in 0.17.1: the blocks drawer slides up from the bottom (blocks on the left, categories on
 the right) and blocks are smaller, at the same scale as the rest of the screen.
 

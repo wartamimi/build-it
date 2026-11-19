@@ -512,10 +512,36 @@ Not done / limits
   tests; not yet looked at on a physical phone.
 - Palette entries wider than the drawer are cut off at its edge (they can still be dragged).
 
+## Phase 18 — "Preview first" redesign (owner request, direction F)
+
+The owner compared six mockups (A–C as images, D–F as an interactive HTML page) and chose F,
+"Pratinjau sebagai pusat" (preview first).
+
+Done
+- Theme: warm light and dark schemes ("Sand" surfaces, "Brick" orange primary). Dynamic colour
+  stays off by default.
+- Designer (phone): the preview fills the width; the widget palette is a round dock floating on
+  its left (icons only; + opens the full list with names; drag an icon sideways onto the preview
+  or tap it). The selected view gets a dark action bubble placed under it (or above it when there
+  is no room): Properties, Events, Collection, Duplicate, Delete. The bar underneath keeps the id
+  picker, problems, tree and the property cards. "Screen events" in the toolbar.
+- Events tab: one card per source (Screen, each view of the layout, each component, More blocks
+  for procedures, and a card for leftovers such as events of deleted views). Chips: tick = the
+  screen has the event (opens it in the block editor, with its block count), + = add it and open
+  it. Opening Events from a view's bubble scrolls to that view's card and outlines it.
+- Blocks drawer (phone): search field across all categories and a horizontal row of round
+  category bubbles above the blocks. Wide screens keep the category rail, with the search field.
+- Test: EventSourcesTest (grouping of events by source).
+
+Not done / limits
+- The Events tab is kept as a tab (the mockup reached events only from views); both ways work.
+- Checked with Robolectric screenshots of the real screens and the usual tests; not yet looked
+  at on a physical phone. Tablet layouts (840dp and wider) keep the three-pane designer.
+
 ## Build status
 
 - `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:deps:test :engine:ai:test` —
-  passing locally (171 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
+  passing locally (172 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
 - APK: CI publishes a signed GitHub release for each push to main. Emulator job: on-device build, install and console pass.
 
@@ -541,6 +567,7 @@ Not done / limits
 | engine:blocks CatalogTest (every block and component: validates, compiles as Java and Kotlin against android.jar; procedures; loop checks; AppCompat base class; collected blocks) | 9 | pass |
 | feature:blocks BlockLayoutTest | 3 | pass |
 | feature:blocks BlocksViewModelTest (save → generated Java on disk, hand-edit protection, procedure parameters, palette drop, component permissions in the manifest) | 5 | pass |
+| feature:blocks EventSourcesTest (events grouped by screen, view, component, procedures, leftovers) | 1 | pass |
 | engine:editor EditorEngineTest (lexers, search/replace, checks, history, indent) | 7 | pass |
 | feature:code CodeViewModelTest (autosave to disk, conflict instead of overwrite, save/discard, problems) | 5 | pass |
 | feature:code CodeEditTextTest (Robolectric, real view: auto-indent, undo/redo) | 2 | pass |
@@ -574,6 +601,6 @@ Not done / limits
 
 ## Next
 
-The owner's Sketchware-parity plan (Phases 11–16) and the look-and-feel pass (Phase 17) are complete. Open items: AAB output, custom list
+The owner's Sketchware-parity plan (Phases 11–16) the look-and-feel pass (Phase 17) and the preview-first redesign (Phase 18) are complete. Open items: AAB output, custom list
 item layouts and RecyclerView, measured performance work on a physical device, and a formal
 security review.

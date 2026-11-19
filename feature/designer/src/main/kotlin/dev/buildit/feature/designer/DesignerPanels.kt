@@ -22,6 +22,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.text
+import androidx.compose.foundation.layout.width
 import kotlin.math.abs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -122,6 +124,8 @@ const val LIBRARY_TAG = "designer-library"
 fun ComponentLibrary(
     onAdd: (String, Map<String, String>) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false,
     collection: WidgetCollection? = null,
+    /** Icons only, in round buttons (the collapsed dock beside the preview). */
+    dock: Boolean = false,
 ) {
     var query by remember { mutableStateOf("") }
     val filtered = remember(query) { Palette.search(query) }
@@ -142,17 +146,20 @@ fun ComponentLibrary(
         )
         LazyColumn(
             Modifier.fillMaxSize().testTag(LIBRARY_TAG),
-            contentPadding = PaddingValues(horizontal = if (compact) 6.dp else Spacing.sm, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 6.dp),
+            contentPadding = PaddingValues(horizontal = if (dock) 0.dp else if (compact) 6.dp else Spacing.sm, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(if (dock) 4.dp else if (compact) 5.dp else 6.dp),
+            horizontalAlignment = if (dock) Alignment.CenterHorizontally else Alignment.Start,
         ) {
             val collected = collection?.names.orEmpty().filter { query.isBlank() || it.contains(query, ignoreCase = true) }
-            if (collected.isNotEmpty()) {
+            if (collected.isNotEmpty() && !dock) {
                 item(key = "h-collection") { SectionHeader(stringResource(R.string.ds_collection), compact) }
                 items(collected, key = { "col-$it" }) { name -> CollectedItem(name, collection!!, compact) }
             }
             filtered.forEach { (section, defs) ->
-                item(key = "h-$section") { SectionHeader(stringResource(section.label), compact) }
-                items(defs, key = { it.key }) { item -> LibraryItem(item, onAdd, drag, onDragMove, onDrop, compact) }
+                item(key = "h-$section") {
+                    if (dock) HorizontalDivider(Modifier.width(24.dp).padding(vertical = 2.dp)) else SectionHeader(stringResource(section.label), compact)
+                }
+                items(defs, key = { it.key }) { item -> LibraryItem(item, onAdd, drag, onDragMove, onDrop, compact, dock) }
             }
         }
     }
@@ -205,18 +212,16 @@ private fun CollectedItem(name: String, c: WidgetCollection, compact: Boolean) {
 }
 
 @Composable
-private fun LibraryItem(item: PaletteItem, onAdd: (String, Map<String, String>) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit, compact: Boolean) {
+private fun LibraryItem(item: PaletteItem, onAdd: (String, Map<String, String>) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit, compact: Boolean, dock: Boolean = false) {
     var origin by remember { mutableStateOf(Offset.Zero) }
     val haptics = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
     val dragging = drag.tag != null && drag.label == item.label
     val def = remember(item.tag) { ComponentCatalog.find(item.tag) }
-    PaletteShape(
-        compact,
-        modifier = Modifier
+    val gesture = Modifier
             .graphicsLayer { alpha = if (dragging) 0.45f else 1f }
             .onGloballyPositioned { origin = it.positionInWindow() }
-            .clip(RoundedCornerShape(8.dp))
+            .clip(if (dock) CircleShape else RoundedCornerShape(8.dp))
             .indication(interaction, ripple())
             .semantics(mergeDescendants = true) {
                 role = Role.Button
@@ -257,7 +262,20 @@ private fun LibraryItem(item: PaletteItem, onAdd: (String, Map<String, String>) 
                         }
                     }
                 }
-            },
+            }
+    if (dock) {
+        val color = sectionColor(item.section)
+        Box(
+            gesture.size(40.dp).background(color.copy(alpha = 0.13f), CircleShape)
+                // The label is not drawn, but tests and screen readers still find the widget by name
+                .semantics { text = androidx.compose.ui.text.AnnotatedString(item.label) },
+            contentAlignment = Alignment.Center,
+        ) { WidgetGlyph(item.glyph, color, size = 20.dp) }
+        return
+    }
+    PaletteShape(
+        compact,
+        modifier = gesture,
         content = {
             WidgetGlyph(item.glyph, sectionColor(item.section), size = if (compact) 18.dp else 22.dp)
             Column(Modifier.padding(start = 6.dp).weight(1f)) {

@@ -44,7 +44,9 @@ import dev.buildit.feature.projects.ProjectsViewModel
 import dev.buildit.feature.settings.SettingsScreen
 import dev.buildit.feature.settings.SettingsViewModel
 import dev.buildit.feature.blocks.ComponentsScreen
+import dev.buildit.feature.blocks.EventsRequest
 import dev.buildit.feature.blocks.EventsScreen
+import dev.buildit.feature.blocks.SCREEN_SOURCE
 import dev.buildit.feature.blocks.BlocksViewModel
 import dev.buildit.feature.blocks.R as BlocksR
 import dev.buildit.feature.code.CodeScreen
@@ -203,11 +205,17 @@ fun BuildItApp(container: AppContainer) {
                     val context = LocalContext.current
                     val install = { apk: java.io.File -> ApkActions.install(context, apk) { m -> context.getString(BuildR.string.bd_install_failed, m) } }
                     val share = { apk: java.io.File -> ApkActions.share(context, apk) }
+                    val eventsRequest = remember(id) { EventsRequest() }
                     val tabs = remember(designer, blocks, code, build, console, ai, libraries, assets) {
                         listOf(
                             // Main editors
-                            WorkspaceExtraTab(title = { stringResource(DesignerR.string.ds_tab) }, content = { scope -> DesignerScreen(designer, onExit = scope.leave) }, icon = BiIcons.Widgets, key = DESIGN_TAB),
-                            WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_events_tab) }, content = { scope -> EventsScreen(blocks, onExit = scope.leave) }, icon = BiIcons.Event, key = EVENTS_TAB),
+                            WorkspaceExtraTab(title = { stringResource(DesignerR.string.ds_tab) }, content = { scope ->
+                                DesignerScreen(designer, onExit = scope.leave, onOpenEvents = { source ->
+                                    eventsRequest.source = source ?: SCREEN_SOURCE
+                                    scope.showTab(EVENTS_TAB)
+                                })
+                            }, icon = BiIcons.Widgets, key = DESIGN_TAB),
+                            WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_events_tab) }, content = { scope -> EventsScreen(blocks, onExit = scope.leave, request = eventsRequest) }, icon = BiIcons.Event, key = EVENTS_TAB),
                             WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_components_tab) }, content = { ComponentsScreen(blocks) }, icon = BiIcons.Component, key = COMPONENTS_TAB),
                             // Project tools (drawer)
                             WorkspaceExtraTab(

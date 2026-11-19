@@ -143,4 +143,8 @@
     <string name="ds_pal_androidx">AndroidX</string>
     <string name="ds_pal_other">Lainnya</string>
     <string name="ds_pick_view">Pilih view lain</string>
+    <string name="ds_screen_events">Event layar</string>
+    <string name="ds_view_events">Event</string>
+    <string name="ds_dock_open">Widget</string>
+    <string name="ds_dock_close">Tutup widget</string>
 </resources>

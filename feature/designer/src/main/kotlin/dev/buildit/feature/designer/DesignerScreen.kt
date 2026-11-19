@@ -104,7 +104,12 @@ private enum class Panel(val label: Int) { Library(R.string.ds_panel_library), T
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
+fun DesignerScreen(
+    viewModel: DesignerViewModel,
+    onExit: () -> Unit,
+    /** Opens the events of a view (its id name) or, with null, the screen's own events. */
+    onOpenEvents: ((String?) -> Unit)? = null,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val autoSave by viewModel.autoSaveEnabled.collectAsStateWithLifecycle(initialValue = null)
     val snackbar = remember { SnackbarHostState() }
@@ -160,7 +165,7 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
 
     Box(Modifier.fillMaxSize().onGloballyPositioned { rootOffset = it.positionInWindow() }) {
         Column(Modifier.fillMaxSize()) {
-            Toolbar(state, viewModel, onNewLayout = { newLayout = true }, onNewActivity = { newActivity = true }, onScreenOptions = { screenOptions = true })
+            Toolbar(state, viewModel, onNewLayout = { newLayout = true }, onNewActivity = { newActivity = true }, onScreenOptions = { screenOptions = true }, onScreenEvents = onOpenEvents?.let { f -> { viewModel.flush(); f(null) } })
             HorizontalDivider()
             when {
                 state.loading && state.root == null -> BiLoadingState()
@@ -201,17 +206,40 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
                             }
                         }
                     } else {
-                        // Phone layout: widget palette beside the canvas, a property bar for the
-                        // selected view underneath, and the full panels in a bottom sheet.
+                        // Phone layout (preview first): the preview fills the screen, widgets sit in a
+                        // round dock on its left, and the selected view gets a bubble of actions.
+                        var dockOpen by rememberSaveable { mutableStateOf(false) }
                         Column(Modifier.fillMaxSize()) {
-                            Row(Modifier.weight(1f).fillMaxWidth()) {
-                                Surface(tonalElevation = 1.dp) {
-                                    ComponentLibrary({ t, a -> viewModel.addComponent(t, a) }, drag, onDragMove, onDrop, Modifier.width(118.dp).fillMaxHeight(), compact = true, collection = collection)
+                            Box(Modifier.weight(1f).fillMaxWidth()) {
+                                DesignerCanvas(
+                                    state, handle, onSelect = viewModel::select, onCommand = viewModel::apply, onIssues = { previewIssues = it },
+                                    startInset = 56.dp,
+                                    bubble = {
+                                        state.selectedUid?.let { uid -> state.root?.find(uid) }?.let { el ->
+                                            SelectionActions(
+                                                onProperties = { sheet = Panel.Properties },
+                                                onEvents = onOpenEvents?.let { f ->
+                                                    el[Attr.ID]?.let(LayoutEditor::idName)?.let { id -> { viewModel.flush(); f(id) } }
+                                                },
+                                                onCollect = if (state.collectedWidgets != null) ({ saveWidget = el.uid }) else null,
+                                                onDuplicate = { viewModel.apply(LayoutCommand.Duplicate(el.uid)) },
+                                                onDelete = { viewModel.apply(LayoutCommand.Remove(el.uid)) },
+                                            )
+                                        }
+                                    },
+                                )
+                                WidgetDock(
+                                    open = dockOpen,
+                                    onToggle = { dockOpen = !dockOpen },
+                                    modifier = Modifier.align(Alignment.TopStart).padding(Spacing.sm).fillMaxHeight(),
+                                ) {
+                                    ComponentLibrary(
+                                        { t, a -> viewModel.addComponent(t, a); dockOpen = false }, drag, onDragMove, { onDrop(); dockOpen = false },
+                                        Modifier.fillMaxSize(), compact = true, collection = collection, dock = !dockOpen,
+                                    )
                                 }
-                                VerticalDivider()
-                                Box(Modifier.weight(1f).fillMaxHeight()) { canvas(Modifier) }
                             }
-                            PropertyBar(state, state.diagnostics.size + previewIssues.size, viewModel, onPanel = { sheet = it }, onSaveWidget = { saveWidget = it })
+                            PropertyBar(state, state.diagnostics.size + previewIssues.size, viewModel, onPanel = { sheet = it })
                         }
                     }
                 }
@@ -277,7 +305,7 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
  * pick another view), quick actions, then property tabs and one card per property.
  */
 @Composable
-private fun PropertyBar(state: DesignerUiState, problems: Int, vm: DesignerViewModel, onPanel: (Panel) -> Unit, onSaveWidget: (Long) -> Unit) {
+private fun PropertyBar(state: DesignerUiState, problems: Int, vm: DesignerViewModel, onPanel: (Panel) -> Unit) {
     val el = state.selectedUid?.let { state.root?.find(it) }
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shadowElevation = 6.dp, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(start = Spacing.sm, end = Spacing.xs, top = 2.dp, bottom = Spacing.xs).animateContentSize()) {
@@ -314,11 +342,6 @@ private fun PropertyBar(state: DesignerUiState, problems: Int, vm: DesignerViewM
                 }
                 BadgedIcon(BiIcons.Warning, stringResource(R.string.ds_panel_problems), problems, { onPanel(Panel.Problems) })
                 BiIconButton(BiIcons.Layers, stringResource(R.string.ds_panel_tree), { onPanel(Panel.Tree) })
-                if (el != null) {
-                    if (state.collectedWidgets != null) BiIconButton(BiIcons.Library, stringResource(R.string.ds_collection_save), { onSaveWidget(el.uid) })
-                    BiIconButton(BiIcons.Duplicate, stringResource(R.string.ds_duplicate), { vm.apply(LayoutCommand.Duplicate(el.uid)) })
-                    BiIconButton(BiIcons.Delete, stringResource(R.string.ds_delete), { vm.apply(LayoutCommand.Remove(el.uid)) }, enabled = el.uid != state.root?.uid)
-                }
             }
             // One card per property, like Sketchware: tap a card to edit it in a popup made for that kind of value
             if (el != null) {
@@ -343,6 +366,66 @@ private fun PropertyBar(state: DesignerUiState, problems: Int, vm: DesignerViewM
     }
 }
 
+/** The round widget dock on the left of the preview: icons only, or the full list when [open]. */
+@Composable
+private fun WidgetDock(open: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val width by androidx.compose.animation.core.animateDpAsState(if (open) 160.dp else 48.dp, label = "dock")
+    Surface(
+        modifier.width(width),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        shadowElevation = 4.dp,
+    ) {
+        Column(horizontalAlignment = if (open) Alignment.Start else Alignment.CenterHorizontally) {
+            Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary).clickable(onClick = onToggle),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (open) BiIcons.Close else BiIcons.Add,
+                        stringResource(if (open) R.string.ds_dock_close else R.string.ds_dock_open),
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+            }
+            Box(Modifier.weight(1f).fillMaxWidth()) { content() }
+        }
+    }
+}
+
+/** Actions for the selected view, shown in a dark bubble right next to it on the preview. */
+@Composable
+private fun SelectionActions(
+    onProperties: () -> Unit,
+    onEvents: (() -> Unit)?,
+    onCollect: (() -> Unit)?,
+    onDuplicate: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.inverseSurface, contentColor = MaterialTheme.colorScheme.inverseOnSurface, shadowElevation = 6.dp) {
+        Row(Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
+            BubbleAction(BiIcons.Tune, stringResource(R.string.ds_panel_properties), onProperties)
+            onEvents?.let { BubbleAction(BiIcons.Event, stringResource(R.string.ds_view_events), it, accent = true) }
+            onCollect?.let { BubbleAction(BiIcons.Library, stringResource(R.string.ds_collection), it) }
+            BubbleAction(BiIcons.Duplicate, stringResource(R.string.ds_duplicate), onDuplicate)
+            BubbleAction(BiIcons.Delete, stringResource(R.string.ds_delete), onDelete)
+        }
+    }
+}
+
+@Composable
+private fun BubbleAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit, accent: Boolean = false) {
+    val tint = if (accent) MaterialTheme.colorScheme.inversePrimary else androidx.compose.material3.LocalContentColor.current
+    Column(
+        Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(icon, null, Modifier.size(18.dp), tint = tint)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = tint, maxLines = 1)
+    }
+}
+
 @Composable
 private fun BadgedIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, count: Int, onClick: () -> Unit) {
     Box {
@@ -355,7 +438,7 @@ private fun BadgedIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, la
 }
 
 @Composable
-private fun Toolbar(state: DesignerUiState, vm: DesignerViewModel, onNewLayout: () -> Unit, onNewActivity: () -> Unit, onScreenOptions: () -> Unit) {
+private fun Toolbar(state: DesignerUiState, vm: DesignerViewModel, onNewLayout: () -> Unit, onNewActivity: () -> Unit, onScreenOptions: () -> Unit, onScreenEvents: (() -> Unit)?) {
     // Save status and the save action stay pinned; the rest scrolls on narrow screens.
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
     Row(
@@ -380,6 +463,12 @@ private fun Toolbar(state: DesignerUiState, vm: DesignerViewModel, onNewLayout: 
                 }
             }
         }
+        if (onScreenEvents != null) AssistChip(
+            onClick = onScreenEvents,
+            label = { Text(stringResource(R.string.ds_screen_events)) },
+            leadingIcon = { Icon(BiIcons.Event, null, Modifier.size(16.dp)) },
+            modifier = Modifier.padding(end = Spacing.xs),
+        )
         BiIconButton(BiIcons.Undo, stringResource(R.string.ds_undo), vm::undo, enabled = state.canUndo)
         BiIconButton(BiIcons.Redo, stringResource(R.string.ds_redo), vm::redo, enabled = state.canRedo)
 

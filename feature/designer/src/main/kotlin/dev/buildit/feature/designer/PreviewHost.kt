@@ -51,6 +51,9 @@ class PreviewHost(context: Context) : ViewGroup(context) {
     var onDragStart: ((Float, Float) -> Boolean)? = null
     var onDragMove: ((Float, Float) -> Unit)? = null
     var onDragEnd: ((Float, Float, Boolean) -> Unit)? = null
+    /** The selected element's bounds in this view's pixels after each draw (null: none); called only on change. */
+    var onSelectionBounds: ((android.graphics.RectF?) -> Unit)? = null
+    private var lastSelection: android.graphics.RectF? = null
 
     private var dragging = false
     private val density = resources.displayMetrics.density
@@ -187,7 +190,10 @@ class PreviewHost(context: Context) : ViewGroup(context) {
         val boxes = if (selectedUid != null || highlightUid != null) boxes() else emptyMap()
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), framePaint)
         highlightUid?.let { boxes[it] }?.let { drawBox(canvas, it, hiPaint) }
-        selectedUid?.let { boxes[it] }?.let { drawBox(canvas, it, selPaint) }
+        val sel = selectedUid?.let { boxes[it] }
+        sel?.let { drawBox(canvas, it, selPaint) }
+        val r = sel?.let { b -> val dy = topPx * scale; android.graphics.RectF(b.left * scale, b.top * scale + dy, b.right * scale, b.bottom * scale + dy) }
+        if (r != lastSelection) { lastSelection = r; onSelectionBounds?.invoke(r) }
     }
 
     private fun drawBox(c: Canvas, b: Box, p: Paint) {
