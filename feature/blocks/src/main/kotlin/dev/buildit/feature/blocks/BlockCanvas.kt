@@ -32,7 +32,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
@@ -99,6 +102,8 @@ private class Drag(
     var overTrash by mutableStateOf(false)
     /** Last pointer position on screen, for scrolling the canvas while the finger rests near an edge. */
     var pointer by mutableStateOf(Offset.Zero)
+    /** The chain laid out at (0, 0) once; drawing translates it to [origin]. */
+    var laid: List<LaidBlock>? = null
 }
 
 /** Label of the clip a palette block carries while it is dragged onto the canvas; the text is the block type. */
@@ -108,21 +113,6 @@ const val PALETTE_CLIP_LABEL = "dev.buildit.block"
 private class NewDrag(val shape: BlockShape) {
     var world by mutableStateOf(Offset.Zero)
     var target by mutableStateOf<SnapTarget?>(null)
-}
-
-fun categoryColor(c: BlockCategory?): Color = when (c) {
-    BlockCategory.Events -> Color(0xFFB8860B)
-    BlockCategory.Control -> Color(0xFFC0602A)
-    BlockCategory.Logic -> Color(0xFF3F6EC4)
-    BlockCategory.Math -> Color(0xFF2E7D4F)
-    BlockCategory.Text -> Color(0xFF167A7A)
-    BlockCategory.Variables -> Color(0xFFB0457A)
-    BlockCategory.Lists -> Color(0xFF7653B8)
-    BlockCategory.Components -> Color(0xFF4554B0)
-    BlockCategory.Parts -> Color(0xFF8C4FA0)
-    BlockCategory.App -> Color(0xFF6D5B4A)
-    BlockCategory.Code -> Color(0xFF55606E)
-    null -> Color(0xFF8A2C2C)
 }
 
 @Composable
@@ -143,19 +133,10 @@ fun BlockCanvas(
     onDropNew: (type: String, x: Float, y: Float, slotFor: (BlockDocument, List<Block>) -> Slot?) -> Unit = { _, _, _, _ -> },
 ) {
     val density = LocalDensity.current.density
-    val measurer = rememberTextMeasurer(cacheSize = 256)
-    val textStyle = remember { TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.White) }
-    val context = LocalContext.current
-    val configuration = LocalConfiguration.current
-    val layout = remember(measurer, density, configuration) {
-        val res = context.resources
-        BlockLayout(
-            density,
-            measure = { s -> measurer.measure(s, textStyle).size.let { TextSize(it.width.toFloat(), it.height.toFloat()) } },
-            partsOf = { def -> localizedParts(def, res) },
-            labelOf = { l -> statementLabelRes(l)?.let(res::getString) ?: l },
-        )
-    }
+    val painter = rememberBlockPainter()
+    val measurer = painter.measurer
+    val textStyle = painter.style
+    val layout = painter.layout
     var drag by remember { mutableStateOf<Drag?>(null) }
     val doc by rememberUpdatedState(document)
     val select by rememberUpdatedState(onSelect)
@@ -172,6 +153,9 @@ fun BlockCanvas(
     val selection = MaterialTheme.colorScheme.primary
     val error = MaterialTheme.colorScheme.error
     val trashColor = MaterialTheme.colorScheme.errorContainer
+    val ghost = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)
+    val shadow = Color.Black.copy(alpha = 0.18f)
+    val haptics = LocalHapticFeedback.current
 
     fun trashCenter() = Offset(canvas.size.width - trashRadius * 1.6f, canvas.size.height - trashRadius * 1.6f)
 
@@ -187,7 +171,9 @@ fun BlockCanvas(
         d.origin = canvas.toWorld(p) - d.grab
         d.overTrash = (p - trashCenter()).getDistance() < trashRadius * 1.4f
         val shape = BlockRegistry.find(d.chain.first().type)?.shape
-        d.target = if (d.overTrash || shape == null) null else snap(d.base, d.chain, shape, d.origin)
+        val next = if (d.overTrash || shape == null) null else snap(d.base, d.chain, shape, d.origin)
+        if (next != null && next.slot != d.target?.slot) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        d.target = next
     }
 
     // Scroll while a dragged block is held near an edge, so blocks can travel beyond the screen.
@@ -282,6 +268,7 @@ fun BlockCanvas(
                                     val (base, chain) = BlockOps.detach(doc, hit.block.id)
                                     val origin = Offset(hit.box.left, hit.box.top + if (hit.hat) 0f else 0f)
                                     drag = Drag(doc, base, chain, startWorld - origin).also { it.origin = origin }
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                     select(hit.block.id)
                                 }
                             }
@@ -319,12 +306,15 @@ fun BlockCanvas(
         drawGrid(canvas, grid)
         val visible = Area(-canvas.pan.x / canvas.zoom, -canvas.pan.y / canvas.zoom, (size.width - canvas.pan.x) / canvas.zoom, (size.height - canvas.pan.y) / canvas.zoom)
         withTransform({ translate(canvas.pan.x, canvas.pan.y); scale(canvas.zoom, canvas.zoom, Offset.Zero) }) {
-            stacks.forEach { s -> if (s.bounds.intersects(visible)) s.blocks.forEach { drawBlock(it, measurer, textStyle, selectedId, errorIds, selection, error) } }
+            stacks.forEach { s -> if (s.bounds.intersects(visible)) s.blocks.forEach { drawBlock(it, measurer, textStyle, selectedId, errorIds, selection, error, layout.hatCap) } }
             drag?.let { d ->
-                d.target?.let { t ->
-                    drawRoundRect(selection, Offset(t.x - 4f, t.y - 3f), Size(60f * density, 6f), CornerRadius(3f, 3f))
+                val laid = d.laid ?: layout.layoutChain(d.chain, 0f, 0f).also { d.laid = it }
+                // Where the chain will land: a grey copy of its outline at the target
+                d.target?.let { t -> translate(t.x, t.y) { laid.forEach { drawGhost(it, ghost, layout.hatCap) } } }
+                translate(d.origin.x, d.origin.y) {
+                    translate(3f * density, 5f * density) { laid.forEach { drawGhost(it, shadow, layout.hatCap) } }
+                    laid.forEach { drawBlock(it, measurer, textStyle, null, emptySet(), selection, error, layout.hatCap, alpha = 0.92f) }
                 }
-                layout.layoutChain(d.chain, d.origin.x, d.origin.y).forEach { drawBlock(it, measurer, textStyle, null, emptySet(), selection, error, alpha = 0.85f) }
             }
             newDrag?.target?.let { t ->
                 drawRoundRect(selection, Offset(t.x - 4f, t.y - 3f), Size(60f * density, 6f), CornerRadius(3f, 3f))
@@ -339,45 +329,19 @@ fun BlockCanvas(
     }
 }
 
+/** A block's outline filled with one colour (drop preview, drag shadow). */
+private fun DrawScope.drawGhost(lb: LaidBlock, color: Color, hatCap: Float) {
+    val path = (lb.paintCache as? androidx.compose.ui.graphics.Path) ?: blockOutline(lb, density, hatCap).also { lb.paintCache = it }
+    drawPath(path, color)
+    lb.valueChildren.values.forEach { drawGhost(it, color, hatCap) }
+    lb.mouths.forEach { m -> m.blocks.forEach { drawGhost(it, color, hatCap) } }
+}
+
 private fun DrawScope.drawGrid(canvas: BlockCanvasState, color: Color) {
     val step = 32f * density * canvas.zoom
     if (step < 8f) return
     var x = canvas.pan.x % step
     while (x < size.width) { var y = canvas.pan.y % step; while (y < size.height) { drawCircle(color, 1.5f, Offset(x, y)); y += step }; x += step }
-}
-
-private fun DrawScope.drawBlock(
-    lb: LaidBlock,
-    measurer: androidx.compose.ui.text.TextMeasurer,
-    style: TextStyle,
-    selectedId: String?,
-    errorIds: Set<String>,
-    selection: Color,
-    error: Color,
-    alpha: Float = 1f,
-) {
-    val base = categoryColor(lb.def?.category).let { if (lb.block.disabled) it.copy(alpha = 0.35f) else it }.copy(alpha = alpha)
-    val radius = CornerRadius(8f * density, 8f * density)
-    lb.shapes.forEach { s -> drawRoundRect(base, Offset(s.left, s.top), Size(s.width, s.height), radius) }
-    val outline = when {
-        lb.block.id in errorIds -> error
-        lb.block.id == selectedId -> selection
-        else -> null
-    }
-    outline?.let { c -> lb.shapes.forEach { s -> drawRoundRect(c, Offset(s.left, s.top), Size(s.width, s.height), radius, style = Stroke(width = 2.5f * density)) } }
-    lb.pieces.forEach { p ->
-        when (p) {
-            is Piece.Label -> drawText(measurer, p.text.ifEmpty { " " }, Offset(p.box.left, p.box.top), style)
-            is Piece.Field -> {
-                drawRoundRect(Color.White.copy(alpha = 0.22f), Offset(p.box.left, p.box.top), Size(p.box.width, p.box.height), CornerRadius(6f * density, 6f * density))
-                val t = measurer.measure(p.text, if (p.placeholder) style.copy(fontStyle = FontStyle.Italic) else style)
-                drawText(t, topLeft = Offset(p.box.left + (p.box.width - t.size.width) / 2, p.box.top + (p.box.height - t.size.height) / 2))
-            }
-            is Piece.EmptySlot -> drawRoundRect(Color.Black.copy(alpha = 0.25f), Offset(p.box.left, p.box.top), Size(p.box.width, p.box.height), CornerRadius(6f * density, 6f * density))
-        }
-    }
-    lb.valueChildren.values.forEach { drawBlock(it, measurer, style, selectedId, errorIds, selection, error, alpha) }
-    lb.mouths.forEach { m -> m.blocks.forEach { drawBlock(it, measurer, style, selectedId, errorIds, selection, error, alpha) } }
 }
 
 /** Block message in the app language; falls back to English if a translation's placeholders don't match. */

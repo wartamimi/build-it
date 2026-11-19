@@ -23,7 +23,7 @@
     <string name="ds_panel_problems">Problems</string>
 
     <string name="ds_search_components">Search components</string>
-    <string name="ds_library_hint">Tap to add next to the selection, or long-press and drag onto the canvas.</string>
+    <string name="ds_library_hint">Tap to add next to the selection, or drag sideways onto the screen (long-press also drags).</string>
     <string name="ds_needs_dependency">Needs %1$s</string>
     <string name="ds_move_up">Move up</string>
     <string name="ds_move_down">Move down</string>
@@ -137,4 +137,10 @@
     <string name="ds_collection_exists">The collection already has %1$s</string>
     <string name="ds_collection_invalid_name">Use letters, digits, spaces, _ . or - (up to 60)</string>
     <string name="ds_collection_remove">Remove from collection</string>
+    <string name="ds_pal_layouts">Layouts</string>
+    <string name="ds_pal_widgets">Widgets</string>
+    <string name="ds_pal_lists">Lists &amp; media</string>
+    <string name="ds_pal_androidx">AndroidX</string>
+    <string name="ds_pal_other">Other</string>
+    <string name="ds_pick_view">Choose another view</string>
 </resources>

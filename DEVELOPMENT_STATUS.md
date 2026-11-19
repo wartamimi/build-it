@@ -1,6 +1,6 @@
 # Development status
 
-Last updated: 2026-11-18
+Last updated: 2026-11-19
 
 ## Summary
 
@@ -478,10 +478,42 @@ Done
 Not done / limits
 - No benchmark numbers yet; smoothness was not measured on a physical device.
 
+## Phase 17 — Look and feel closer to Sketchware (owner request)
+
+Done
+- Designer palette: a narrow column (118dp on phones) of pills with a drawing and a short,
+  single-line name, in sections Layouts, Widgets, Lists & media, AndroidX and Other. Presets
+  Linear(H)/Linear(V) insert a LinearLayout with its orientation; Scroll(H)/Scroll(V) are the two
+  scroll views. Every catalog widget is in the palette (tested). The drawings are Build It's own,
+  made from simple shapes.
+- Dragging from the palette starts as soon as the finger moves sideways; vertical moves scroll the
+  list; a long press also starts a drag; a tap adds next to the selection. Haptic feedback on pick-up.
+- Preview: the status bar (unless the screen is fullscreen) and the title bar (default window
+  style) are drawn above the layout in the project's primary colours (colorPrimary/primary, or
+  the framework theme's defaults) with the app name; the layout gets the remaining height, as on
+  a device.
+- Property bar: the selected view's drawing and id with a drop-down to pick any view, problems
+  with a count badge, tree, collection, duplicate and delete; pill tabs Basic/Recent/All and an
+  "All properties" link; smaller white cards with a symbol for the kind of value.
+- Blocks: shapes painted from the existing geometry: a notch on top of statements and a matching
+  tab underneath, C-blocks with notches inside their mouths, a rounded cap on event blocks (which
+  end flat), hexagonal boolean values, round number values, number and text literals as white
+  boxes, white boxes for typed fields, darker drop-downs, an edge shade under each block, and
+  brighter colours per category.
+- Blocks drawer (phone): slides in from the right over the canvas with a colour tile per
+  category; palette entries are real block drawings with their default inputs.
+- Dragging blocks: the dragged chain is laid out once and moved (no re-layout per frame), a grey
+  outline shows where it will land, a soft shadow under it, haptic ticks when it snaps.
+
+Not done / limits
+- Checked with screenshots of the real screens under Robolectric (native graphics) and the usual
+  tests; not yet looked at on a physical phone.
+- Palette entries wider than the drawer are cut off at its edge (they can still be dragged).
+
 ## Build status
 
 - `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:deps:test :engine:ai:test` —
-  passing locally (169 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
+  passing locally (171 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
 - APK: CI publishes a signed GitHub release for each push to main. Emulator job: on-device build, install and console pass.
 
@@ -498,6 +530,7 @@ Not done / limits
 | engine:layout DropAndValuesTest | 6 | pass |
 | feature:designer PreviewRendererTest (Robolectric, real views, Phase 13 widgets) | 3 | pass |
 | feature:designer PropertyPopupsTest (dimension parsing, card values, Basic/Recent/All) | 3 | pass |
+| feature:designer PaletteTest (every widget in the palette, presets insert their attributes, search) | 2 | pass |
 | engine:project CollectionStoreTest (save, replace, rename, delete, names that escape) | 2 | pass |
 | feature:libraries LibrariesViewModelTest (add, disable, remove, failed download, AppCompat switch) | 3 | pass |
 | engine:blocks BlockOpsTest | 7 | pass |
@@ -539,6 +572,6 @@ Not done / limits
 
 ## Next
 
-The owner's Sketchware-parity plan (Phases 11–16) is complete. Open items: AAB output, custom list
+The owner's Sketchware-parity plan (Phases 11–16) and the look-and-feel pass (Phase 17) are complete. Open items: AAB output, custom list
 item layouts and RecyclerView, measured performance work on a physical device, and a formal
 security review.

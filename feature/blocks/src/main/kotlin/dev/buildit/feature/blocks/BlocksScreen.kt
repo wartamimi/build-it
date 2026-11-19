@@ -6,6 +6,16 @@ import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.ui.draganddrop.DragAndDropTransferData
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
@@ -190,21 +200,31 @@ fun BlocksScreen(
                                 canvasView(Modifier.weight(1f).fillMaxHeight())
                             }
                         } else {
-                            // Phone: the canvas gets the whole screen; blocks slide up in a drawer.
-                            Column(Modifier.fillMaxSize()) {
-                                Box(Modifier.weight(1f).fillMaxWidth()) {
-                                    canvasView(Modifier.fillMaxSize())
-                                    ExtendedFloatingActionButton(
-                                        onClick = { paletteOpen = !paletteOpen },
-                                        icon = { Icon(if (paletteOpen) BiIcons.Close else BiIcons.Blocks, null) },
-                                        text = { Text(stringResource(if (paletteOpen) R.string.bk_hide_palette else R.string.bk_show_palette)) },
-                                        modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.md),
-                                    )
+                            // Phone: the canvas gets the whole screen; the blocks drawer slides in from the
+                            // right like Sketchware's, leaving the left of the canvas free to drop onto.
+                            val drawerWidth = minOf(maxWidth * 0.64f, 360.dp)
+                            Box(Modifier.fillMaxSize()) {
+                                canvasView(Modifier.fillMaxSize())
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = paletteOpen,
+                                    enter = slideInHorizontally(tween(220)) { it } + fadeIn(tween(220)),
+                                    exit = slideOutHorizontally(tween(180)) { it } + fadeOut(tween(180)),
+                                    modifier = Modifier.align(Alignment.CenterEnd),
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
+                                        shadowElevation = 10.dp,
+                                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                        modifier = Modifier.fillMaxHeight().width(drawerWidth),
+                                    ) { palette(Modifier.fillMaxSize()) }
                                 }
-                                if (paletteOpen) {
-                                    HorizontalDivider()
-                                    Surface(tonalElevation = 2.dp) { palette(Modifier.fillMaxWidth().height(panelHeight)) }
-                                }
+                                ExtendedFloatingActionButton(
+                                    onClick = { paletteOpen = !paletteOpen },
+                                    icon = { Icon(if (paletteOpen) BiIcons.Close else BiIcons.Blocks, null) },
+                                    text = { Text(stringResource(if (paletteOpen) R.string.bk_hide_palette else R.string.bk_show_palette)) },
+                                    expanded = !paletteOpen,
+                                    modifier = Modifier.align(Alignment.BottomStart).padding(Spacing.md),
+                                )
                             }
                         }
                     }
@@ -358,11 +378,32 @@ private fun Palette(
     // null: the collection
     var category by rememberSaveable { mutableStateOf<BlockCategory?>(BlockCategory.Events) }
     val res = LocalContext.current.resources
+    val painter = rememberBlockPainter()
+    val doc = state.document
+    // Sample blocks as they will be created, so the palette shows real shapes with real defaults
+    val samples = remember(category, doc?.variables, doc?.components, state.views, state.sounds, state.images) {
+        var n = 0
+        BlockRegistry.all.filter { it.category == category }.map { def ->
+            def to runCatching {
+                BlockRegistry.create(def.type, { "p" + n++ }, doc?.variables.orEmpty(), state.views, doc?.components.orEmpty(), state.sounds, state.images)
+            }.getOrNull()
+        }
+    }
     Row(modifier) {
-        LazyColumn(Modifier.weight(1f).fillMaxHeight().padding(horizontal = Spacing.sm).testTag(PALETTE_TAG)) {
+        LazyColumn(
+            Modifier.weight(1f).fillMaxHeight().testTag(PALETTE_TAG),
+            contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             item { Text(stringResource(R.string.bk_palette_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Spacing.xs)) }
             if (category == BlockCategory.Variables || category == BlockCategory.Lists) {
-                item { TextButton(onClick = onNewVariable) { Icon(BiIcons.Add, null); Text(stringResource(R.string.bk_new_variable)) } }
+                item {
+                    Surface(onClick = onNewVariable, shape = RoundedCornerShape(8.dp), color = categoryColor(category), contentColor = androidx.compose.ui.graphics.Color.White) {
+                        Row(Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(BiIcons.Add, null, Modifier.size(18.dp)); Text(stringResource(R.string.bk_new_variable), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = Spacing.xs))
+                        }
+                    }
+                }
                 items(state.document?.variables.orEmpty(), key = { "v-" + it.name }) { v ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("${v.name} · ${typeLabel(v.type)}", modifier = Modifier.weight(1f).padding(start = Spacing.sm), style = MaterialTheme.typography.bodyMedium)
@@ -380,7 +421,7 @@ private fun Palette(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             onClick = { onAddCollected(name) }, shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.tertiaryContainer,
-                            modifier = Modifier.weight(1f).padding(vertical = Spacing.xxs),
+                            modifier = Modifier.weight(1f),
                         ) {
                             Row(Modifier.padding(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(BiIcons.Library, null, Modifier.size(18.dp))
@@ -391,47 +432,42 @@ private fun Palette(
                     }
                 }
             }
-            items(BlockRegistry.all.filter { it.category == category }, key = { it.type }) { def ->
-                PaletteBlock(def, paletteText(def, res), onClick = { onAdd(def.type) })
+            items(samples, key = { it.first.type }) { (def, sample) ->
+                PaletteBlock(def, paletteText(def, res), sample, painter, onClick = { onAdd(def.type) })
             }
         }
-        VerticalDivider()
-        // Category rail on the right, within reach of the thumb.
-        Column(Modifier.width(104.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(vertical = Spacing.xs)) {
+        // Category rail on the right, within reach of the thumb: a coloured tile per category.
+        Column(
+            Modifier.width(100.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainer)
+                .verticalScroll(rememberScrollState()).padding(vertical = Spacing.xs, horizontal = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
             if (state.collectedBlocks != null) {
-                val selected = category == null
-                Row(
-                    Modifier.fillMaxWidth()
-                        .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent)
-                        .clickable { category = null }
-                        .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(BiIcons.Library, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.tertiary)
-                    Text(
-                        stringResource(R.string.bk_collection), style = MaterialTheme.typography.labelMedium, maxLines = 1,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(start = Spacing.sm),
-                    )
-                }
+                CategoryTile(stringResource(R.string.bk_collection), MaterialTheme.colorScheme.tertiary, category == null) { category = null }
             }
             BlockCategory.entries.forEach { c ->
-                val selected = c == category
-                Row(
-                    Modifier.fillMaxWidth()
-                        .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent)
-                        .clickable { category = c }
-                        .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(Modifier.width(4.dp).height(18.dp).background(categoryColor(c), RoundedCornerShape(2.dp)))
-                    Text(
-                        stringResource(categoryRes(c)), style = MaterialTheme.typography.labelMedium, maxLines = 1,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier.padding(start = Spacing.sm),
-                    )
-                }
+                CategoryTile(stringResource(categoryRes(c)), categoryColor(c), c == category) { category = c }
             }
         }
+    }
+}
+
+@Composable
+private fun CategoryTile(label: String, color: androidx.compose.ui.graphics.Color, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) color.copy(alpha = 0.18f) else androidx.compose.ui.graphics.Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(14.dp).background(color, RoundedCornerShape(3.dp)))
+        Text(
+            label, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.padding(start = 6.dp),
+        )
     }
 }
 
@@ -451,22 +487,24 @@ private fun paletteText(def: BlockDef, res: android.content.res.Resources): Stri
     }
 
 @Composable
-private fun PaletteBlock(def: BlockDef, text: String, onClick: () -> Unit) {
-    Box(
-        Modifier.padding(vertical = Spacing.xs)
-            .background(categoryColor(def.category), RoundedCornerShape(8.dp))
-            // Long-press and drag onto the canvas to drop the block where it should go; tap to add it at the selection
-            .dragAndDropSource { _ ->
-                DragAndDropTransferData(
-                    ClipData(ClipDescription("$PALETTE_CLIP_LABEL:${def.type}", arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN)), ClipData.Item(def.type)),
-                )
-            }
-            .clickable(onClick = onClick)
-            .heightIn(min = 40.dp)
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Text(text, color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+private fun PaletteBlock(def: BlockDef, text: String, sample: Block?, painter: BlockPainter, onClick: () -> Unit) {
+    val dragSource = Modifier
+        // Long-press and drag onto the canvas to drop the block where it should go; tap to add it at the selection
+        .dragAndDropSource { _ ->
+            DragAndDropTransferData(
+                ClipData(ClipDescription("$PALETTE_CLIP_LABEL:${def.type}", arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN)), ClipData.Item(def.type)),
+            )
+        }
+        .clickable(onClick = onClick)
+        // The drawing has no text semantics of its own: describe the block for tests and screen readers
+        .semantics(mergeDescendants = true) { this.text = AnnotatedString(text) }
+    if (sample != null) {
+        Box(dragSource) { BlockPreview(sample, painter, scale = 0.9f) }
+    } else {
+        Box(
+            Modifier.background(categoryColor(def.category), RoundedCornerShape(6.dp)).then(dragSource).heightIn(min = 40.dp).padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            contentAlignment = Alignment.CenterStart,
+        ) { Text(text, color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium) }
     }
 }
 

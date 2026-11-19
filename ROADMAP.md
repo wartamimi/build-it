@@ -24,6 +24,7 @@ are updated (§19). Status details are in [DEVELOPMENT_STATUS.md](DEVELOPMENT_ST
 | 14 | Sketchware parity: per-attribute property popups, Basic/Recent properties, Collection (reusable blocks, widgets, images, sounds), AppCompat/AndroidX on/off switch in the Library Manager | Done |
 | 15 | On-device Kotlin builder (compile Kotlin sources in the app); Sketchware parity: project managers (custom Java/Kotlin files, AndroidManifest editor, assets, permissions), release signing and AAB | Done: Kotlin and mixed Kotlin/Java projects build on the device (verified on the API 34 emulator), permissions manager, release keys; AAB not built (D22) |
 | 16 | Simple app templates for new projects; integration: emulator tests per phase, performance pass, docs, final signed APK | Done: six app templates in Java and Kotlin (each built in tests, the Java ones run on the emulator), baseline profile, release 0.16.0 |
+| 17 | Look and feel closer to Sketchware (owner request): compact widget palette with presets and drawings, device chrome in the preview, lighter property bar; block shapes with notches, category colours, side drawer, drop preview | Done, release 0.17.0 |
 
 ## Phase 1 implementation plan (as executed)
 

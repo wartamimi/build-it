@@ -3,6 +3,26 @@
 package dev.buildit.feature.designer
 
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag as dragPointer
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.material3.ripple
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import kotlin.math.abs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -77,7 +97,15 @@ import dev.buildit.engine.layout.XmlElement
 @Stable
 class LibraryDrag {
     var tag by mutableStateOf<String?>(null)
+    var attrs by mutableStateOf<Map<String, String>>(emptyMap())
+    var label by mutableStateOf("")
+    var glyph by mutableStateOf(Glyph.View)
+    var color by mutableStateOf(Color.Gray)
     var position by mutableStateOf(Offset.Zero)
+
+    fun begin(item: PaletteItem, at: Offset) {
+        attrs = item.attrs; label = item.label; glyph = item.glyph; color = sectionColor(item.section); position = at; tag = item.tag
+    }
 }
 
 // ---------------------------------------------------------------- Library
@@ -85,16 +113,18 @@ class LibraryDrag {
 /** Test tag of the component library list. */
 const val LIBRARY_TAG = "designer-library"
 
+/**
+ * The widget palette. On the phone it is a narrow column of pills (drawing + short name) that are
+ * dragged sideways onto the preview, or tapped to add next to the selection; vertical swipes
+ * scroll the list. A long press also starts a drag.
+ */
 @Composable
 fun ComponentLibrary(
-    onAdd: (String) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false,
+    onAdd: (String, Map<String, String>) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false,
     collection: WidgetCollection? = null,
 ) {
     var query by remember { mutableStateOf("") }
-    val filtered = remember(query) {
-        ComponentCatalog.all.filter { query.isBlank() || it.displayName.contains(query, ignoreCase = true) || it.tag.contains(query, ignoreCase = true) }
-            .groupBy { it.category }
-    }
+    val filtered = remember(query) { Palette.search(query) }
     Column(modifier) {
         if (!compact) OutlinedTextField(
             value = query,
@@ -110,56 +140,64 @@ fun ComponentLibrary(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = Spacing.md),
         )
-        LazyColumn(Modifier.fillMaxSize().testTag(LIBRARY_TAG)) {
+        LazyColumn(
+            Modifier.fillMaxSize().testTag(LIBRARY_TAG),
+            contentPadding = PaddingValues(horizontal = if (compact) 6.dp else Spacing.sm, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 6.dp),
+        ) {
             val collected = collection?.names.orEmpty().filter { query.isBlank() || it.contains(query, ignoreCase = true) }
             if (collected.isNotEmpty()) {
-                item(key = "h-collection") {
-                    Text(
-                        stringResource(R.string.ds_collection),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = if (compact) Spacing.sm else Spacing.md, top = Spacing.md, bottom = Spacing.xs),
-                    )
-                }
+                item(key = "h-collection") { SectionHeader(stringResource(R.string.ds_collection), compact) }
                 items(collected, key = { "col-$it" }) { name -> CollectedItem(name, collection!!, compact) }
             }
-            filtered.forEach { (category, defs) ->
-                item(key = "h-$category") {
-                    Text(
-                        category.name,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = if (compact) Spacing.sm else Spacing.md, top = Spacing.md, bottom = Spacing.xs),
-                    )
-                }
-                items(defs, key = { it.tag }) { def -> LibraryItem(def, onAdd, drag, onDragMove, onDrop, compact) }
+            filtered.forEach { (section, defs) ->
+                item(key = "h-$section") { SectionHeader(stringResource(section.label), compact) }
+                items(defs, key = { it.key }) { item -> LibraryItem(item, onAdd, drag, onDragMove, onDrop, compact) }
             }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(text: String, compact: Boolean) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1, overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(start = 4.dp, top = if (compact) 8.dp else Spacing.md, bottom = 2.dp),
+    )
 }
 
 /** Widgets from the collection shown at the top of the library. */
 class WidgetCollection(val names: List<String>, val onAdd: (String) -> Unit, val onDelete: (String) -> Unit)
 
 @Composable
+private fun PaletteShape(compact: Boolean, content: @Composable RowScope.() -> Unit, modifier: Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = if (compact) 34.dp else 42.dp)
+            .shadow(1.dp, RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(8.dp))
+            .padding(horizontal = if (compact) 6.dp else Spacing.sm, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
+}
+
+@Composable
 private fun CollectedItem(name: String, c: WidgetCollection, compact: Boolean) {
     var menu by remember { mutableStateOf(false) }
     Box {
-        Row(
-            Modifier.fillMaxWidth()
-                .combinedClickable(onClick = { c.onAdd(name) }, onLongClick = { menu = true })
-                .padding(horizontal = if (compact) Spacing.sm else Spacing.md, vertical = if (compact) Spacing.xs else Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier.size(if (compact) 24.dp else 28.dp).background(MaterialTheme.colorScheme.tertiaryContainer, RoundedCornerShape(6.dp)),
-                contentAlignment = Alignment.Center,
-            ) { Icon(BiIcons.Library, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer) }
+        PaletteShape(compact, modifier = Modifier.clip(RoundedCornerShape(8.dp)).combinedClickable(onClick = { c.onAdd(name) }, onLongClick = { menu = true }), content = {
+            Icon(BiIcons.Library, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.tertiary)
             Text(
-                name, style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = if (compact) Spacing.sm else Spacing.md).weight(1f),
+                name, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 6.dp).weight(1f),
             )
-        }
+        })
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             DropdownMenuItem(text = { Text(stringResource(R.string.ds_collection_remove)) }, leadingIcon = { Icon(BiIcons.Delete, null) }, onClick = { menu = false; c.onDelete(name) })
         }
@@ -167,57 +205,97 @@ private fun CollectedItem(name: String, c: WidgetCollection, compact: Boolean) {
 }
 
 @Composable
-private fun LibraryItem(def: ComponentDef, onAdd: (String) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit, compact: Boolean) {
+private fun LibraryItem(item: PaletteItem, onAdd: (String, Map<String, String>) -> Unit, drag: LibraryDrag, onDragMove: () -> Unit, onDrop: () -> Unit, compact: Boolean) {
     var origin by remember { mutableStateOf(Offset.Zero) }
-    Row(
-        Modifier
-            .fillMaxWidth()
+    val haptics = LocalHapticFeedback.current
+    val interaction = remember { MutableInteractionSource() }
+    val dragging = drag.tag != null && drag.label == item.label
+    val def = remember(item.tag) { ComponentCatalog.find(item.tag) }
+    PaletteShape(
+        compact,
+        modifier = Modifier
+            .graphicsLayer { alpha = if (dragging) 0.45f else 1f }
             .onGloballyPositioned { origin = it.positionInWindow() }
-            .pointerInput(def.tag) {
-                detectDragGesturesAfterLongPress(
-                    onDragStart = { o -> drag.tag = def.tag; drag.position = origin + o },
-                    onDrag = { change, amount -> change.consume(); drag.position += amount; onDragMove() },
-                    onDragEnd = { onDrop(); drag.tag = null },
-                    onDragCancel = { drag.tag = null; onDragMove() },
-                )
+            .clip(RoundedCornerShape(8.dp))
+            .indication(interaction, ripple())
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                onClick { onAdd(item.tag, item.attrs); true }
             }
-            .clickable { onAdd(def.tag) }
-            .padding(horizontal = if (compact) Spacing.sm else Spacing.md, vertical = if (compact) Spacing.xs else Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier.size(if (compact) 24.dp else 28.dp).background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(def.displayName.take(2), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
-        }
-        Column(Modifier.padding(start = if (compact) Spacing.sm else Spacing.md).weight(1f)) {
-            Text(def.displayName, style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyMedium, maxLines = if (compact) 1 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
-            if (!compact) def.requiresDependency?.let {
-                Text(stringResource(R.string.ds_needs_dependency, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            .pointerInput(item.key) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val press = PressInteraction.Press(down.position)
+                    interaction.tryEmit(press)
+                    var total = Offset.Zero
+                    // true: start dragging, false: tap, null (timeout): long press, also a drag
+                    val decision = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        while (true) {
+                            val ev = awaitPointerEvent()
+                            val c = ev.changes.firstOrNull { it.id == down.id } ?: return@withTimeoutOrNull TapResult.Cancel
+                            if (!c.pressed) return@withTimeoutOrNull if (c.isConsumed) TapResult.Cancel else TapResult.Tap
+                            if (c.isConsumed) return@withTimeoutOrNull TapResult.Cancel
+                            total += c.positionChange()
+                            val slop = viewConfiguration.touchSlop
+                            if (abs(total.x) > slop && abs(total.x) > abs(total.y) * 1.3f) { c.consume(); return@withTimeoutOrNull TapResult.Drag }
+                            if (abs(total.y) > slop) return@withTimeoutOrNull TapResult.Cancel
+                        }
+                        @Suppress("UNREACHABLE_CODE") TapResult.Cancel
+                    } ?: TapResult.Drag
+                    when (decision) {
+                        TapResult.Tap -> { interaction.tryEmit(PressInteraction.Release(press)); onAdd(item.tag, item.attrs) }
+                        TapResult.Cancel -> interaction.tryEmit(PressInteraction.Cancel(press))
+                        TapResult.Drag -> {
+                            interaction.tryEmit(PressInteraction.Cancel(press))
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            drag.begin(item, origin + down.position + total)
+                            onDragMove()
+                            val completed = dragPointer(down.id) { c -> drag.position += c.positionChange(); c.consume(); onDragMove() }
+                            if (completed) onDrop()
+                            drag.tag = null
+                            if (!completed) onDragMove()
+                        }
+                    }
+                }
+            },
+        content = {
+            WidgetGlyph(item.glyph, sectionColor(item.section), size = if (compact) 18.dp else 22.dp)
+            Column(Modifier.padding(start = 6.dp).weight(1f)) {
+                Text(item.label, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (!compact) def?.requiresDependency?.let {
+                    Text(stringResource(R.string.ds_needs_dependency, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
-        }
-    }
+        },
+    )
 }
 
-/** Floating label that follows the pointer while dragging from the library. */
+private enum class TapResult { Tap, Drag, Cancel }
+
+/** The pill that follows the finger while a widget is dragged from the palette. */
 @Composable
 fun DragGhost(drag: LibraryDrag, rootOffset: Offset) {
-    val tag = drag.tag ?: return
+    drag.tag ?: return
     val p = drag.position - rootOffset
-    Box(
+    Row(
         Modifier
-            .offset { IntOffset(p.x.toInt() + 24, p.y.toInt() - 48) }
-            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
-            .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+            .offset { IntOffset(p.x.toInt() + 24, p.y.toInt() - 72) }
+            .shadow(6.dp, RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(8.dp))
+            .border(1.5.dp, drag.color, RoundedCornerShape(8.dp))
+            .padding(horizontal = Spacing.sm, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(ComponentCatalog.find(tag)?.displayName ?: tag, color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelLarge)
+        WidgetGlyph(drag.glyph, drag.color, size = 18.dp)
+        Text(drag.label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 6.dp))
     }
 }
 
 // ---------------------------------------------------------------- Tree
 
 private data class TreeRow(val element: XmlElement, val depth: Int)
+
+internal fun flattenTree(root: XmlElement): List<Pair<XmlElement, Int>> = flatten(root).map { it.element to it.depth }
 
 private fun flatten(root: XmlElement): List<TreeRow> = buildList {
     fun visit(e: XmlElement, d: Int) { add(TreeRow(e, d)); e.elements.forEach { visit(it, d + 1) } }

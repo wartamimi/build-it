@@ -18,6 +18,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import dev.buildit.core.designsystem.theme.Spacing
 import dev.buildit.engine.layout.DropResolver
 import dev.buildit.engine.layout.LayoutCommand
+import dev.buildit.engine.layout.Values
+import dev.buildit.engine.project.WindowStyle
 
 /** Shared handle so the library's drag-and-drop can address the canvas. */
 class CanvasHandle {
@@ -31,7 +33,9 @@ class CanvasHandle {
         val lx = windowX - loc[0]
         val ly = windowY - loc[1]
         if (lx < 0 || ly < 0 || lx > h.width || ly > h.height) return null
-        return lx / h.scale to ly / h.scale
+        val y = ly / h.scale - h.topPx
+        if (y < 0) return null
+        return lx / h.scale to y
     }
 }
 
@@ -87,7 +91,7 @@ fun DesignerCanvas(
                     val (wDp, hDp) = state.preview.device.size(state.preview.landscape)
                     val density = state.preview.device.densityDpi / 160f
                     host.surfaceColor = surfaceColorFor(renderer)
-                    host.setContent(result.root, result.views, (wDp * density).toInt(), (hDp * density).toInt())
+                    host.setContent(result.root, result.views, (wDp * density).toInt(), (hDp * density).toInt(), chromeFor(state, density))
                     host.zoom = state.preview.zoom
                     issues(result.issues)
                 }
@@ -95,6 +99,30 @@ fun DesignerCanvas(
             },
         )
     }
+}
+
+/**
+ * The window decoration of the screen being edited: status bar unless fullscreen, and the action
+ * bar for the default window style, in the app's primary colours with the app name.
+ */
+private fun chromeFor(state: DesignerUiState, density: Float): PreviewHost.Chrome {
+    val window = state.screen?.window ?: WindowStyle.NoActionBar
+    if (window == WindowStyle.Fullscreen) return PreviewHost.Chrome()
+    val night = state.preview.night
+    fun color(vararg names: String) = names.firstNotNullOfOrNull { n -> state.values.resolve("@color/$n", night)?.let(Values::parseColor) }
+    val primary = color("colorPrimary", "primary", "purple_500") ?: 0xFF37474F.toInt() // Theme.Material.Light.DarkActionBar
+    val dark = color("colorPrimaryDark", "primary_dark", "purple_700") ?: if (color("colorPrimary", "primary", "purple_500") == null) 0xFF263238.toInt() else darken(primary)
+    val title = state.values.resolve("@string/app_name", night) ?: state.screen?.name.orEmpty()
+    return PreviewHost.Chrome(
+        statusPx = (24 * density).toInt(),
+        barPx = if (window == WindowStyle.Default) (56 * density).toInt() else 0,
+        color = primary, darkColor = dark, title = title, density = density,
+    )
+}
+
+private fun darken(c: Int): Int {
+    val f = 0.8f
+    return (c and 0xFF000000.toInt()) or ((((c shr 16) and 0xFF) * f).toInt() shl 16) or ((((c shr 8) and 0xFF) * f).toInt() shl 8) or ((c and 0xFF) * f).toInt()
 }
 
 private fun surfaceColorFor(renderer: PreviewRenderer): Int {

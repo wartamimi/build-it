@@ -168,9 +168,9 @@ class DesignerViewModel(
      * Adds a component next to the selection: into the selected container, otherwise after the
      * selected view in its parent, otherwise at the end of the root.
      */
-    fun addComponent(tag: String) {
+    fun addComponent(tag: String, attrs: Map<String, String> = emptyMap()) {
         val (parent, index) = insertionPoint() ?: return
-        apply(LayoutCommand.Insert(parent, index, tag))
+        apply(LayoutCommand.Insert(parent, index, tag, attrs))
     }
 
     /** Inside the selected container, after the selected view, or at the end of the root. */

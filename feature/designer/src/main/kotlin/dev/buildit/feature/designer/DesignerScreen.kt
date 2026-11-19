@@ -1,6 +1,22 @@
 package dev.buildit.feature.designer
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+import dev.buildit.engine.layout.Attr
+import dev.buildit.engine.layout.LayoutEditor
 import androidx.annotation.StringRes
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -136,7 +152,7 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
         val tag = drag.tag
         if (host != null && root != null && tag != null) {
             handle.toPreview(drag.position.x, drag.position.y)?.let { (x, y) ->
-                DropResolver.resolve(root, host.boxes(), x, y)?.let { t -> viewModel.apply(LayoutCommand.Insert(t.parentUid, t.index, tag)) }
+                DropResolver.resolve(root, host.boxes(), x, y)?.let { t -> viewModel.apply(LayoutCommand.Insert(t.parentUid, t.index, tag, drag.attrs)) }
             }
             host.highlightUid = null
         }
@@ -164,7 +180,7 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
                     val canvas: @Composable (Modifier) -> Unit = { m ->
                         DesignerCanvas(state, handle, onSelect = viewModel::select, onCommand = viewModel::apply, onIssues = { previewIssues = it }, modifier = m)
                     }
-                    val library: @Composable (Modifier) -> Unit = { m -> ComponentLibrary(viewModel::addComponent, drag, onDragMove, onDrop, m, collection = collection) }
+                    val library: @Composable (Modifier) -> Unit = { m -> ComponentLibrary({ t, a -> viewModel.addComponent(t, a) }, drag, onDragMove, onDrop, m, collection = collection) }
                     val panelHeight = maxHeight * 0.45f
                     if (maxWidth >= 840.dp) {
                         Row(Modifier.fillMaxSize()) {
@@ -190,7 +206,7 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
                         Column(Modifier.fillMaxSize()) {
                             Row(Modifier.weight(1f).fillMaxWidth()) {
                                 Surface(tonalElevation = 1.dp) {
-                                    ComponentLibrary(viewModel::addComponent, drag, onDragMove, onDrop, Modifier.width(140.dp).fillMaxHeight(), compact = true, collection = collection)
+                                    ComponentLibrary({ t, a -> viewModel.addComponent(t, a) }, drag, onDragMove, onDrop, Modifier.width(118.dp).fillMaxHeight(), compact = true, collection = collection)
                                 }
                                 VerticalDivider()
                                 Box(Modifier.weight(1f).fillMaxHeight()) { canvas(Modifier) }
@@ -234,7 +250,7 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
             Text(stringResource(p.label), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = Spacing.lg))
             Box(Modifier.fillMaxWidth().fillMaxHeight(0.75f)) {
                 when (p) {
-                    Panel.Library -> ComponentLibrary({ viewModel.addComponent(it); sheet = null }, drag, onDragMove, onDrop, Modifier.fillMaxSize(), collection = collection)
+                    Panel.Library -> ComponentLibrary({ t, a -> viewModel.addComponent(t, a); sheet = null }, drag, onDragMove, onDrop, Modifier.fillMaxSize(), collection = collection)
                     Panel.Tree -> ComponentTree(state, viewModel)
                     Panel.Properties -> PropertiesInspector(state, viewModel)
                     Panel.Problems -> ProblemsList(state, previewIssues, { viewModel.select(it); sheet = Panel.Properties })
@@ -256,36 +272,52 @@ fun DesignerScreen(viewModel: DesignerViewModel, onExit: () -> Unit) {
     if (screenOptions && screen != null) ScreenOptionsDialog(screen, onDismiss = { screenOptions = false }, onSave = { screenOptions = false; viewModel.setScreenOptions(it) })
 }
 
-/** Bottom bar of the phone layout: what is selected and quick actions for it. */
+/**
+ * Bottom bar of the phone layout, in the Sketchware arrangement: the selected view (tap its name to
+ * pick another view), quick actions, then property tabs and one card per property.
+ */
 @Composable
 private fun PropertyBar(state: DesignerUiState, problems: Int, vm: DesignerViewModel, onPanel: (Panel) -> Unit, onSaveWidget: (Long) -> Unit) {
     val el = state.selectedUid?.let { state.root?.find(it) }
-    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shadowElevation = 6.dp, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(start = Spacing.sm, end = Spacing.xs, top = 2.dp, bottom = Spacing.xs).animateContentSize()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f).padding(start = Spacing.xs)) {
-                    if (el == null) {
-                        Text(stringResource(R.string.ds_bar_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else {
-                        Text(el.label(), style = MaterialTheme.typography.titleSmall, maxLines = 1)
-                        Text(el.name.substringAfterLast('.'), style = CodeTypography.small, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                var picker by remember { mutableStateOf(false) }
+                Box(Modifier.weight(1f)) {
+                    Row(
+                        Modifier.clip(RoundedCornerShape(8.dp)).clickable { picker = true }.padding(horizontal = 4.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        val glyph = el?.let { e -> Palette.glyphFor(e.name) { e[it] } } ?: Glyph.View
+                        Box(Modifier.size(28.dp).background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
+                            WidgetGlyph(glyph, MaterialTheme.colorScheme.primary, size = 18.dp)
+                        }
+                        Column(Modifier.padding(start = Spacing.sm).weight(1f, fill = false)) {
+                            if (el == null) {
+                                Text(stringResource(R.string.ds_bar_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                            } else {
+                                Text(el[Attr.ID]?.let(LayoutEditor::idName) ?: el.name.substringAfterLast('.'), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(el.name.substringAfterLast('.'), style = CodeTypography.small, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                            }
+                        }
+                        Icon(BiIcons.MoveDown, stringResource(R.string.ds_pick_view), Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    DropdownMenu(expanded = picker, onDismissRequest = { picker = false }) {
+                        state.root?.let(::flattenTree).orEmpty().forEach { (e, depth) ->
+                            DropdownMenuItem(
+                                text = { Text(e.label(), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = if (e.uid == el?.uid) FontWeight.Bold else null) },
+                                leadingIcon = { Row { Spacer(Modifier.width((depth * 12).dp)); WidgetGlyph(Palette.glyphFor(e.name) { e[it] }, MaterialTheme.colorScheme.primary, size = 18.dp) } },
+                                onClick = { picker = false; vm.select(e.uid) },
+                            )
+                        }
                     }
                 }
+                BadgedIcon(BiIcons.Warning, stringResource(R.string.ds_panel_problems), problems, { onPanel(Panel.Problems) })
+                BiIconButton(BiIcons.Layers, stringResource(R.string.ds_panel_tree), { onPanel(Panel.Tree) })
                 if (el != null) {
                     if (state.collectedWidgets != null) BiIconButton(BiIcons.Library, stringResource(R.string.ds_collection_save), { onSaveWidget(el.uid) })
                     BiIconButton(BiIcons.Duplicate, stringResource(R.string.ds_duplicate), { vm.apply(LayoutCommand.Duplicate(el.uid)) })
                     BiIconButton(BiIcons.Delete, stringResource(R.string.ds_delete), { vm.apply(LayoutCommand.Remove(el.uid)) }, enabled = el.uid != state.root?.uid)
-                }
-            }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                AssistChip(
-                    onClick = { onPanel(Panel.Problems) },
-                    label = { Text(stringResource(R.string.ds_panel_problems) + if (problems > 0) " ($problems)" else "") },
-                    leadingIcon = { Icon(BiIcons.Warning, null, tint = if (problems > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) },
-                )
-                AssistChip(onClick = { onPanel(Panel.Tree) }, label = { Text(stringResource(R.string.ds_panel_tree)) }, leadingIcon = { Icon(BiIcons.Layers, null) })
-                if (el != null) {
-                    AssistChip(onClick = { onPanel(Panel.Properties) }, label = { Text(stringResource(R.string.ds_all_properties)) }, leadingIcon = { Icon(BiIcons.Tune, null) })
                 }
             }
             // One card per property, like Sketchware: tap a card to edit it in a popup made for that kind of value
@@ -294,16 +326,31 @@ private fun PropertyBar(state: DesignerUiState, problems: Int, vm: DesignerViewM
                 var editing by remember(el.uid) { mutableStateOf<PropertyDef?>(null) }
                 var tab by rememberSaveable { mutableStateOf(PropertyTab.Basic) }
                 val defs = propertiesForTab(all, tab, state.recentProperties)
-                Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                    PropertyTabs(tab) { tab = it }
-                    if (defs.isEmpty()) Text(stringResource(R.string.ds_recent_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    defs.forEach { d -> PropertyCard(d, el[d.attr]) { editing = d } }
+                PropertyTabs(tab, onTab = { tab = it }, onAllProperties = { onPanel(Panel.Properties) })
+                LazyRow(
+                    Modifier.fillMaxWidth().padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(end = Spacing.sm),
+                ) {
+                    if (defs.isEmpty()) item { Text(stringResource(R.string.ds_recent_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Spacing.sm)) }
+                    items(defs, key = { it.attr }) { d -> PropertyCard(d, el[d.attr]) { editing = d } }
                 }
                 editing?.let { d ->
                     PropertyPopup(d, el[d.attr], state.resDir, onSet = { vm.setProperty(el.uid, d.attr, it) }, onDismiss = { editing = null })
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BadgedIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, count: Int, onClick: () -> Unit) {
+    Box {
+        BiIconButton(icon, if (count > 0) "$label ($count)" else label, onClick)
+        if (count > 0) Box(
+            Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp).size(16.dp).background(MaterialTheme.colorScheme.error, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) { Text(if (count > 9) "9+" else "$count", color = MaterialTheme.colorScheme.onError, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp) }
     }
 }
 

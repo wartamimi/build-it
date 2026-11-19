@@ -1,5 +1,17 @@
 Build It for Android 8.0 and newer.
 
+New in 0.17.0: the designer and the block editor look and feel closer to Sketchware. The widget
+palette is a narrow column of short names with a drawing for each widget (Linear(H), Linear(V),
+Scroll(H), Scroll(V), Button, ...) under Layouts, Widgets, Lists & media and AndroidX; drag a
+widget sideways onto the screen right away (a long press still works), or tap it. The preview
+shows the status bar and the title bar of the screen in the app's colours. The bar under the
+selected view shows its id (tap it to pick another view), Basic/Recent/All tabs and a card per
+property. Blocks have Sketchware-style shapes: a notch on top and a tab underneath so they click
+together, a rounded cap on events, pointed true/false values, round number values, white boxes for
+typed text and numbers, and brighter colours per category. The blocks drawer slides in from the
+right and shows each block exactly as it will look. While dragging a block a grey outline shows
+where it will land, with a short vibration when it snaps.
+
 New in 0.16.0: Kotlin projects now build on your phone. The first Kotlin build downloads the
 Kotlin compiler (about 60 MB) and prepares it once; Kotlin and Java files in one project can call
 each other. New projects can start from six small apps, in Java or Kotlin: Counter, Calculator,

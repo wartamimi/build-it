@@ -28,6 +28,14 @@ class PreviewHost(context: Context) : ViewGroup(context) {
     var surfaceColor = Color.WHITE
         set(value) { field = value; invalidate() }
 
+    /** Status bar and action bar drawn above the layout, like the device shows them. */
+    data class Chrome(val statusPx: Int = 0, val barPx: Int = 0, val color: Int = 0xFF263238.toInt(), val darkColor: Int = 0xFF21272B.toInt(), val title: String = "", val density: Float = 1f)
+
+    var chrome = Chrome()
+        private set
+    /** Device pixels above the layout content. */
+    val topPx get() = chrome.statusPx + chrome.barPx
+
     private var content: View? = null
     private var views: Map<Long, View> = emptyMap()
     var scale = 1f
@@ -56,10 +64,10 @@ class PreviewHost(context: Context) : ViewGroup(context) {
     private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent) = true
         override fun onSingleTapUp(e: MotionEvent): Boolean {
-            onTap?.invoke(e.x / scale, e.y / scale); return true
+            onTap?.invoke(e.x / scale, e.y / scale - topPx); return true
         }
         override fun onLongPress(e: MotionEvent) {
-            dragging = onDragStart?.invoke(e.x / scale, e.y / scale) == true
+            dragging = onDragStart?.invoke(e.x / scale, e.y / scale - topPx) == true
             if (dragging) parent?.requestDisallowInterceptTouchEvent(true)
         }
     })
@@ -69,8 +77,9 @@ class PreviewHost(context: Context) : ViewGroup(context) {
         isLongClickable = true
     }
 
-    fun setContent(root: View, viewMap: Map<Long, View>, widthPx: Int, heightPx: Int) {
+    fun setContent(root: View, viewMap: Map<Long, View>, widthPx: Int, heightPx: Int, chrome: Chrome = Chrome()) {
         content?.let { removeView(it) }
+        this.chrome = chrome
         deviceWidthPx = widthPx
         deviceHeightPx = heightPx
         views = viewMap
@@ -87,16 +96,17 @@ class PreviewHost(context: Context) : ViewGroup(context) {
         scale = (fit * zoom).coerceIn(0.05f, 4f)
         content?.measure(
             MeasureSpec.makeMeasureSpec(deviceWidthPx, MeasureSpec.EXACTLY),
-            MeasureSpec.makeMeasureSpec(deviceHeightPx, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec((deviceHeightPx - topPx).coerceAtLeast(1), MeasureSpec.EXACTLY),
         )
         setMeasuredDimension((deviceWidthPx * scale).toInt(), (deviceHeightPx * scale).toInt())
     }
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
         content?.let {
-            it.layout(0, 0, deviceWidthPx, deviceHeightPx)
+            it.layout(0, 0, deviceWidthPx, (deviceHeightPx - topPx).coerceAtLeast(1))
             it.pivotX = 0f; it.pivotY = 0f
             it.scaleX = scale; it.scaleY = scale
+            it.translationY = topPx * scale
         }
     }
 
@@ -106,9 +116,9 @@ class PreviewHost(context: Context) : ViewGroup(context) {
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (dragging) {
             when (event.actionMasked) {
-                MotionEvent.ACTION_MOVE -> onDragMove?.invoke(event.x / scale, event.y / scale)
-                MotionEvent.ACTION_UP -> { dragging = false; onDragEnd?.invoke(event.x / scale, event.y / scale, false) }
-                MotionEvent.ACTION_CANCEL -> { dragging = false; onDragEnd?.invoke(event.x / scale, event.y / scale, true) }
+                MotionEvent.ACTION_MOVE -> onDragMove?.invoke(event.x / scale, event.y / scale - topPx)
+                MotionEvent.ACTION_UP -> { dragging = false; onDragEnd?.invoke(event.x / scale, event.y / scale - topPx, false) }
+                MotionEvent.ACTION_CANCEL -> { dragging = false; onDragEnd?.invoke(event.x / scale, event.y / scale - topPx, true) }
             }
             return true
         }
@@ -136,8 +146,44 @@ class PreviewHost(context: Context) : ViewGroup(context) {
         return Box(x, y, x + v.width, y + v.height)
     }
 
+    private val chromePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    private fun drawChrome(c: Canvas) {
+        val ch = chrome
+        if (topPx == 0) return
+        val w = width.toFloat()
+        val s = scale
+        val dp = s * ch.density // one device dp in canvas pixels
+        if (ch.statusPx > 0) {
+            val h = ch.statusPx * s
+            chromePaint.color = ch.darkColor; chromePaint.style = Paint.Style.FILL
+            c.drawRect(0f, 0f, w, h, chromePaint)
+            chromePaint.color = Color.WHITE; chromePaint.textSize = h * 0.55f
+            chromePaint.textAlign = Paint.Align.LEFT
+            c.drawText("12:00", 12 * dp, h * 0.72f, chromePaint)
+            // Battery and signal, simple shapes
+            val bh = h * 0.4f; val top = (h - bh) / 2
+            c.drawRect(w - 12 * dp - bh * 0.6f, top, w - 12 * dp, top + bh, chromePaint)
+            val path = android.graphics.Path().apply { moveTo(w - 20 * dp - bh, top + bh); lineTo(w - 20 * dp, top + bh); lineTo(w - 20 * dp, top); close() }
+            c.drawPath(path, chromePaint)
+        }
+        if (ch.barPx > 0) {
+            val t = ch.statusPx * s
+            val h = ch.barPx * s
+            chromePaint.color = ch.color; chromePaint.style = Paint.Style.FILL
+            c.drawRect(0f, t, w, t + h, chromePaint)
+            chromePaint.color = Color.WHITE; chromePaint.textSize = h * 0.36f
+            chromePaint.isFakeBoldText = true
+            c.drawText(ch.title, 16 * dp, t + h * 0.62f, chromePaint)
+            chromePaint.isFakeBoldText = false
+            chromePaint.color = 0x22000000
+            c.drawRect(0f, t + h, w, t + h + 2 * dp, chromePaint)
+        }
+    }
+
     override fun dispatchDraw(canvas: Canvas) {
         super.dispatchDraw(canvas)
+        drawChrome(canvas)
         val boxes = if (selectedUid != null || highlightUid != null) boxes() else emptyMap()
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), framePaint)
         highlightUid?.let { boxes[it] }?.let { drawBox(canvas, it, hiPaint) }
@@ -146,6 +192,7 @@ class PreviewHost(context: Context) : ViewGroup(context) {
 
     private fun drawBox(c: Canvas, b: Box, p: Paint) {
         val inset = p.strokeWidth / 2
-        c.drawRect(b.left * scale + inset, b.top * scale + inset, b.right * scale - inset, b.bottom * scale - inset, p)
+        val dy = topPx * scale
+        c.drawRect(b.left * scale + inset, b.top * scale + inset + dy, b.right * scale - inset, b.bottom * scale - inset + dy, p)
     }
 }

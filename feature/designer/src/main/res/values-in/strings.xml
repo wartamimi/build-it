@@ -23,7 +23,7 @@
     <string name="ds_panel_problems">Masalah</string>
 
     <string name="ds_search_components">Cari komponen</string>
-    <string name="ds_library_hint">Ketuk untuk menambah di samping pilihan, atau tekan lama lalu seret ke kanvas.</string>
+    <string name="ds_library_hint">Ketuk untuk menambah di samping pilihan, atau seret ke samping ke layar (tekan lama juga bisa menyeret).</string>
     <string name="ds_needs_dependency">Butuh %1$s</string>
     <string name="ds_move_up">Naikkan</string>
     <string name="ds_move_down">Turunkan</string>
@@ -137,4 +137,10 @@
     <string name="ds_collection_exists">Koleksi sudah punya %1$s</string>
     <string name="ds_collection_invalid_name">Gunakan huruf, angka, spasi, _ . atau - (maks. 60)</string>
     <string name="ds_collection_remove">Hapus dari koleksi</string>
+    <string name="ds_pal_layouts">Tata letak</string>
+    <string name="ds_pal_widgets">Widget</string>
+    <string name="ds_pal_lists">Daftar &amp; media</string>
+    <string name="ds_pal_androidx">AndroidX</string>
+    <string name="ds_pal_other">Lainnya</string>
+    <string name="ds_pick_view">Pilih view lain</string>
 </resources>

@@ -1,6 +1,8 @@
 package dev.buildit.feature.designer
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.buildit.core.designsystem.theme.CodeTypography
 import dev.buildit.core.designsystem.theme.Spacing
 import dev.buildit.engine.layout.LayoutEditor
@@ -75,17 +78,38 @@ internal fun propertiesForTab(all: List<PropertyDef>, tab: PropertyTab, recent: 
 }
 
 @Composable
-internal fun PropertyTabs(tab: PropertyTab, onTab: (PropertyTab) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+internal fun PropertyTabs(tab: PropertyTab, onTab: (PropertyTab) -> Unit, onAllProperties: () -> Unit) {
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         PropertyTab.entries.forEach { t ->
             val on = t == tab
             Surface(
-                onClick = { onTab(t) }, shape = RoundedCornerShape(6.dp),
-                color = if (on) MaterialTheme.colorScheme.primary else Color.Transparent,
+                onClick = { onTab(t) }, shape = CircleShape,
+                color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerLowest,
                 contentColor = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-            ) { Text(stringResource(t.label), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 1.dp)) }
+                border = if (on) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) { Text(stringResource(t.label), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)) }
+        }
+        Surface(onClick = onAllProperties, shape = CircleShape, color = Color.Transparent, contentColor = MaterialTheme.colorScheme.primary) {
+            Text(stringResource(R.string.ds_all_properties) + " ›", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
         }
     }
+}
+
+/** A small symbol for the kind of value a property holds. */
+internal fun typeSymbol(t: PropertyType): String = when (t) {
+    PropertyType.Id -> "#"
+    PropertyType.Dimension -> "dp"
+    PropertyType.LayoutSize -> "↔"
+    PropertyType.Text -> "T"
+    PropertyType.TextSize -> "Aa"
+    PropertyType.Color -> "●"
+    PropertyType.Drawable -> "▣"
+    PropertyType.Enum -> "≡"
+    PropertyType.Flags -> "☰"
+    PropertyType.Boolean -> "◐"
+    PropertyType.Float -> "0.5"
+    PropertyType.Integer -> "12"
+    PropertyType.Raw -> "</>"
 }
 
 /** Short form of a value for a property card. */
@@ -99,20 +123,35 @@ internal fun cardValue(def: PropertyDef, value: String?): String = when {
 
 @Composable
 internal fun PropertyCard(def: PropertyDef, value: String?, onClick: () -> Unit) {
+    val set = value != null
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
-        color = if (value != null) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.widthIn(min = 72.dp, max = 140.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        border = BorderStroke(1.dp, if (set) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 1.dp,
+        modifier = Modifier.width(92.dp),
     ) {
-        Column(Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
-            Text(def.attr.substringAfter(':'), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (def.type == PropertyType.Color) value?.let(Values::parseColor)?.let { c ->
-                    Box(Modifier.padding(end = Spacing.xs).size(12.dp).background(Color(c), CircleShape).border(1.dp, MaterialTheme.colorScheme.outline, CircleShape))
+                val c = if (def.type == PropertyType.Color) value?.let(Values::parseColor)?.let { Color(it) } else null
+                Box(
+                    Modifier.size(20.dp).background(c ?: if (set) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(5.dp))
+                        .then(if (c != null) Modifier.border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(5.dp)) else Modifier),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (c == null) Text(typeSymbol(def.type), style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, maxLines = 1,
+                        color = if (set) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text(cardValue(def, value), style = CodeTypography.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    def.attr.substringAfter(':').removePrefix("layout_"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 5.dp),
+                )
             }
+            Text(
+                cardValue(def, value), style = CodeTypography.small, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = if (set) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline, modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }

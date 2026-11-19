@@ -47,6 +47,9 @@ class LaidBlock(
     val mouths: List<Mouth>,
     val hat: Boolean,
 ) {
+    /** Drawing data (the block's outline) built on first draw; layouts are immutable. */
+    var paintCache: Any? = null
+
     /** Depth-first, parents before children. */
     fun walk(): Sequence<LaidBlock> = sequence {
         yield(this@LaidBlock)
