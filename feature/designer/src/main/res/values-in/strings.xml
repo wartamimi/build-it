@@ -147,4 +147,5 @@
     <string name="ds_view_events">Event</string>
     <string name="ds_dock_open">Widget</string>
     <string name="ds_dock_close">Tutup widget</string>
+    <string name="ds_zoom">Zoom %1$d%%</string>
 </resources>

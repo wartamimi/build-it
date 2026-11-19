@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.buildit.core.data.ProjectRepository
 import dev.buildit.core.model.ProjectSummary
+import dev.buildit.engine.project.NewProjectOptions
 import dev.buildit.engine.project.ProjectTemplate
 import dev.buildit.engine.project.ProjectValidation
 import dev.buildit.engine.project.ProjectValidationException
@@ -72,8 +73,8 @@ class ProjectsViewModel(private val repository: ProjectRepository) : ViewModel()
     fun validateNew(name: String, packageName: String): List<ValidationIssue> =
         ProjectValidation.validateName(name) + ProjectValidation.validatePackageName(packageName)
 
-    fun create(name: String, packageName: String, template: ProjectTemplate) = run {
-        val p = repository.create(name, packageName, template)
+    fun create(name: String, packageName: String, template: ProjectTemplate, options: NewProjectOptions = NewProjectOptions()) = run {
+        val p = repository.create(name, packageName, template, options)
         _messages.send(ProjectsMessage.Created(p.name))
         _openRequests.send(p.id)
     }

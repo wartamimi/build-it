@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
@@ -206,37 +208,46 @@ fun DesignerScreen(
                             }
                         }
                     } else {
-                        // Phone layout (preview first): the preview fills the screen, widgets sit in a
-                        // round dock on its left, and the selected view gets a bubble of actions.
+                        // Phone layout (preview first): the preview fills the screen. "+" opens a compact
+                        // widget column beside the layout (and turns into "×"); the selected view gets a
+                        // bubble of actions.
                         var dockOpen by rememberSaveable { mutableStateOf(false) }
                         Column(Modifier.fillMaxSize()) {
-                            Box(Modifier.weight(1f).fillMaxWidth()) {
-                                DesignerCanvas(
-                                    state, handle, onSelect = viewModel::select, onCommand = viewModel::apply, onIssues = { previewIssues = it },
-                                    startInset = 56.dp,
-                                    bubble = {
-                                        state.selectedUid?.let { uid -> state.root?.find(uid) }?.let { el ->
-                                            SelectionActions(
-                                                onProperties = { sheet = Panel.Properties },
-                                                onEvents = onOpenEvents?.let { f ->
-                                                    el[Attr.ID]?.let(LayoutEditor::idName)?.let { id -> { viewModel.flush(); f(id) } }
-                                                },
-                                                onCollect = if (state.collectedWidgets != null) ({ saveWidget = el.uid }) else null,
-                                                onDuplicate = { viewModel.apply(LayoutCommand.Duplicate(el.uid)) },
-                                                onDelete = { viewModel.apply(LayoutCommand.Remove(el.uid)) },
+                            Row(Modifier.weight(1f).fillMaxWidth()) {
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = dockOpen,
+                                    enter = androidx.compose.animation.expandHorizontally() + androidx.compose.animation.fadeIn(),
+                                    exit = androidx.compose.animation.shrinkHorizontally() + androidx.compose.animation.fadeOut(),
+                                ) {
+                                    Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest, shadowElevation = 2.dp) {
+                                        Column(Modifier.width(118.dp).fillMaxHeight()) {
+                                            DockButton(open = true, onToggle = { dockOpen = false }, Modifier.padding(start = Spacing.sm, top = Spacing.sm, bottom = Spacing.sm))
+                                            ComponentLibrary(
+                                                { t, a -> viewModel.addComponent(t, a) }, drag, onDragMove, onDrop,
+                                                Modifier.weight(1f).fillMaxWidth(), compact = true, collection = collection,
                                             )
                                         }
-                                    },
-                                )
-                                WidgetDock(
-                                    open = dockOpen,
-                                    onToggle = { dockOpen = !dockOpen },
-                                    modifier = Modifier.align(Alignment.TopStart).padding(Spacing.sm).fillMaxHeight(),
-                                ) {
-                                    ComponentLibrary(
-                                        { t, a -> viewModel.addComponent(t, a); dockOpen = false }, drag, onDragMove, { onDrop(); dockOpen = false },
-                                        Modifier.fillMaxSize(), compact = true, collection = collection, dock = !dockOpen,
+                                    }
+                                }
+                                Box(Modifier.weight(1f).fillMaxHeight()) {
+                                    DesignerCanvas(
+                                        state, handle, onSelect = viewModel::select, onCommand = viewModel::apply, onIssues = { previewIssues = it },
+                                        startInset = if (dockOpen) 0.dp else 48.dp,
+                                        bubble = {
+                                            state.selectedUid?.let { uid -> state.root?.find(uid) }?.let { el ->
+                                                SelectionActions(
+                                                    onProperties = { sheet = Panel.Properties },
+                                                    onEvents = onOpenEvents?.let { f ->
+                                                        el[Attr.ID]?.let(LayoutEditor::idName)?.let { id -> { viewModel.flush(); f(id) } }
+                                                    },
+                                                    onCollect = if (state.collectedWidgets != null) ({ saveWidget = el.uid }) else null,
+                                                    onDuplicate = { viewModel.apply(LayoutCommand.Duplicate(el.uid)) },
+                                                    onDelete = { viewModel.apply(LayoutCommand.Remove(el.uid)) },
+                                                )
+                                            }
+                                        },
                                     )
+                                    if (!dockOpen) DockButton(open = false, onToggle = { dockOpen = true }, Modifier.align(Alignment.TopStart).padding(Spacing.sm))
                                 }
                             }
                             PropertyBar(state, state.diagnostics.size + previewIssues.size, viewModel, onPanel = { sheet = it })
@@ -308,7 +319,8 @@ fun DesignerScreen(
 private fun PropertyBar(state: DesignerUiState, problems: Int, vm: DesignerViewModel, onPanel: (Panel) -> Unit) {
     val el = state.selectedUid?.let { state.root?.find(it) }
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shadowElevation = 6.dp, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(start = Spacing.sm, end = Spacing.xs, top = 2.dp, bottom = Spacing.xs).animateContentSize()) {
+        // Fixed height, so the preview above keeps its size whether or not a view is selected.
+        Column(Modifier.height(164.dp).padding(start = Spacing.sm, end = Spacing.xs, top = 2.dp, bottom = Spacing.xs)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 var picker by remember { mutableStateOf(false) }
                 Box(Modifier.weight(1f)) {
@@ -366,31 +378,20 @@ private fun PropertyBar(state: DesignerUiState, problems: Int, vm: DesignerViewM
     }
 }
 
-/** The round widget dock on the left of the preview: icons only, or the full list when [open]. */
+/** The round "+" that opens the widget column; it shows "×" while the column is open. */
 @Composable
-private fun WidgetDock(open: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val width by androidx.compose.animation.core.animateDpAsState(if (open) 160.dp else 48.dp, label = "dock")
-    Surface(
-        modifier.width(width),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        shadowElevation = 4.dp,
+private fun DockButton(open: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    val turn by androidx.compose.animation.core.animateFloatAsState(if (open) 45f else 0f, label = "dock")
+    Box(
+        modifier.size(40.dp).shadow(3.dp, CircleShape).clip(CircleShape).background(MaterialTheme.colorScheme.primary).clickable(onClick = onToggle),
+        contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = if (open) Alignment.Start else Alignment.CenterHorizontally) {
-            Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
-                Box(
-                    Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary).clickable(onClick = onToggle),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        if (open) BiIcons.Close else BiIcons.Add,
-                        stringResource(if (open) R.string.ds_dock_close else R.string.ds_dock_open),
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                    )
-                }
-            }
-            Box(Modifier.weight(1f).fillMaxWidth()) { content() }
-        }
+        // One "+" that turns into "×"
+        Icon(
+            BiIcons.Add, stringResource(if (open) R.string.ds_dock_close else R.string.ds_dock_open),
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.graphicsLayer { rotationZ = turn },
+        )
     }
 }
 
@@ -437,17 +438,13 @@ private fun BadgedIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, la
     }
 }
 
+/** One compact row: the layout picker, screen events, undo/redo, a menu for the preview options, save. */
 @Composable
 private fun Toolbar(state: DesignerUiState, vm: DesignerViewModel, onNewLayout: () -> Unit, onNewActivity: () -> Unit, onScreenOptions: () -> Unit, onScreenEvents: (() -> Unit)?) {
-    // Save status and the save action stay pinned; the rest scrolls on narrow screens.
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-    Row(
-        Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row(Modifier.fillMaxWidth().height(48.dp).padding(end = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
         var layoutMenu by remember { mutableStateOf(false) }
-        Box {
-            TextButton(onClick = { layoutMenu = true }) { Text((state.current ?: stringResource(R.string.ds_layout)) + ".xml ▾") }
+        Box(Modifier.weight(1f)) {
+            TextButton(onClick = { layoutMenu = true }) { Text((state.current ?: stringResource(R.string.ds_layout)) + ".xml ▾", maxLines = 1, overflow = TextOverflow.Ellipsis) }
             DropdownMenu(expanded = layoutMenu, onDismissRequest = { layoutMenu = false }) {
                 state.layouts.forEach { l -> DropdownMenuItem(text = { Text("$l.xml") }, onClick = { layoutMenu = false; vm.open(l) }) }
                 HorizontalDivider()
@@ -463,42 +460,40 @@ private fun Toolbar(state: DesignerUiState, vm: DesignerViewModel, onNewLayout: 
                 }
             }
         }
-        if (onScreenEvents != null) AssistChip(
-            onClick = onScreenEvents,
-            label = { Text(stringResource(R.string.ds_screen_events)) },
-            leadingIcon = { Icon(BiIcons.Event, null, Modifier.size(16.dp)) },
-            modifier = Modifier.padding(end = Spacing.xs),
-        )
+        if (onScreenEvents != null) BiIconButton(BiIcons.Event, stringResource(R.string.ds_screen_events), onScreenEvents)
         BiIconButton(BiIcons.Undo, stringResource(R.string.ds_undo), vm::undo, enabled = state.canUndo)
         BiIconButton(BiIcons.Redo, stringResource(R.string.ds_redo), vm::redo, enabled = state.canRedo)
-
-        var deviceMenu by remember { mutableStateOf(false) }
+        var more by remember { mutableStateOf(false) }
         Box {
-            BiIconButton(BiIcons.Device, stringResource(R.string.ds_device), { deviceMenu = true })
-            DropdownMenu(expanded = deviceMenu, onDismissRequest = { deviceMenu = false }) {
+            BiIconButton(BiIcons.Device, stringResource(R.string.ds_device), { more = true })
+            DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
                 DeviceProfile.entries.forEach { d ->
                     DropdownMenuItem(
                         text = { Text("${d.name} · ${d.widthDp}×${d.heightDp}dp") },
                         trailingIcon = { if (d == state.preview.device) Icon(BiIcons.Check, null) },
-                        onClick = { deviceMenu = false; vm.setPreview { it.copy(device = d) } },
+                        onClick = { more = false; vm.setPreview { it.copy(device = d) } },
                     )
                 }
+                HorizontalDivider()
+                DropdownMenuItem(text = { Text(stringResource(R.string.ds_rotate)) }, leadingIcon = { Icon(BiIcons.Rotate, null) }, onClick = { vm.setPreview { it.copy(landscape = !it.landscape) } })
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.ds_night)) }, leadingIcon = { Icon(BiIcons.Night, null) },
+                    trailingIcon = { if (state.preview.night) Icon(BiIcons.Check, null) },
+                    onClick = { vm.setPreview { it.copy(night = !it.night) } },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.ds_zoom, (state.preview.zoom * 100).toInt())) },
+                    trailingIcon = {
+                        Row {
+                            IconButton(onClick = { vm.setPreview { it.copy(zoom = (it.zoom - 0.25f).coerceAtLeast(0.5f)) } }) { Text("−") }
+                            IconButton(onClick = { vm.setPreview { it.copy(zoom = (it.zoom + 0.25f).coerceAtMost(3f)) } }) { Text("+") }
+                        }
+                    },
+                    onClick = { vm.setPreview { it.copy(zoom = 1f) } },
+                )
             }
         }
-        BiIconButton(BiIcons.Rotate, stringResource(R.string.ds_rotate), { vm.setPreview { it.copy(landscape = !it.landscape) } })
-        FilterChip(selected = state.preview.night, onClick = { vm.setPreview { it.copy(night = !it.night) } }, label = { Icon(BiIcons.Night, stringResource(R.string.ds_night)) })
-        IconButton(onClick = { vm.setPreview { it.copy(zoom = (it.zoom - 0.25f).coerceAtLeast(0.5f)) } }) { Text("−") }
-        Text("${(state.preview.zoom * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
-        IconButton(onClick = { vm.setPreview { it.copy(zoom = (it.zoom + 0.25f).coerceAtMost(3f)) } }) { Text("+") }
-    }
-
-        val status = when {
-            state.saving -> stringResource(R.string.ds_saving)
-            state.dirty -> stringResource(R.string.ds_unsaved)
-            state.root != null -> stringResource(R.string.ds_saved)
-            else -> ""
-        }
-        Text(status, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, modifier = Modifier.padding(start = Spacing.sm).widthIn(max = 96.dp))
+        // Save: enabled while there are unsaved changes (autosave also saves on leaving).
         BiIconButton(BiIcons.Save, stringResource(R.string.ds_save), { vm.save() }, enabled = state.dirty && !state.saving)
     }
 }

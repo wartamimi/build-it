@@ -538,10 +538,42 @@ Not done / limits
 - Checked with Robolectric screenshots of the real screens and the usual tests; not yet looked
   at on a physical phone. Tablet layouts (840dp and wider) keep the three-pane designer.
 
+## Phase 19 — Owner feedback on the preview-first redesign
+
+Done
+- Events tab like Sketchware: kinds on the left (Activity, View, Component, More block, and
+  Loose blocks when there are any), events of that kind on the right as rows with the owner and
+  block count, + adds one. Opening events from a view's bubble shows View with that view's events
+  outlined, and offers its events at once when it has none.
+- One full-screen editor per event: the workspace hides its title bar, tabs and run bar
+  (WorkspaceTabScope.fullScreen) while an event is open; the canvas shows only that event's
+  stack and loose stacks (other events can't be hit or snapped to).
+- Block canvas: hats (event and define blocks) can't be dragged; other blocks start moving only
+  after a long press (moving earlier pans); a long press without moving only selects. Palette
+  blocks are added by long-press drag; the long-press accessibility action adds after the selection.
+- Compact toolbars: designer (layout picker, screen events, undo, redo, preview menu with device,
+  rotate, night and zoom, save) and blocks (back, event title, undo, redo, problems badge, menu
+  with zoom, code and problems, save). The status text was removed; Save is enabled only with
+  unsaved changes. The blocks status line shows only errors or hand edits.
+- Designer: "+" opens a 118dp widget column beside the layout (the preview moves over) and turns
+  into "×". The selected view is filled with a translucent tint. The property bar has a fixed
+  height, so the preview no longer resizes on selection.
+- New project settings: version code/name, minimum SDK (21–30), AppCompat and Material, theme
+  colours (main colour with a darker status bar colour, accent colour) with a preview. Stored as
+  AppConfig.colors, written to res/values/colors.xml and used by themes.xml (framework or
+  Material Components items); screens follow the AppCompat choice.
+- Icons: the Material icons were replaced with Build It line icons on one grid.
+- Tests: ProjectStoreTest (settings chosen before creating), EventSourcesTest (event kinds).
+
+Not done / limits
+- Sketchware's Drawer events have no counterpart: Build It has no navigation drawer widget yet.
+- Loose stacks are shared by all events of a screen (they show in every event editor).
+- Checked with Robolectric screenshots and tests; not yet on a physical phone.
+
 ## Build status
 
 - `./gradlew testDebugUnitTest :engine:project:test :engine:layout:test :engine:blocks:test :engine:editor:test :engine:build:test :engine:deps:test :engine:ai:test` —
-  passing locally (172 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
+  passing locally (174 tests, none skipped). On CI the SDK-dependent tests are required, not skipped. and on CI (GitHub Actions, JDK 21).
 - `./gradlew :app:compileDebugKotlin` — compiles.
 - APK: CI publishes a signed GitHub release for each push to main. Emulator job: on-device build, install and console pass.
 
@@ -549,7 +581,7 @@ Not done / limits
 
 | Suite | Tests | Result |
 |---|---|---|
-| engine:project ProjectStoreTest | 17 | pass |
+| engine:project ProjectStoreTest | 18 | pass |
 | engine:project ProjectFilesTest (incl. screen options in the manifest, AppCompat switch) | 7 | pass |
 | engine:project ProjectValidationTest | 5 | pass |
 | engine:project ActivitiesTest | 2 | pass |
@@ -567,7 +599,7 @@ Not done / limits
 | engine:blocks CatalogTest (every block and component: validates, compiles as Java and Kotlin against android.jar; procedures; loop checks; AppCompat base class; collected blocks) | 9 | pass |
 | feature:blocks BlockLayoutTest | 3 | pass |
 | feature:blocks BlocksViewModelTest (save → generated Java on disk, hand-edit protection, procedure parameters, palette drop, component permissions in the manifest) | 5 | pass |
-| feature:blocks EventSourcesTest (events grouped by screen, view, component, procedures, leftovers) | 1 | pass |
+| feature:blocks EventSourcesTest (event kinds of the Events tab, view events) | 2 | pass |
 | engine:editor EditorEngineTest (lexers, search/replace, checks, history, indent) | 7 | pass |
 | feature:code CodeViewModelTest (autosave to disk, conflict instead of overwrite, save/discard, problems) | 5 | pass |
 | feature:code CodeEditTextTest (Robolectric, real view: auto-indent, undo/redo) | 2 | pass |
@@ -601,6 +633,6 @@ Not done / limits
 
 ## Next
 
-The owner's Sketchware-parity plan (Phases 11–16) the look-and-feel pass (Phase 17) and the preview-first redesign (Phase 18) are complete. Open items: AAB output, custom list
+The owner's Sketchware-parity plan (Phases 11–16) the look-and-feel pass (Phase 17) the preview-first redesign (Phase 18) and its follow-up (Phase 19) are complete. Open items: AAB output, custom list
 item layouts and RecyclerView, measured performance work on a physical device, and a formal
 security review.

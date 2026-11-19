@@ -33,14 +33,16 @@ class ProjectStore(
         workspaceRoot.mkdirs()
     }
 
-    fun create(name: String, packageName: String, template: ProjectTemplate = ProjectTemplates.EmptyActivity): LoadResult.Loaded {
+    fun create(name: String, packageName: String, template: ProjectTemplate = ProjectTemplates.EmptyActivity, options: NewProjectOptions = NewProjectOptions()): LoadResult.Loaded {
         val now = clock.now()
         val manifest = ProjectManifest(
             id = ids.newId(),
             name = name.trim(),
             createdAt = now,
             updatedAt = now,
-            app = AppConfig(packageName = packageName.trim(), language = template.language, namespace = packageName.trim()),
+            app = AppConfig(packageName = packageName.trim(), language = template.language, namespace = packageName.trim())
+                .let { if (options.appCompat) AppCompat.set(it, true) else it }
+                .copy(versionCode = options.versionCode, versionName = options.versionName, minSdk = options.minSdk, colors = options.colors),
             modules = listOf(template.module),
         )
         val issues = ProjectValidation.validate(manifest)
@@ -53,6 +55,8 @@ class ProjectStore(
             File(staging, ProjectFormat.INTERNAL_DIR).mkdirs()
             writeManifestAtomically(staging, manifest)
             template.generate(staging, manifest)
+            // Screens a template wrote for the framework Activity follow the AppCompat choice.
+            if (manifest.app.appCompat) AppCompatSources.sync(staging, manifest)
             if (!staging.renameTo(dir)) throw IOException("Could not move new project into place: $dir")
         } catch (t: Throwable) {
             staging.deleteRecursively()

@@ -38,9 +38,28 @@ data class AppConfig(
     val permissions: List<String> = emptyList(),
     /** AndroidX AppCompat and Material Components on (Library Manager switch): see [AppCompat]. */
     val appCompat: Boolean = false,
+    /** Theme colours chosen when the project was created (null: the platform theme's own colours). */
+    val colors: ThemeColors? = null,
 ) {
     val effectiveNamespace: String get() = namespace ?: packageName
 }
+
+/** The app's theme colours, `#AARRGGBB`, written to res/values/colors.xml and used by the theme. */
+@Serializable
+data class ThemeColors(
+    val primary: String = "#FF3F51B5",
+    val primaryDark: String = "#FF303F9F",
+    val accent: String = "#FFFF4081",
+)
+
+/** Settings chosen before a project is created (like Sketchware's new-project screen). */
+data class NewProjectOptions(
+    val versionCode: Int = 1,
+    val versionName: String = "1.0",
+    val minSdk: Int = 24,
+    val appCompat: Boolean = false,
+    val colors: ThemeColors? = null,
+)
 
 /** A library added to the project. Disabled libraries stay listed but are not built or bundled. */
 @Serializable

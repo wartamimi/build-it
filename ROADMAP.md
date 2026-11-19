@@ -26,6 +26,7 @@ are updated (§19). Status details are in [DEVELOPMENT_STATUS.md](DEVELOPMENT_ST
 | 16 | Simple app templates for new projects; integration: emulator tests per phase, performance pass, docs, final signed APK | Done: six app templates in Java and Kotlin (each built in tests, the Java ones run on the emulator), baseline profile, release 0.16.0 |
 | 17 | Look and feel closer to Sketchware (owner request): compact widget palette with presets and drawings, device chrome in the preview, lighter property bar; block shapes with notches, category colours, side drawer, drop preview | Done, release 0.17.0 |
 | 18 | "Preview first" redesign (owner request, direction F of the mockups): warm theme, round widget dock, action bubble on the selected view, events as cards per source with chips, blocks drawer with search and category bubbles | Done, release 0.18.0 |
+| 19 | Owner feedback on 0.18.0: Sketchware-style Events tab, full-screen editor per event, fixed event blocks, long-press drag, compact toolbars, side widget column, filled selection, new-project settings, line icons | Done, release 0.19.0 |
 
 ## Phase 1 implementation plan (as executed)
 

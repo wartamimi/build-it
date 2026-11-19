@@ -185,7 +185,7 @@ fun ProjectsScreen(
     if (showCreate) {
         CreateProjectSheet(
             validate = viewModel::validateNew,
-            onCreate = { n, pkg, t -> showCreate = false; viewModel.create(n, pkg, t) },
+            onCreate = { n, pkg, t, o -> showCreate = false; viewModel.create(n, pkg, t, o) },
             onDismiss = { showCreate = false },
         )
     }

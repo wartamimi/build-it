@@ -215,7 +215,7 @@ fun BuildItApp(container: AppContainer) {
                                     scope.showTab(EVENTS_TAB)
                                 })
                             }, icon = BiIcons.Widgets, key = DESIGN_TAB),
-                            WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_events_tab) }, content = { scope -> EventsScreen(blocks, onExit = scope.leave, request = eventsRequest) }, icon = BiIcons.Event, key = EVENTS_TAB),
+                            WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_events_tab) }, content = { scope -> EventsScreen(blocks, onExit = scope.leave, request = eventsRequest, onFullScreen = scope.fullScreen) }, icon = BiIcons.Event, key = EVENTS_TAB),
                             WorkspaceExtraTab(title = { stringResource(BlocksR.string.bk_components_tab) }, content = { ComponentsScreen(blocks) }, icon = BiIcons.Component, key = COMPONENTS_TAB),
                             // Project tools (drawer)
                             WorkspaceExtraTab(

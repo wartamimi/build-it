@@ -1,5 +1,17 @@
 Build It for Android 8.0 and newer.
 
+New in 0.19.0 (owner feedback on 0.18.0): the Events tab is laid out like Sketchware's, with
+Activity, View, Component and More block on the left, the screen's events on the right and + to
+add one. Each event opens in its own full-screen editor, without the tabs, the tools menu or the
+run bar, and shows only that event and loose blocks. Event blocks (when screen is created, ...)
+stay in place; other blocks move only after a long press, and blocks are added from the drawer
+with a long press (drag them onto the canvas). Shorter toolbars: preview options and zoom moved
+into menus. The designer's "+" opens a narrow widget column beside the layout and turns into
+"×". A selected view is filled with a soft tint instead of outlined, and the preview keeps its
+size when a view is selected. New projects: choose the version, minimum Android version,
+AppCompat and Material, and the theme's main and accent colours before creating. New simple
+line icons.
+
 New in 0.18.0: a new look built around the preview, with warm colours and a brick-orange
 accent. The preview fills the designer; widgets sit in a round dock on its left (tap + to open the
 full list, or drag an icon onto the screen). Tap a view and a bubble next to it offers

@@ -57,7 +57,8 @@ class PreviewHost(context: Context) : ViewGroup(context) {
 
     private var dragging = false
     private val density = resources.displayMetrics.density
-    private val selPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2 * density; color = 0xFF2D57C0.toInt() }
+    /** The selected view is filled with a see-through tint (like Sketchware), not outlined. */
+    private val selPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = 0x552D7CF0 }
     private val hiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = 2 * density; color = 0xFFA63D0B.toInt()
         pathEffect = DashPathEffect(floatArrayOf(8 * density, 5 * density), 0f)

@@ -58,6 +58,7 @@ import dev.buildit.engine.blocks.BlockDocument
 import dev.buildit.engine.blocks.BlockOps
 import dev.buildit.engine.blocks.BlockRegistry
 import dev.buildit.engine.blocks.BlockShape
+import dev.buildit.engine.blocks.BlockStack
 import dev.buildit.engine.blocks.Slot
 import kotlin.math.hypot
 
@@ -131,6 +132,8 @@ fun BlockCanvas(
      * in a document (null: a new stack at the drop position).
      */
     onDropNew: (type: String, x: Float, y: Float, slotFor: (BlockDocument, List<Block>) -> Slot?) -> Unit = { _, _, _, _ -> },
+    /** Stacks to show (null: all). The event editor shows only its event and the loose stacks. */
+    showStack: ((BlockStack) -> Boolean)? = null,
 ) {
     val density = LocalDensity.current.density
     val painter = rememberBlockPainter()
@@ -146,8 +149,11 @@ fun BlockCanvas(
     val snapRadius = 40f * density
     val trashRadius = 36f * density
 
+    val show by rememberUpdatedState(showStack)
+    /** The laid-out stacks that are shown (hidden ones can't be hit or snapped to). */
+    fun laidOut(d: BlockDocument): List<LaidStack> = layout.layout(d).let { all -> show?.let { f -> all.filter { f(d.stacks[it.index]) } } ?: all }
     val shown = drag?.base ?: document
-    val stacks = remember(shown, layout) { layout.layout(shown) }
+    val stacks = remember(shown, layout, showStack) { laidOut(shown) }
     val surface = MaterialTheme.colorScheme.surfaceContainerLow
     val grid = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
     val selection = MaterialTheme.colorScheme.primary
@@ -161,7 +167,7 @@ fun BlockCanvas(
 
     /** Nearest compatible slot for [chain] whose origin is at [origin], within the snap radius. */
     fun snap(base: BlockDocument, chain: List<Block>?, shape: BlockShape, origin: Offset): SnapTarget? =
-        if (shape == BlockShape.Hat) null else layout.targets(layout.layout(base), shape)
+        if (shape == BlockShape.Hat) null else layout.targets(laidOut(base), shape)
             .filter { chain == null || BlockOps.canInsert(base, chain, it.slot) }
             .minByOrNull { hypot(it.x - origin.x, it.y - origin.y) }
             ?.takeIf { hypot(it.x - origin.x, it.y - origin.y) < snapRadius / canvas.zoom.coerceAtMost(1f) }
@@ -244,11 +250,45 @@ fun BlockCanvas(
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     val startWorld = canvas.toWorld(down.position)
-                    val current = layout.layout(doc)
+                    val current = laidOut(doc)
                     val hit = layout.hit(current, startWorld.x, startWorld.y)
                     var moved = false
                     var zooming = false
                     var last = down.position
+                    fun tap() {
+                        if (hit == null) select(null) else {
+                            val field = layout.fieldAt(hit, startWorld.x, startWorld.y)
+                            if (field != null) fieldTap(hit.block, field.name) else select(hit.block.id)
+                        }
+                    }
+                    // Blocks move only after a long press, like Sketchware; event blocks (hats) stay put.
+                    // Moving the finger earlier pans the canvas instead.
+                    if (hit != null && !hit.hat) {
+                        val early = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                            var e: androidx.compose.ui.input.pointer.PointerEvent
+                            do {
+                                e = awaitPointerEvent()
+                                val ps = e.changes.filter { it.pressed }
+                            } while (ps.size == 1 && (ps.first().position - down.position).getDistance() <= touchSlop)
+                            e
+                        }
+                        if (early == null) {
+                            val (base, chain) = BlockOps.detach(doc, hit.block.id)
+                            val origin = Offset(hit.box.left, hit.box.top)
+                            drag = Drag(doc, base, chain, startWorld - origin).also { it.origin = origin; it.pointer = down.position }
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            select(hit.block.id)
+                        } else {
+                            val ps = early.changes.filter { it.pressed }
+                            early.changes.forEach { it.consume() }
+                            when {
+                                ps.isEmpty() -> { tap(); return@awaitEachGesture }
+                                ps.size > 1 -> zooming = true
+                                else -> { moved = true; canvas.pan += ps.first().position - down.position; last = ps.first().position }
+                            }
+                        }
+                    }
+                    var dragMoved = false
                     while (true) {
                         val event = awaitPointerEvent()
                         val pressed = event.changes.filter { it.pressed }
@@ -261,24 +301,12 @@ fun BlockCanvas(
                             canvas.pan += pressed.map { it.positionChange() }.reduce { a, b -> a + b } / pressed.size.toFloat()
                         } else if (!zooming) {
                             val p = pressed.first().position
-                            if (!moved && (p - down.position).getDistance() > touchSlop) {
-                                moved = true
-                                if (hit != null) {
-                                    // Start dragging the block (and the statements below it).
-                                    val (base, chain) = BlockOps.detach(doc, hit.block.id)
-                                    val origin = Offset(hit.box.left, hit.box.top + if (hit.hat) 0f else 0f)
-                                    drag = Drag(doc, base, chain, startWorld - origin).also { it.origin = origin }
-                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    select(hit.block.id)
-                                }
-                            }
-                            if (moved) {
-                                val d = drag
-                                if (d != null) {
-                                    moveDrag(d, p)
-                                } else {
-                                    canvas.pan += p - last
-                                }
+                            val d = drag
+                            if (d != null) {
+                                if (dragMoved || (p - down.position).getDistance() > touchSlop) { dragMoved = true; moveDrag(d, p) }
+                            } else {
+                                if (!moved && (p - down.position).getDistance() > touchSlop) moved = true
+                                if (moved) canvas.pan += p - last
                             }
                             last = p
                         }
@@ -286,19 +314,17 @@ fun BlockCanvas(
                     }
                     val d = drag
                     if (d != null) {
-                        val result = when {
-                            d.overTrash -> d.base
-                            d.target != null -> BlockOps.insert(d.base, d.chain, d.target!!.slot, d.origin.x + 24f to d.origin.y + 24f)
-                            else -> BlockOps.addStack(d.base, d.chain, d.origin.x, d.origin.y)
-                        }
                         drag = null
-                        commit(d.original, result)
-                    } else if (!moved && !zooming) {
-                        if (hit == null) select(null) else {
-                            val field = layout.fieldAt(hit, startWorld.x, startWorld.y)
-                            if (field != null) fieldTap(hit.block, field.name) else select(hit.block.id)
+                        // A long press without moving only selects the block.
+                        if (dragMoved) {
+                            val result = when {
+                                d.overTrash -> d.base
+                                d.target != null -> BlockOps.insert(d.base, d.chain, d.target!!.slot, d.origin.x + 24f to d.origin.y + 24f)
+                                else -> BlockOps.addStack(d.base, d.chain, d.origin.x, d.origin.y)
+                            }
+                            commit(d.original, result)
                         }
-                    }
+                    } else if (!moved && !zooming) tap()
                 }
             },
     ) {

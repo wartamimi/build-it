@@ -17,6 +17,8 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -47,7 +49,8 @@ class UiDeviceTest {
         compose.onNodeWithText("Show blocks", useUnmergedTree = true).performClick()
         compose.onNodeWithText("App").performScrollTo().performClick()
         compose.onNodeWithTag(PALETTE_TAG).performScrollToNode(hasText("close this screen"))
-        compose.onNodeWithText("close this screen").performClick()
+        // Blocks are added with a long press (the accessibility action adds after the selection).
+        compose.onNodeWithText("close this screen").performSemanticsAction(SemanticsActions.OnLongClick)
         compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Save").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Save").performClick()
         val dir = File(compose.activity.filesDir, "workspace").listFiles().orEmpty().first { File(it, "buildit.json").readText().contains(name) }

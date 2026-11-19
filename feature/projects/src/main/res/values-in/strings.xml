@@ -67,4 +67,12 @@
     <string name="projects_template_stopwatch_desc">Mulai, berhenti dan reset dengan komponen timer</string>
     <string name="projects_template_dice">Dadu</string>
     <string name="projects_template_dice_desc">Angka acak dan jumlah lemparan</string>
+    <string name="projects_field_version_code">Kode versi</string>
+    <string name="projects_field_version_name">Nama versi</string>
+    <string name="projects_field_min_sdk">Versi Android minimum</string>
+    <string name="projects_field_appcompat">AppCompat dan Material</string>
+    <string name="projects_appcompat_hint">AndroidX AppCompat dan Material Components (perlu untuk widget Material). Bisa diubah nanti di Pustaka.</string>
+    <string name="projects_field_colors">Warna tema</string>
+    <string name="projects_color_primary">Warna utama</string>
+    <string name="projects_color_accent">Warna aksen</string>
 </resources>

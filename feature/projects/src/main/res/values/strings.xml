@@ -67,4 +67,12 @@
     <string name="projects_template_stopwatch_desc">Start, stop and reset with a timer component</string>
     <string name="projects_template_dice">Dice</string>
     <string name="projects_template_dice_desc">Random numbers and a roll count</string>
+    <string name="projects_field_version_code">Version code</string>
+    <string name="projects_field_version_name">Version name</string>
+    <string name="projects_field_min_sdk">Minimum Android version</string>
+    <string name="projects_field_appcompat">AppCompat and Material</string>
+    <string name="projects_appcompat_hint">AndroidX AppCompat and Material Components (needed for Material widgets). Can be changed later in Libraries.</string>
+    <string name="projects_field_colors">Theme colours</string>
+    <string name="projects_color_primary">Main colour</string>
+    <string name="projects_color_accent">Accent colour</string>
 </resources>

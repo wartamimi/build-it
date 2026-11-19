@@ -123,7 +123,8 @@ fun WorkspaceScreen(
         val i = allTabs.indexOfFirst { it.key == key }
         if (i >= 0) selected = i
     }
-    val tabScope = WorkspaceTabScope(leave, openInTab, showTab)
+    var fullScreen by remember { mutableStateOf(false) }
+    val tabScope = WorkspaceTabScope(leave, openInTab, showTab, fullScreen = { fullScreen = it })
 
     ModalNavigationDrawer(
         drawerState = drawer,
@@ -151,7 +152,7 @@ fun WorkspaceScreen(
     ) {
         Scaffold(
             topBar = {
-                BiTopBar(
+                if (!fullScreen) BiTopBar(
                     title = if (onTool) allTabs[current].title() else state.project?.manifest?.name ?: stringResource(R.string.ws_title),
                     subtitle = if (onTool) state.project?.manifest?.name else state.project?.manifest?.app?.packageName,
                     // Route through the back dispatcher so a tab (e.g. the designer) can finish its work first.
@@ -162,7 +163,7 @@ fun WorkspaceScreen(
                     },
                 )
             },
-            bottomBar = { if (!onTool && !state.loading && state.error == null) bottomBar?.invoke(tabScope) },
+            bottomBar = { if (!fullScreen && !onTool && !state.loading && state.error == null) bottomBar?.invoke(tabScope) },
             snackbarHost = { SnackbarHost(snackbar) },
         ) { padding ->
             Column(Modifier.padding(padding).fillMaxSize()) {
@@ -170,7 +171,7 @@ fun WorkspaceScreen(
                     state.loading -> BiLoadingState()
                     state.error != null -> BiErrorState(stringResource(R.string.ws_open_failed), state.error!!, retryLabel = stringResource(R.string.ws_retry), onRetry = { viewModel.load() })
                     else -> {
-                        if (!onTool && primary.size > 1) {
+                        if (!fullScreen && !onTool && primary.size > 1) {
                             PrimaryTabRow(selectedTabIndex = primary.indexOf(current)) {
                                 primary.forEach { i ->
                                     val t = allTabs[i]
@@ -217,7 +218,13 @@ fun WorkspaceScreen(
  * What a contributed tab can ask of the workspace: [leave] it (after finishing its own work), or
  * [openFile] in whichever tab opens that file (returns false if none can), or [showTab] by its key.
  */
-class WorkspaceTabScope(val leave: () -> Unit, val openFile: (path: String) -> Boolean, val showTab: (key: String) -> Unit = {})
+class WorkspaceTabScope(
+    val leave: () -> Unit,
+    val openFile: (path: String) -> Boolean,
+    val showTab: (key: String) -> Unit = {},
+    /** True hides the workspace's title bar, tabs and bottom bar (e.g. while one event is edited). */
+    val fullScreen: (Boolean) -> Unit = {},
+)
 
 /** A tab contributed by another feature (e.g. the designer). Extra tabs come first. */
 class WorkspaceExtraTab(

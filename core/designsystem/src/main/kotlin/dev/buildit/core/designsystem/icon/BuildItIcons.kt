@@ -1,21 +1,5 @@
 package dev.buildit.core.designsystem.icon
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -24,23 +8,79 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
-/** Icon set for Build It. Material core icons plus a few custom glyphs drawn on a 24dp grid. */
+/** Icon set for Build It: simple line icons drawn on one 24dp grid with rounded ends. */
 object BiIcons {
-    val Home = Icons.Filled.Home
-    val Projects = Icons.AutoMirrored.Filled.List
-    val Settings = Icons.Filled.Settings
-    val Back = Icons.AutoMirrored.Filled.ArrowBack
-    val Add = Icons.Filled.Add
-    val Build = Icons.Filled.Build
-    val Delete = Icons.Filled.Delete
-    val Edit = Icons.Filled.Edit
-    val Info = Icons.Filled.Info
-    val More = Icons.Filled.MoreVert
-    val Refresh = Icons.Filled.Refresh
-    val Search = Icons.Filled.Search
-    val Share = Icons.Filled.Share
-    val Close = Icons.Filled.Close
-    val Check = Icons.Filled.Check
+    // Line icons drawn on one 24dp grid with rounded ends, so every icon has the same light look.
+
+    val Home: ImageVector by lazy {
+        outline("Home") {
+            moveTo(3.5f, 11f); lineTo(12f, 4f); lineTo(20.5f, 11f)
+            moveTo(6f, 9.5f); lineTo(6f, 19f); quadTo(6f, 20f, 7f, 20f); lineTo(17f, 20f); quadTo(18f, 20f, 18f, 19f); lineTo(18f, 9.5f)
+            moveTo(10f, 20f); lineTo(10f, 15f); lineTo(14f, 15f); lineTo(14f, 20f)
+        }
+    }
+    val Projects: ImageVector by lazy {
+        outline("Projects") {
+            moveTo(9f, 6f); lineTo(20f, 6f); moveTo(9f, 12f); lineTo(20f, 12f); moveTo(9f, 18f); lineTo(20f, 18f)
+            moveTo(4.5f, 6f); lineTo(4.51f, 6f); moveTo(4.5f, 12f); lineTo(4.51f, 12f); moveTo(4.5f, 18f); lineTo(4.51f, 18f)
+        }
+    }
+    val Settings: ImageVector by lazy {
+        outline("Settings") {
+            circle(12f, 12f, 3f)
+            circle(12f, 12f, 6.5f)
+            for (i in 0 until 8) {
+                val a = Math.toRadians(i * 45.0)
+                moveTo(12f + 6.5f * kotlin.math.cos(a).toFloat(), 12f + 6.5f * kotlin.math.sin(a).toFloat())
+                lineTo(12f + 9f * kotlin.math.cos(a).toFloat(), 12f + 9f * kotlin.math.sin(a).toFloat())
+            }
+        }
+    }
+    val Back: ImageVector by lazy { outline("Back") { moveTo(19f, 12f); lineTo(5f, 12f); moveTo(11f, 6f); lineTo(5f, 12f); lineTo(11f, 18f) } }
+    val Add: ImageVector by lazy { outline("Add", 2f) { moveTo(12f, 5f); lineTo(12f, 19f); moveTo(5f, 12f); lineTo(19f, 12f) } }
+    val Build: ImageVector by lazy {
+        outline("Build") {
+            // A hammer
+            moveTo(4f, 6.5f); lineTo(13f, 6.5f); lineTo(15.5f, 9f); lineTo(4f, 9f); close()
+            moveTo(9f, 9f); lineTo(9f, 20f)
+            moveTo(13f, 6.5f); lineTo(13f, 4.5f)
+        }
+    }
+    val Delete: ImageVector by lazy {
+        outline("Delete") {
+            moveTo(4f, 7f); lineTo(20f, 7f)
+            moveTo(9f, 7f); lineTo(9f, 4.5f); lineTo(15f, 4.5f); lineTo(15f, 7f)
+            moveTo(6f, 7f); lineTo(7f, 19f); quadTo(7.1f, 20f, 8f, 20f); lineTo(16f, 20f); quadTo(16.9f, 20f, 17f, 19f); lineTo(18f, 7f)
+            moveTo(10f, 11f); lineTo(10f, 16f); moveTo(14f, 11f); lineTo(14f, 16f)
+        }
+    }
+    val Edit: ImageVector by lazy {
+        outline("Edit") {
+            moveTo(4f, 20f); lineTo(4.5f, 16f); lineTo(15.5f, 5f); quadTo(17f, 3.5f, 18.5f, 5f); lineTo(19f, 5.5f); quadTo(20.5f, 7f, 19f, 8.5f); lineTo(8f, 19.5f); close()
+            moveTo(13.5f, 7f); lineTo(17f, 10.5f)
+        }
+    }
+    val Info: ImageVector by lazy {
+        outline("Info") { circle(12f, 12f, 9f); moveTo(12f, 11f); lineTo(12f, 16.5f); moveTo(12f, 7.75f); lineTo(12.01f, 7.75f) }
+    }
+    val More: ImageVector by lazy {
+        outline("More", 2.6f) { moveTo(12f, 5.5f); lineTo(12.01f, 5.5f); moveTo(12f, 12f); lineTo(12.01f, 12f); moveTo(12f, 18.5f); lineTo(12.01f, 18.5f) }
+    }
+    val Refresh: ImageVector by lazy {
+        outline("Refresh") {
+            moveTo(19.5f, 12f); arcTo(7.5f, 7.5f, 0f, true, true, 17f, 6.4f)
+            moveTo(17.5f, 3f); lineTo(17.5f, 7f); lineTo(13.5f, 7f)
+        }
+    }
+    val Search: ImageVector by lazy { outline("Search") { circle(10.5f, 10.5f, 6f); moveTo(15f, 15f); lineTo(20f, 20f) } }
+    val Share: ImageVector by lazy {
+        outline("Share") {
+            circle(17.5f, 5.5f, 2.5f); circle(6.5f, 12f, 2.5f); circle(17.5f, 18.5f, 2.5f)
+            moveTo(8.7f, 10.7f); lineTo(15.3f, 6.8f); moveTo(8.7f, 13.3f); lineTo(15.3f, 17.2f)
+        }
+    }
+    val Close: ImageVector by lazy { outline("Close", 2f) { moveTo(6f, 6f); lineTo(18f, 18f); moveTo(18f, 6f); lineTo(6f, 18f) } }
+    val Check: ImageVector by lazy { outline("Check", 2f) { moveTo(5f, 12.5f); lineTo(10f, 17.5f); lineTo(19f, 7f) } }
 
     /** Folder outline. */
     val Folder: ImageVector by lazy {
@@ -303,6 +343,10 @@ object BiIcons {
     /** Clock face: time. */
     val Clock: ImageVector by lazy {
         outline("Clock") { moveTo(21f, 12f); arcTo(9f, 9f, 0f, true, true, 3f, 12f); arcTo(9f, 9f, 0f, true, true, 21f, 12f); moveTo(12f, 7f); lineTo(12f, 12f); lineTo(15f, 14f) }
+    }
+
+    private fun androidx.compose.ui.graphics.vector.PathBuilder.circle(cx: Float, cy: Float, r: Float) {
+        moveTo(cx + r, cy); arcTo(r, r, 0f, false, false, cx - r, cy); arcTo(r, r, 0f, false, false, cx + r, cy); close()
     }
 
     private fun outline(name: String, stroke: Float = 1.8f, block: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit): ImageVector =

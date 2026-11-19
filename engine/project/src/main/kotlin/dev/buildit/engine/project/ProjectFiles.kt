@@ -122,7 +122,7 @@ object ManifestSync {
         // themes.xml first: the manifest refers to its window styles only when they are there.
         val themesFile = File(projectDir, THEMES)
         val legacy = themesFile.isFile && !g.isTracked(THEMES) && themesFile.readText() == AndroidSources.LEGACY_THEMES
-        when (val r = g.write(THEMES, AndroidSources.themes(manifest.app.appCompat), force || legacy)) {
+        when (val r = g.write(THEMES, AndroidSources.themes(manifest.app.appCompat, manifest.app.colors), force || legacy)) {
             GeneratedFiles.WriteResult.Written -> written += THEMES
             GeneratedFiles.WriteResult.Unchanged -> Unit
             is GeneratedFiles.WriteResult.UserModified -> conflicts += r.path

@@ -22,6 +22,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import org.junit.Assert.assertTrue
@@ -71,6 +73,8 @@ class AppFlowTest {
         // Add a component from the library and save: the layout file on disk must change.
         val layout = File(workspace, "app/src/main/res/layout/activity_main.xml")
         // Phone layout: the widget palette sits beside the canvas.
+        // Phone layout: "+" opens the widget column beside the preview.
+        compose.onNodeWithContentDescription("Widgets").performClick()
         compose.onNodeWithTag(LIBRARY_TAG).performScrollToNode(hasText("Button"))
         compose.onAllNodesWithText("Button").onFirst().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Save").fetchSemanticsNodes().isNotEmpty() }
@@ -87,7 +91,8 @@ class AppFlowTest {
         compose.onNodeWithText("Show blocks", useUnmergedTree = true).performClick()
         compose.onNodeWithText("App").performScrollTo().performClick()
         compose.onNodeWithTag(PALETTE_TAG).performScrollToNode(hasText("close this screen"))
-        compose.onNodeWithText("close this screen").performClick()
+        // Blocks are added with a long press (the accessibility action adds after the selection).
+        compose.onNodeWithText("close this screen").performSemanticsAction(SemanticsActions.OnLongClick)
         compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Save").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Save").performClick()
         compose.waitUntil(10_000) { File(workspace, ".buildit/blocks/MainActivity.json").let { it.isFile && it.readText().contains("app_finish") } }

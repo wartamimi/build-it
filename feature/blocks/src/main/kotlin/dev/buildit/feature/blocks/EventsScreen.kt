@@ -106,46 +106,49 @@ class EventsRequest {
     var source by mutableStateOf<String?>(null)
 }
 
-/** One card of the Events tab: a thing that has events, with the events it can have. */
-internal data class EventSource(
-    val key: String,
-    val title: String,
-    val subtitle: String,
-    val icon: ImageVector,
-    val color: androidx.compose.ui.graphics.Color,
-    /** (type, fields) of every event this source can have. */
-    val candidates: List<Pair<String, Map<String, String>>>,
-    /** Stacks of the document that belong here. */
-    val entries: List<EventEntry>,
-)
-
-private fun matches(h: Block, type: String, fields: Map<String, String>) = h.type == type && fields.all { (k, v) -> h.field(k) == v }
-
 internal fun viewCandidates(v: dev.buildit.engine.blocks.ViewInfo): List<Pair<String, Map<String, String>>> =
     listOf("event_click" to mapOf("view" to v.id)) +
         (if (ViewFamilies.matches(ViewKind.Compound, v.tag)) listOf("event_checked" to mapOf("view" to v.id)) else emptyList()) +
         ViewEvents.specs.filter { ViewFamilies.matches(it.kind, v.tag) }.map { it.hat to mapOf("view" to v.id) }
 
+/** What an event belongs to, for the second line of its row: a view or component name, or the screen. */
+internal fun eventOwner(head: Block, activity: String?): String =
+    head.fields["view"] ?: Components.specs.firstNotNullOfOrNull { s -> head.fields[s.field]?.takeIf { s.events.any { it.hat == head.type } } }
+        ?: head.fields["name"] ?: activity.orEmpty()
+
 /**
- * The Events tab: one card per thing that has events (the screen, each view, each component),
- * each with a chip per event. A chip with a tick is already on the screen and opens the block
- * editor on it; a chip with + adds that event and opens it.
+ * The Events tab, laid out like Sketchware's: kinds of events on the left (Activity, View,
+ * Component, More block), the screen's events of that kind on the right, and + to add one.
+ * Tapping an event opens it in its own full-screen block editor.
  */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun EventsScreen(viewModel: BlocksViewModel, onExit: () -> Unit, request: EventsRequest? = null) {
+fun EventsScreen(
+    viewModel: BlocksViewModel,
+    onExit: () -> Unit,
+    request: EventsRequest? = null,
+    /** Called with true while an event is open, so the workspace can hide its tabs and bars. */
+    onFullScreen: (Boolean) -> Unit = {},
+) {
     var editing by rememberSaveable { mutableStateOf(false) }
     var focus by rememberSaveable { mutableStateOf<String?>(null) }
+    var section by rememberSaveable { mutableStateOf(EventSection.Screen) }
     var highlight by rememberSaveable { mutableStateOf<String?>(null) }
-    // A request from the designer: back to the list, on that source's card.
+    var adding by remember { mutableStateOf(false) }
+    // A request from the designer: back to the list, on that view's events (or the screen's).
     val asked = request?.source
     LaunchedEffect(asked) {
         if (asked != null) {
             editing = false
-            highlight = asked
+            section = if (asked == SCREEN_SOURCE) EventSection.Screen else EventSection.Views
+            highlight = asked.takeIf { it != SCREEN_SOURCE }
             request.source = null
             viewModel.refreshViews()
         }
+    }
+    val fullScreen by androidx.compose.runtime.rememberUpdatedState(onFullScreen)
+    androidx.compose.runtime.DisposableEffect(editing) {
+        fullScreen(editing)
+        onDispose { if (editing) fullScreen(false) }
     }
     if (editing) {
         BlocksScreen(viewModel, onExit, onBack = { editing = false }, focus = focus)
@@ -154,7 +157,6 @@ fun EventsScreen(viewModel: BlocksViewModel, onExit: () -> Unit, request: Events
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refreshViews() }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { viewModel.flush() } }
-    var naming by remember { mutableStateOf(false) }
     val open = { id: String -> focus = id; editing = true }
 
     when {
@@ -163,137 +165,155 @@ fun EventsScreen(viewModel: BlocksViewModel, onExit: () -> Unit, request: Events
         state.document == null -> BiEmptyState(BiIcons.Event, stringResource(R.string.bk_no_activities_title), stringResource(R.string.bk_no_activities_body))
         else -> {
             val doc = state.document!!
+            val entries = remember(doc) { eventEntries(doc) }
             val res = LocalContext.current.resources
-            val sources = remember(doc, state.views, res) { eventSources(doc, state.views, res) }
-            val list = androidx.compose.foundation.lazy.rememberLazyListState()
-            LaunchedEffect(highlight, sources) {
-                val i = sources.indexOfFirst { it.key == highlight }
-                if (i >= 0) list.animateScrollToItem(i)
+            // Opened from a view without events yet: offer that view's events right away.
+            LaunchedEffect(highlight, entries, state.views) {
+                val h = highlight ?: return@LaunchedEffect
+                if (state.views.any { it.id == h } && entries.none { it.section == EventSection.Views && it.head.field("view") == h }) adding = true
             }
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                state = list,
-                contentPadding = PaddingValues(Spacing.md, Spacing.md, Spacing.md, Spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                items(sources, key = { it.key }) { src ->
-                    SourceCard(
-                        src, highlighted = src.key == highlight, res = res,
-                        onOpen = open,
-                        onAdd = { type, fields -> viewModel.addEvent(type, fields)?.let(open) },
-                        onNewProcedure = if (src.key == EventSection.More.name) ({ naming = true }) else null,
-                    )
+            Box(Modifier.fillMaxSize()) {
+                Row(Modifier.fillMaxSize()) {
+                    SectionRail(section, entries, onSelect = { section = it; highlight = null })
+                    VerticalDivider()
+                    val shown = entries.filter { it.section == section }
+                    if (shown.isEmpty()) {
+                        BiEmptyState(BiIcons.Event, stringResource(R.string.bk_no_events_title), stringResource(R.string.bk_no_events_body), Modifier.weight(1f))
+                    } else {
+                        LazyColumn(
+                            Modifier.weight(1f).fillMaxHeight(),
+                            contentPadding = PaddingValues(Spacing.sm, Spacing.sm, Spacing.sm, 88.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            items(shown, key = { it.head.id }) { e ->
+                                EventRow(
+                                    e, eventTitle(e.head, res), eventOwner(e.head, state.activity),
+                                    highlighted = highlight != null && e.head.field("view") == highlight,
+                                    onClick = { open(e.head.id) },
+                                )
+                            }
+                        }
+                    }
                 }
-                if (state.views.isEmpty()) item(key = "hint") {
-                    Text(
-                        stringResource(R.string.bk_no_views),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(Spacing.sm),
-                    )
+                if (section != EventSection.Loose) {
+                    FloatingActionButton(onClick = { adding = true }, modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.lg)) {
+                        Icon(BiIcons.Add, stringResource(R.string.bk_add_event))
+                    }
                 }
             }
-            if (naming) ProcedureDialog(onDismiss = { naming = false }) { name ->
-                naming = false
-                viewModel.addEvent("proc_define", mapOf("name" to name))?.let(open)
+            if (adding) AddEventDialog(section, state, doc, res, onlyView = highlight, onDismiss = { adding = false; highlight = null }) { type, fields ->
+                adding = false
+                val existing = entries.firstOrNull { it.head.type == type && fields.all { (k, v) -> it.head.field(k) == v } }
+                if (existing != null) open(existing.head.id) else viewModel.addEvent(type, fields)?.let(open)
             }
         }
     }
 }
 
-/** The cards of the Events tab, in order: screen, views, components, procedures, leftovers. */
-internal fun eventSources(doc: BlockDocument, views: List<dev.buildit.engine.blocks.ViewInfo>, res: android.content.res.Resources): List<EventSource> {
-    val entries = eventEntries(doc)
-    val used = mutableSetOf<String>()
-    fun take(cands: List<Pair<String, Map<String, String>>>) =
-        entries.filter { e -> e.head.id !in used && cands.any { (t, f) -> matches(e.head, t, f) } }.also { l -> l.forEach { used += it.head.id } }
-    val out = mutableListOf<EventSource>()
-    val screen = EventSection.Screen.types.map { it to emptyMap<String, String>() }
-    out += EventSource(SCREEN_SOURCE, res.getString(R.string.bk_section_screen), res.getString(R.string.bk_source_screen), BiIcons.Screens, categoryColor(BlockCategory.Events), screen, take(screen))
-    views.forEach { v ->
-        val c = viewCandidates(v)
-        out += EventSource(v.id, v.id, v.tag.substringAfterLast('.'), BiIcons.Widgets, categoryColor(BlockCategory.Components), c, take(c))
+/** The kinds of events, as a narrow list on the left. */
+@Composable
+private fun SectionRail(selected: EventSection, entries: List<EventEntry>, onSelect: (EventSection) -> Unit) {
+    Column(Modifier.width(112.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainer).verticalScroll(rememberScrollState()).padding(vertical = Spacing.xs)) {
+        EventSection.entries.forEach { s ->
+            val count = entries.count { it.section == s }
+            if (s == EventSection.Loose && count == 0) return@forEach
+            val on = s == selected
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (on) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent)
+                    .clickable { onSelect(s) }
+                    .padding(horizontal = 10.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(s.label), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f),
+                    fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                )
+                if (count > 0) Text("$count", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
-    doc.components.forEach { comp ->
-        val spec = Components.spec(comp.type)
-        val c = spec.events.map { it.hat to mapOf(spec.field to comp.name) }
-        out += EventSource("comp:" + comp.name, comp.name, res.getString(componentLabel(comp.type)), componentIcon(comp.type), categoryColor(BlockCategory.Parts), c, take(c))
-    }
-    val more = entries.filter { it.head.id !in used && it.section == EventSection.More }.also { l -> l.forEach { used += it.head.id } }
-    out += EventSource(EventSection.More.name, res.getString(R.string.bk_section_more), res.getString(R.string.bk_source_more), BiIcons.Blocks, categoryColor(BlockCategory.Code), emptyList(), more)
-    // Events of views or components that are gone, and stacks without an event.
-    val rest = entries.filter { it.head.id !in used }
-    if (rest.isNotEmpty()) out += EventSource(EventSection.Loose.name, res.getString(R.string.bk_section_loose), res.getString(R.string.bk_source_loose), BiIcons.Warning, categoryColor(BlockCategory.Variables), emptyList(), rest)
-    return out
 }
 
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+/** One event: a coloured icon, the event, and what it belongs to. */
 @Composable
-private fun SourceCard(
-    src: EventSource,
-    highlighted: Boolean,
+private fun EventRow(e: EventEntry, title: String, owner: String, highlighted: Boolean, onClick: () -> Unit) {
+    val color = categoryColor(BlockRegistry.find(e.head.type)?.category ?: BlockCategory.Code)
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        border = androidx.compose.foundation.BorderStroke(if (highlighted) 2.dp else 1.dp, if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(horizontal = Spacing.sm, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(34.dp).background(color, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                Icon(if (e.section == EventSection.More) BiIcons.Blocks else BiIcons.Event, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
+            }
+            Column(Modifier.weight(1f).padding(horizontal = Spacing.sm)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    owner + " · " + stringResource(R.string.bk_event_blocks, e.blockCount) + if (e.head.disabled) " · " + stringResource(R.string.bk_disable) else "",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddEventDialog(
+    section: EventSection,
+    state: BlocksUiState,
+    doc: BlockDocument,
     res: android.content.res.Resources,
-    onOpen: (String) -> Unit,
+    /** Only this view's events (opened from the designer). */
+    onlyView: String? = null,
+    onDismiss: () -> Unit,
     onAdd: (String, Map<String, String>) -> Unit,
-    onNewProcedure: (() -> Unit)?,
 ) {
-    Card(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        border = if (highlighted) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-    ) {
-        Column(Modifier.padding(Spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(36.dp).background(src.color, androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
-                    Icon(src.icon, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(20.dp))
-                }
-                Column(Modifier.padding(start = Spacing.md).weight(1f)) {
-                    Text(src.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(src.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            androidx.compose.foundation.layout.FlowRow(
-                Modifier.fillMaxWidth().padding(top = Spacing.sm),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                // Events already on the screen first, then the ones that can be added.
-                src.entries.forEach { e -> EventChip(eventTitle(e.head, res), added = true, color = src.color, blocks = e.blockCount) { onOpen(e.head.id) } }
-                src.candidates.filter { (t, f) -> src.entries.none { matches(it.head, t, f) } }.forEach { (t, f) ->
-                    EventChip(eventTitle(Block("", t, f), res), added = false, color = src.color) { onAdd(t, f) }
-                }
-                onNewProcedure?.let { EventChip(stringResource(R.string.bk_new_procedure), added = false, color = src.color, onClick = it) }
-            }
+    val candidates: List<Pair<String, Map<String, String>>> = when (section) {
+        EventSection.Screen -> section.types.map { it to emptyMap() }
+        EventSection.Views -> state.views.filter { onlyView == null || it.id == onlyView }.flatMap(::viewCandidates)
+        EventSection.Components -> doc.components.flatMap { c ->
+            val spec = Components.spec(c.type)
+            spec.events.map { it.hat to mapOf(spec.field to c.name) }
         }
+        EventSection.More, EventSection.Loose -> emptyList()
     }
-}
-
-/** An event as a chip: filled with a tick when the screen has it, outlined with + when it can be added. */
-@Composable
-private fun EventChip(title: String, added: Boolean, color: androidx.compose.ui.graphics.Color, blocks: Int = 0, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(16.dp)
-    Row(
-        Modifier
-            .clip(shape)
-            .then(if (added) Modifier.background(color.copy(alpha = 0.16f)) else Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape))
-            .clickable(onClick = onClick)
-            .padding(start = 8.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(if (added) BiIcons.Check else BiIcons.Add, null, Modifier.size(16.dp), tint = if (added) color else MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(
-            title,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (added) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 4.dp),
-        )
-        if (added && blocks > 0) {
-            Box(Modifier.padding(start = 6.dp).background(color, RoundedCornerShape(8.dp)).padding(horizontal = 5.dp)) {
-                Text("$blocks", style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White)
+    val existing = remember(doc) { eventEntries(doc).map { it.head } }
+    fun added(type: String, fields: Map<String, String>) = existing.any { h -> h.type == type && fields.all { (k, v) -> h.field(k) == v } }
+    var procName by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.bk_add_event)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (section == EventSection.More) {
+                    OutlinedTextField(procName, { procName = it.trim() }, label = { Text(stringResource(R.string.bk_procedure_name)) }, singleLine = true, textStyle = CodeTypography.body,
+                        isError = procName.isNotEmpty() && !Names.isIdentifier(procName))
+                } else if (candidates.isEmpty()) {
+                    Text(stringResource(if (section == EventSection.Views) R.string.bk_no_views else R.string.bk_no_components_of_type))
+                }
+                candidates.forEach { (type, fields) ->
+                    val already = added(type, fields)
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onAdd(type, fields) }.padding(vertical = Spacing.md, horizontal = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(if (already) BiIcons.Check else BiIcons.Add, null, Modifier.size(18.dp), tint = categoryColor(BlockCategory.Events))
+                        Text(eventTitle(Block("", type, fields), res), modifier = Modifier.weight(1f).padding(start = Spacing.md))
+                        if (already) Text(stringResource(R.string.bk_already_added), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
-        }
-    }
+        },
+        confirmButton = {
+            if (section == EventSection.More) {
+                TextButton(enabled = Names.isIdentifier(procName), onClick = { onAdd("proc_define", mapOf("name" to procName)) }) { Text(stringResource(R.string.bk_ok)) }
+            } else TextButton(onClick = onDismiss) { Text(stringResource(R.string.bk_cancel)) }
+        },
+        dismissButton = if (section == EventSection.More) ({ TextButton(onClick = onDismiss) { Text(stringResource(R.string.bk_cancel)) } }) else null,
+    )
 }
 
 /** The block's label with its field values filled in, e.g. "when button1 is clicked". */
@@ -306,21 +326,6 @@ internal fun eventTitle(b: Block, res: android.content.res.Resources): String {
             is MessagePart.Input -> "…"
         }
     }
-}
-
-@Composable
-private fun ProcedureDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
-    var procName by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.bk_new_procedure)) },
-        text = {
-            OutlinedTextField(procName, { procName = it.trim() }, label = { Text(stringResource(R.string.bk_procedure_name)) }, singleLine = true, textStyle = CodeTypography.body,
-                isError = procName.isNotEmpty() && !Names.isIdentifier(procName))
-        },
-        confirmButton = { TextButton(enabled = Names.isIdentifier(procName), onClick = { onCreate(procName) }) { Text(stringResource(R.string.bk_ok)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.bk_cancel)) } },
-    )
 }
 
 // ------------------------------------------------------------ components

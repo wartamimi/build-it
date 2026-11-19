@@ -11,8 +11,8 @@
     <string name="bk_saving">Saving…</string>
     <string name="bk_saved">Saved</string>
     <string name="bk_unsaved">Unsaved changes</string>
-    <string name="bk_canvas">Block canvas. Drag blocks to move or connect them; drag empty space to pan; pinch to zoom.</string>
-    <string name="bk_palette_hint">Tap a block to add it after the selected block, or to the canvas.</string>
+    <string name="bk_canvas">Block canvas. Long-press a block to move or connect it; event blocks stay in place; drag empty space to pan; pinch to zoom.</string>
+    <string name="bk_palette_hint">Long-press a block and drag it onto the canvas.</string>
     <string name="bk_code">Code</string>
     <string name="bk_problems">Problems (%1$d)</string>
     <string name="bk_no_problems">No problems found.</string>
@@ -164,10 +164,10 @@
     <string name="bk_cat_Parts">Components</string>
     <string name="bk_events_tab">Events</string>
     <string name="bk_components_tab">Components</string>
-    <string name="bk_section_screen">Screen</string>
-    <string name="bk_section_views">Views</string>
-    <string name="bk_section_components">Components</string>
-    <string name="bk_section_more">More blocks</string>
+    <string name="bk_section_screen">Activity</string>
+    <string name="bk_section_views">View</string>
+    <string name="bk_section_components">Component</string>
+    <string name="bk_section_more">More block</string>
     <string name="bk_section_loose">Loose blocks</string>
     <string name="bk_add_event">Add event</string>
     <string name="bk_no_events_title">No events here yet</string>
@@ -390,11 +390,8 @@
     <string name="bk_collection_invalid_name">Use letters, digits, spaces, _ . or - (up to 60)</string>
     <string name="bk_collection_remove">Remove from collection</string>
     <string name="bk_collection_empty">Select a block and tap the collection button to save it here.</string>
-    <string name="bk_source_screen">Opens, comes back, goes to the background, closes</string>
-    <string name="bk_source_more">Procedures: blocks you name and reuse</string>
-    <string name="bk_source_loose">Events of views or components that are gone, and stacks without an event</string>
-    <string name="bk_new_procedure">New procedure</string>
     <string name="bk_search_blocks">Search blocks</string>
     <string name="bk_search_clear">Clear search</string>
     <string name="bk_search_none">No blocks match</string>
+    <string name="bk_more_actions">More actions</string>
 </resources>

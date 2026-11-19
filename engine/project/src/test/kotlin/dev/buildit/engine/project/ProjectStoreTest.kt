@@ -45,6 +45,23 @@ class ProjectStoreTest {
         assertEquals(SourceLanguage.Kotlin, created.manifest.app.language)
     }
 
+    @Test fun createAppliesTheSettingsChosenBeforehand() {
+        val colors = ThemeColors("#FF009688", "#FF00796B", "#FFFFC107")
+        val created = store().create("Shop", "com.example.shop", options = NewProjectOptions(versionCode = 3, versionName = "0.3", minSdk = 26, appCompat = true, colors = colors))
+        val app = created.manifest.app
+        assertEquals(3, app.versionCode); assertEquals("0.3", app.versionName); assertEquals(26, app.minSdk)
+        assertTrue(app.appCompat)
+        assertTrue(app.dependencies.any { it.module == "androidx.appcompat:appcompat" && it.enabled })
+        assertEquals(colors, app.colors)
+        val res = File(created.directory, "app/src/main/res/values")
+        assertTrue(File(res, "colors.xml").readText().contains("<color name=\"colorPrimary\">#FF009688</color>"))
+        assertTrue(File(res, "themes.xml").readText().contains("<item name=\"colorPrimary\">@color/colorPrimary</item>"))
+        val main = File(created.directory, "app/src/main/java/com/example/shop/MainActivity.java").readText()
+        assertTrue(main, main.contains("AppCompatActivity"))
+        // Reloads with the same settings.
+        assertEquals(colors, (store().load(created.directory) as LoadResult.Loaded).manifest.app.colors)
+    }
+
     @Test fun createRejectsInvalidPackage() {
         try {
             store().create("App", "com.class.app")

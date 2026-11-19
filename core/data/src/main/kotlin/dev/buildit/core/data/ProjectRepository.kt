@@ -33,7 +33,7 @@ interface ProjectRepository {
     fun recentProjects(limit: Int = 5): Flow<List<ProjectSummary>>
     val projectCount: Flow<Int>
 
-    suspend fun create(name: String, packageName: String, template: ProjectTemplate = ProjectTemplates.EmptyActivity): ProjectSummary
+    suspend fun create(name: String, packageName: String, template: ProjectTemplate = ProjectTemplates.EmptyActivity, options: dev.buildit.engine.project.NewProjectOptions = dev.buildit.engine.project.NewProjectOptions()): ProjectSummary
     suspend fun open(id: String): OpenProject
     suspend fun updateManifest(id: String, transform: (ProjectManifest) -> ProjectManifest): ProjectManifest
 
@@ -73,8 +73,8 @@ class DefaultProjectRepository(
     override fun recentProjects(limit: Int): Flow<List<ProjectSummary>> = dao.observeRecent(limit).map { l -> l.map { it.toSummary() } }
     override val projectCount: Flow<Int> = dao.observeCount()
 
-    override suspend fun create(name: String, packageName: String, template: ProjectTemplate): ProjectSummary = io {
-        val created = store.create(name, packageName, template)
+    override suspend fun create(name: String, packageName: String, template: ProjectTemplate, options: dev.buildit.engine.project.NewProjectOptions): ProjectSummary = io {
+        val created = store.create(name, packageName, template, options)
         index(created.directory, created.manifest, lastOpened = null)
     }
 

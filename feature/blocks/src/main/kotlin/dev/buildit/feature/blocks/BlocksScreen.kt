@@ -91,6 +91,8 @@ import dev.buildit.engine.blocks.BlockCategory
 import dev.buildit.engine.blocks.BlockDef
 import dev.buildit.engine.blocks.BlockDiagnostic
 import dev.buildit.engine.blocks.BlockRegistry
+import dev.buildit.engine.blocks.BlockShape
+import androidx.compose.ui.semantics.onLongClick
 import dev.buildit.engine.blocks.FieldKind
 import dev.buildit.engine.blocks.MessagePart
 import dev.buildit.engine.blocks.ValueType
@@ -165,7 +167,9 @@ fun BlocksScreen(
                 state.error != null -> BiErrorState(stringResource(R.string.bk_open_failed), state.error!!, retryLabel = stringResource(R.string.bk_retry), onRetry = { viewModel.load(state.activity) })
                 state.document == null -> BiEmptyState(BiIcons.Widgets, stringResource(R.string.bk_no_activities_title), stringResource(R.string.bk_no_activities_body))
                 else -> {
-                    Toolbar(state, viewModel, canvas, onCode = { showCode = true }, onProblems = { showProblems = true }, onBack = onBack?.let { b -> { viewModel.flush(); b() } })
+                    val res = LocalContext.current.resources
+                    val title = if (onBack != null) focus?.let { state.document?.find(it) }?.let { eventTitle(it, res) } else null
+                    Toolbar(state, viewModel, canvas, onCode = { showCode = true }, onProblems = { showProblems = true }, onBack = onBack?.let { b -> { viewModel.flush(); b() } }, title = title)
                     StatusLine(state)
                     HorizontalDivider()
                     val errorIds = remember(state.diagnostics) { state.diagnostics.filter { it.severity == BlockDiagnostic.Severity.Error }.mapNotNull { it.blockId }.toSet() }
@@ -183,6 +187,11 @@ fun BlocksScreen(
                                     onDragCommit = viewModel::commitDrag,
                                     description = stringResource(R.string.bk_canvas),
                                     onDropNew = viewModel::drop,
+                                    // Opened on one event: show only that event and loose blocks, like a page per event.
+                                    showStack = if (onBack != null && focus != null) ({ st ->
+                                        val head = st.blocks.firstOrNull()
+                                        head == null || head.id == focus || BlockRegistry.find(head.type)?.shape != BlockShape.Hat
+                                    }) else null,
                                 )
                                 state.selectedId?.let { id -> SelectionBar(id, state, viewModel, canvas, Modifier.align(Alignment.TopEnd), onSave = { saveBlocks = id }) }
                             }
@@ -304,38 +313,47 @@ fun BlocksScreen(
     }
 }
 
+/** One compact row: back, the event (or screen), undo/redo, problems, a menu for the rest, save. */
 @Composable
-private fun Toolbar(state: BlocksUiState, vm: BlocksViewModel, canvas: BlockCanvasState, onCode: () -> Unit, onProblems: () -> Unit, onBack: (() -> Unit)?) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+private fun Toolbar(state: BlocksUiState, vm: BlocksViewModel, canvas: BlockCanvasState, onCode: () -> Unit, onProblems: () -> Unit, onBack: (() -> Unit)?, title: String?) {
+    Row(Modifier.fillMaxWidth().height(48.dp).padding(end = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
         if (onBack != null) BiIconButton(BiIcons.Back, stringResource(R.string.bk_back_to_events), onBack)
-        Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-            var menu by remember { mutableStateOf(false) }
-            if (onBack == null) Box {
-                TextButton(onClick = { menu = true }) { Text((state.activity ?: stringResource(R.string.bk_screen)) + " ▾") }
+        Box(Modifier.weight(1f).padding(start = if (onBack == null) Spacing.xs else 0.dp)) {
+            if (onBack != null) {
+                Text(title ?: state.activity.orEmpty(), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            } else {
+                var menu by remember { mutableStateOf(false) }
+                TextButton(onClick = { menu = true }) { Text((state.activity ?: stringResource(R.string.bk_screen)) + " ▾", maxLines = 1) }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     state.activities.forEach { a -> DropdownMenuItem(text = { Text(a) }, onClick = { menu = false; vm.load(a) }) }
                 }
             }
-            BiIconButton(BiIcons.Undo, stringResource(R.string.bk_undo), vm::undo, enabled = state.canUndo)
-            BiIconButton(BiIcons.Redo, stringResource(R.string.bk_redo), vm::redo, enabled = state.canRedo)
-            IconButton(onClick = { canvas.zoomBy(1f / 1.25f) }) { Text("−") }
-            TextButton(onClick = canvas::reset) { Text("${(canvas.zoom * 100).toInt()}%") }
-            IconButton(onClick = { canvas.zoomBy(1.25f) }) { Text("+") }
-            val errors = state.diagnostics.count { it.severity == BlockDiagnostic.Severity.Error }
-            val total = state.diagnostics.size
-            TextButton(onClick = onProblems) {
-                Icon(BiIcons.Warning, null, tint = if (errors > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(" " + stringResource(R.string.bk_problems, total))
+        }
+        BiIconButton(BiIcons.Undo, stringResource(R.string.bk_undo), vm::undo, enabled = state.canUndo)
+        BiIconButton(BiIcons.Redo, stringResource(R.string.bk_redo), vm::redo, enabled = state.canRedo)
+        val errors = state.diagnostics.count { it.severity == BlockDiagnostic.Severity.Error }
+        val total = state.diagnostics.size
+        if (total > 0) Box {
+            BiIconButton(BiIcons.Warning, stringResource(R.string.bk_problems, total), onProblems)
+            Box(
+                Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp).size(16.dp)
+                    .background(if (errors > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) { Text(if (total > 9) "9+" else "$total", color = MaterialTheme.colorScheme.onError, style = MaterialTheme.typography.labelSmall) }
+        }
+        var more by remember { mutableStateOf(false) }
+        Box {
+            BiIconButton(BiIcons.More, stringResource(R.string.bk_more_actions), { more = true })
+            DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.bk_zoom_in)) }, onClick = { canvas.zoomBy(1.25f) })
+                DropdownMenuItem(text = { Text(stringResource(R.string.bk_zoom_out)) }, onClick = { canvas.zoomBy(1f / 1.25f) })
+                DropdownMenuItem(text = { Text(stringResource(R.string.bk_zoom_reset) + " · ${(canvas.zoom * 100).toInt()}%") }, onClick = { more = false; canvas.reset() })
+                HorizontalDivider()
+                DropdownMenuItem(text = { Text(stringResource(R.string.bk_code)) }, leadingIcon = { Icon(BiIcons.Code, null) }, onClick = { more = false; onCode() })
+                DropdownMenuItem(text = { Text(stringResource(R.string.bk_problems, total)) }, leadingIcon = { Icon(BiIcons.Warning, null) }, onClick = { more = false; onProblems() })
             }
-            TextButton(onClick = onCode) { Text(stringResource(R.string.bk_code)) }
         }
-        val status = when {
-            state.saving -> stringResource(R.string.bk_saving)
-            state.dirty -> stringResource(R.string.bk_unsaved)
-            else -> stringResource(R.string.bk_saved)
-        }
-        Text(status, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
-            modifier = Modifier.padding(start = Spacing.sm).widthIn(max = 96.dp))
+        // Save: highlighted while there are unsaved changes.
         BiIconButton(BiIcons.Save, stringResource(R.string.bk_save), { vm.save() }, enabled = state.dirty && !state.saving)
     }
 }
@@ -343,7 +361,7 @@ private fun Toolbar(state: BlocksUiState, vm: BlocksViewModel, canvas: BlockCanv
 @Composable
 private fun StatusLine(state: BlocksUiState) {
     val (text, color) = when (val s = state.codeStatus) {
-        CodeStatus.UpToDate -> stringResource(R.string.bk_status_up_to_date) to MaterialTheme.colorScheme.onSurfaceVariant
+        CodeStatus.UpToDate -> return
         is CodeStatus.HasErrors -> stringResource(R.string.bk_status_errors, s.count) to MaterialTheme.colorScheme.error
         is CodeStatus.HandEdited -> stringResource(R.string.bk_status_hand_edited) to MaterialTheme.colorScheme.tertiary
         CodeStatus.Unknown -> return
@@ -559,15 +577,18 @@ private fun paletteText(def: BlockDef, res: android.content.res.Resources): Stri
 @Composable
 private fun PaletteBlock(def: BlockDef, text: String, sample: Block?, painter: BlockPainter, onClick: () -> Unit) {
     val dragSource = Modifier
-        // Long-press and drag onto the canvas to drop the block where it should go; tap to add it at the selection
+        // Long-press and drag onto the canvas to drop the block where it should go
         .dragAndDropSource { _ ->
             DragAndDropTransferData(
                 ClipData(ClipDescription("$PALETTE_CLIP_LABEL:${def.type}", arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN)), ClipData.Item(def.type)),
             )
         }
-        .clickable(onClick = onClick)
-        // The drawing has no text semantics of its own: describe the block for tests and screen readers
-        .semantics(mergeDescendants = true) { this.text = AnnotatedString(text) }
+        // Blocks are added by a long press (drag onto the canvas to place it); for screen readers
+        // the long-press action adds it after the selected block.
+        .semantics(mergeDescendants = true) {
+            this.text = AnnotatedString(text)
+            onLongClick { onClick(); true }
+        }
     if (sample != null) {
         Box(dragSource) { BlockPreview(sample, painter) }
     } else {
