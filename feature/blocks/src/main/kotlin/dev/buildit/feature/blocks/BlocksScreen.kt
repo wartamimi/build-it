@@ -9,8 +9,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.semantics
@@ -200,31 +200,38 @@ fun BlocksScreen(
                                 canvasView(Modifier.weight(1f).fillMaxHeight())
                             }
                         } else {
-                            // Phone: the canvas gets the whole screen; the blocks drawer slides in from the
-                            // right like Sketchware's, leaving the left of the canvas free to drop onto.
-                            val drawerWidth = minOf(maxWidth * 0.64f, 360.dp)
-                            Box(Modifier.fillMaxSize()) {
-                                canvasView(Modifier.fillMaxSize())
+                            // Phone: the blocks drawer slides up from the bottom, like Sketchware's: blocks on
+                            // the left, categories on the right, and the canvas keeps the space above it.
+                            Column(Modifier.fillMaxSize()) {
+                                Box(Modifier.weight(1f).fillMaxWidth()) {
+                                    canvasView(Modifier.fillMaxSize())
+                                    ExtendedFloatingActionButton(
+                                        onClick = { paletteOpen = !paletteOpen },
+                                        icon = { Icon(if (paletteOpen) BiIcons.Close else BiIcons.Blocks, null) },
+                                        text = { Text(stringResource(if (paletteOpen) R.string.bk_hide_palette else R.string.bk_show_palette)) },
+                                        expanded = !paletteOpen,
+                                        modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.md),
+                                    )
+                                }
                                 androidx.compose.animation.AnimatedVisibility(
                                     visible = paletteOpen,
-                                    enter = slideInHorizontally(tween(220)) { it } + fadeIn(tween(220)),
-                                    exit = slideOutHorizontally(tween(180)) { it } + fadeOut(tween(180)),
-                                    modifier = Modifier.align(Alignment.CenterEnd),
+                                    enter = expandVertically(tween(220), expandFrom = Alignment.Top) + fadeIn(tween(220)),
+                                    exit = shrinkVertically(tween(180), shrinkTowards = Alignment.Top) + fadeOut(tween(180)),
                                 ) {
                                     Surface(
-                                        shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
+                                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
                                         shadowElevation = 10.dp,
                                         color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                        modifier = Modifier.fillMaxHeight().width(drawerWidth),
-                                    ) { palette(Modifier.fillMaxSize()) }
+                                        modifier = Modifier.fillMaxWidth().height(panelHeight),
+                                    ) {
+                                        Column {
+                                            Box(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp), contentAlignment = Alignment.Center) {
+                                                Box(Modifier.width(36.dp).height(4.dp).background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.dp)))
+                                            }
+                                            palette(Modifier.fillMaxSize())
+                                        }
+                                    }
                                 }
-                                ExtendedFloatingActionButton(
-                                    onClick = { paletteOpen = !paletteOpen },
-                                    icon = { Icon(if (paletteOpen) BiIcons.Close else BiIcons.Blocks, null) },
-                                    text = { Text(stringResource(if (paletteOpen) R.string.bk_hide_palette else R.string.bk_show_palette)) },
-                                    expanded = !paletteOpen,
-                                    modifier = Modifier.align(Alignment.BottomStart).padding(Spacing.md),
-                                )
                             }
                         }
                     }
@@ -459,7 +466,7 @@ private fun CategoryTile(label: String, color: androidx.compose.ui.graphics.Colo
             .clip(RoundedCornerShape(8.dp))
             .background(if (selected) color.copy(alpha = 0.18f) else androidx.compose.ui.graphics.Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 7.dp),
+            .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(14.dp).background(color, RoundedCornerShape(3.dp)))
@@ -499,7 +506,7 @@ private fun PaletteBlock(def: BlockDef, text: String, sample: Block?, painter: B
         // The drawing has no text semantics of its own: describe the block for tests and screen readers
         .semantics(mergeDescendants = true) { this.text = AnnotatedString(text) }
     if (sample != null) {
-        Box(dragSource) { BlockPreview(sample, painter, scale = 0.9f) }
+        Box(dragSource) { BlockPreview(sample, painter) }
     } else {
         Box(
             Modifier.background(categoryColor(def.category), RoundedCornerShape(6.dp)).then(dragSource).heightIn(min = 40.dp).padding(horizontal = Spacing.md, vertical = Spacing.sm),

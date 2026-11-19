@@ -502,6 +502,8 @@ Done
   brighter colours per category.
 - Blocks drawer (phone): slides in from the right over the canvas with a colour tile per
   category; palette entries are real block drawings with their default inputs.
+- 0.17.1 (owner feedback): the phone blocks drawer slides up from the bottom instead of the
+  right, and blocks are drawn at 0.78 of their former size (11sp text).
 - Dragging blocks: the dragged chain is laid out once and moved (no re-layout per frame), a grey
   outline shows where it will land, a soft shadow under it, haptic ticks when it snaps.
 

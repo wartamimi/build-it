@@ -1,5 +1,8 @@
 Build It for Android 8.0 and newer.
 
+New in 0.17.1: the blocks drawer slides up from the bottom (blocks on the left, categories on
+the right) and blocks are smaller, at the same scale as the rest of the screen.
+
 New in 0.17.0: the designer and the block editor look and feel closer to Sketchware. The widget
 palette is a narrow column of short names with a drawing for each widget (Linear(H), Linear(V),
 Scroll(H), Scroll(V), Button, ...) under Layouts, Widgets, Lists & media and AndroidX; drag a

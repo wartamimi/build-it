@@ -331,7 +331,7 @@ fun BlockCanvas(
 
 /** A block's outline filled with one colour (drop preview, drag shadow). */
 private fun DrawScope.drawGhost(lb: LaidBlock, color: Color, hatCap: Float) {
-    val path = (lb.paintCache as? androidx.compose.ui.graphics.Path) ?: blockOutline(lb, density, hatCap).also { lb.paintCache = it }
+    val path = (lb.paintCache as? androidx.compose.ui.graphics.Path) ?: blockOutline(lb, hatCap / 12f, hatCap).also { lb.paintCache = it }
     drawPath(path, color)
     lb.valueChildren.values.forEach { drawGhost(it, color, hatCap) }
     lb.mouths.forEach { m -> m.blocks.forEach { drawGhost(it, color, hatCap) } }

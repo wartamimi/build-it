@@ -128,7 +128,7 @@ internal fun DrawScope.drawBlock(
     hatCap: Float,
     alpha: Float = 1f,
 ) {
-    val u = density
+    val u = hatCap / 12f // the layout unit (hatCap is 12 units)
     val def = lb.def
     val path = (lb.paintCache as? Path) ?: blockOutline(lb, u, hatCap).also { lb.paintCache = it }
     val literal = def?.type in literalTypes
@@ -178,6 +178,9 @@ internal fun DrawScope.drawBlock(
     lb.mouths.forEach { m -> m.blocks.forEach { drawBlock(it, measurer, style, selectedId, errorIds, selection, error, hatCap, alpha) } }
 }
 
+/** Size of blocks relative to the original 1.0 layout (0.17.0 and earlier). */
+const val BLOCK_SCALE = 0.78f
+
 /** Block geometry and text for one screen density and language, shared by the canvas and the palette. */
 class BlockPainter(val layout: BlockLayout, val measurer: TextMeasurer, val style: TextStyle)
 
@@ -188,11 +191,12 @@ fun rememberBlockPainter(): BlockPainter {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     return remember(measurer, density, configuration) {
-        val style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.White)
+        // Compact like Sketchware: blocks sit at the same scale as the rest of the screen
+        val style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White)
         val res = context.resources
         BlockPainter(
             BlockLayout(
-                density,
+                density * BLOCK_SCALE,
                 measure = { s -> measurer.measure(s, style).size.let { TextSize(it.width.toFloat(), it.height.toFloat()) } },
                 partsOf = { def -> localizedParts(def, res) },
                 labelOf = { l -> statementLabelRes(l)?.let(res::getString) ?: l },
